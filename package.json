@@ -1,0 +1,80 @@
+{
+  "name": "ai-commit-generator",
+  "version": "1.0.0",
+  "description": "A powerful, context-aware AI commit message generator",
+  "main": "src/index.js",
+  "bin": {
+    "aicommit": "./bin/aicommit.js",
+    "aic": "./bin/aic.js"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:simple": "node test.js",
+    "test:quick": "node test-quick.js",
+    "test:verbose": "VERBOSE_TESTS=1 jest --verbose",
+    "install:global": "node install.js",
+    "update:global": "node install.js --update",
+    "reinstall:global": "node install.js --reinstall",
+    "uninstall:global": "node install.js --uninstall",
+    "fix:install": "node install.js --fix",
+    "lint": "eslint src/",
+    "format": "prettier --write src/"
+  },
+  "keywords": [
+    "git",
+    "commit",
+    "ai",
+    "automation",
+    "cli",
+    "conventional-commits"
+  ],
+  "author": {
+    "name": "Barun Tayenjam",
+    "url": "https://github.com/baruntayenjam"
+  },
+  "contributors": [
+    {
+      "name": "RovoDev",
+      "url": "https://rovodev.com"
+    }
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.1.0",
+    "inquirer": "^8.2.6",
+    "ora": "^5.4.1",
+    "chalk": "^4.1.2",
+    "simple-git": "^3.20.0",
+    "git-raw-commits": "^4.0.0",
+    "conventional-commits-parser": "^5.0.0",
+    "openai": "^4.24.1",
+    "@anthropic-ai/sdk": "^0.17.1",
+    "@google/generative-ai": "^0.2.1",
+    "@mistralai/mistralai": "^0.1.3",
+    "cohere-ai": "^7.6.0",
+    "groq-sdk": "^0.3.3",
+    "cosmiconfig": "^8.3.6",
+    "rc": "^1.2.8",
+    "conf": "^10.2.0",
+    "axios": "^1.6.2",
+    "lodash": "^4.17.21",
+    "fs-extra": "^11.1.1",
+    "node-cache": "^5.1.2",
+    "semver": "^7.5.4",
+    "joi": "^17.11.0",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0"
+  }
+}

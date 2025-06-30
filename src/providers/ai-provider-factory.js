@@ -1,0 +1,222 @@
+/**
+ * AI Provider Factory - Creates AI provider instances
+ */
+
+const OpenAIProvider = require('./openai-provider');
+const AnthropicProvider = require('./anthropic-provider');
+const GeminiProvider = require('./gemini-provider');
+const MistralProvider = require('./mistral-provider');
+const CohereProvider = require('./cohere-provider');
+const GroqProvider = require('./groq-provider');
+const OllamaProvider = require('./ollama-provider');
+
+class AIProviderFactory {
+  /**
+   * Create an AI provider instance
+   */
+  static create(providerName) {
+    switch (providerName.toLowerCase()) {
+      case 'openai':
+        return new OpenAIProvider();
+      case 'anthropic':
+        return new AnthropicProvider();
+      case 'gemini':
+        return new GeminiProvider();
+      case 'mistral':
+        return new MistralProvider();
+      case 'cohere':
+        return new CohereProvider();
+      case 'groq':
+        return new GroqProvider();
+      case 'ollama':
+        return new OllamaProvider();
+      default:
+        throw new Error(`Unsupported AI provider: ${providerName}`);
+    }
+  }
+
+  /**
+   * Get list of available providers
+   */
+  static getAvailableProviders() {
+    return [
+      {
+        name: 'openai',
+        displayName: 'OpenAI',
+        description: 'GPT-3.5 and GPT-4 models',
+        requiresApiKey: true,
+        models: ['gpt-3.5-turbo', 'gpt-4', 'gpt-4-turbo-preview']
+      },
+      {
+        name: 'anthropic',
+        displayName: 'Anthropic Claude',
+        description: 'Claude 3 models',
+        requiresApiKey: true,
+        models: ['claude-3-sonnet-20240229', 'claude-3-opus-20240229', 'claude-3-haiku-20240307']
+      },
+      {
+        name: 'gemini',
+        displayName: 'Google Gemini',
+        description: 'Gemini Pro models',
+        requiresApiKey: true,
+        models: ['gemini-pro', 'gemini-pro-vision']
+      },
+      {
+        name: 'mistral',
+        displayName: 'Mistral AI',
+        description: 'Mistral models',
+        requiresApiKey: true,
+        models: ['mistral-tiny', 'mistral-small', 'mistral-medium', 'mistral-large-latest']
+      },
+      {
+        name: 'cohere',
+        displayName: 'Cohere',
+        description: 'Command models',
+        requiresApiKey: true,
+        models: ['command', 'command-light', 'command-nightly']
+      },
+      {
+        name: 'groq',
+        displayName: 'Groq',
+        description: 'Fast inference models',
+        requiresApiKey: true,
+        models: ['mixtral-8x7b-32768', 'llama2-70b-4096', 'gemma-7b-it']
+      },
+      {
+        name: 'ollama',
+        displayName: 'Ollama (Local)',
+        description: 'Local models via Ollama',
+        requiresApiKey: false,
+        models: ['llama2', 'codellama', 'mistral', 'neural-chat']
+      }
+    ];
+  }
+
+  /**
+   * Validate provider configuration
+   */
+  static async validateProvider(providerName, config) {
+    try {
+      const provider = this.create(providerName);
+      return await provider.validate(config);
+    } catch (error) {
+      throw new Error(`Provider validation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Test provider connection
+   */
+  static async testProvider(providerName, config) {
+    try {
+      const provider = this.create(providerName);
+      return await provider.test(config);
+    } catch (error) {
+      throw new Error(`Provider test failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get available models for a specific provider
+   */
+  static async getProviderModels(providerName, config = {}) {
+    try {
+      const provider = this.create(providerName);
+      
+      // Set config if provided
+      if (config.apiKey) {
+        provider.config = config;
+      }
+      
+      return await provider.getAvailableModels();
+    } catch (error) {
+      console.warn(`Failed to get models for ${providerName}: ${error.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Get available models for all providers
+   */
+  static async getAllAvailableModels(configs = {}) {
+    const providers = this.getAvailableProviders();
+    const results = {};
+
+    for (const providerInfo of providers) {
+      try {
+        const config = configs[providerInfo.name] || {};
+        const models = await this.getProviderModels(providerInfo.name, config);
+        
+        results[providerInfo.name] = {
+          ...providerInfo,
+          models: models,
+          available: models.length > 0,
+          lastChecked: new Date().toISOString()
+        };
+      } catch (error) {
+        results[providerInfo.name] = {
+          ...providerInfo,
+          models: [],
+          available: false,
+          error: error.message,
+          lastChecked: new Date().toISOString()
+        };
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Get best available model across all providers
+   */
+  static async getBestAvailableModel(configs = {}) {
+    const allModels = await this.getAllAvailableModels(configs);
+    
+    // Priority order for providers (best to worst for commit messages)
+    const providerPriority = ['openai', 'anthropic', 'gemini', 'mistral', 'cohere', 'groq', 'ollama'];
+    
+    for (const providerName of providerPriority) {
+      const providerData = allModels[providerName];
+      if (providerData && providerData.available && providerData.models.length > 0) {
+        // Find recommended model or use first available
+        const recommendedModel = providerData.models.find(m => m.recommended && m.available);
+        const firstAvailable = providerData.models.find(m => m.available);
+        
+        const selectedModel = recommendedModel || firstAvailable;
+        
+        if (selectedModel) {
+          return {
+            provider: providerName,
+            model: selectedModel,
+            providerInfo: providerData
+          };
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Auto-configure provider with best available model
+   */
+  static async autoConfigureProvider(configs = {}) {
+    const bestOption = await this.getBestAvailableModel(configs);
+    
+    if (!bestOption) {
+      throw new Error('No available AI providers found. Please configure at least one provider.');
+    }
+    
+    return {
+      provider: bestOption.provider,
+      model: bestOption.model.id,
+      recommendation: {
+        reason: `Selected ${bestOption.model.name} from ${bestOption.providerInfo.displayName}`,
+        alternatives: Object.keys(configs).filter(p => p !== bestOption.provider)
+      }
+    };
+  }
+}
+
+module.exports = AIProviderFactory;
