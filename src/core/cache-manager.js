@@ -110,6 +110,26 @@ class CacheManager {
   }
 
   /**
+   * Delete a specific cache entry
+   */
+  async del(diff) {
+    try {
+      const key = this.generateKey(diff);
+
+      // Delete from memory cache
+      this.memoryCache.del(key);
+
+      // Delete from persistent cache
+      const cacheFile = path.join(this.cacheDir, `${key}.json`);
+      if (await fs.pathExists(cacheFile)) {
+        await fs.remove(cacheFile);
+      }
+    } catch (error) {
+      console.warn('Cache delete error:', error.message);
+    }
+  }
+
+  /**
    * Truncate diff for storage (keep first 500 chars for debugging)
    */
   truncateDiff(diff) {

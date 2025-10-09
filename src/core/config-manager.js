@@ -99,13 +99,13 @@ class ConfigManager {
    */
   async load() {
     try {
-      const config = this.config.store;
+      const config = { ...this.getDefaults(), ...this.config.store };
       const { error, value } = this.schema.validate(config);
-      
+
       if (error) {
         throw new Error(`Invalid configuration: ${error.message}`);
       }
-      
+
       return value;
     } catch (error) {
       throw new Error(`Failed to load configuration: ${error.message}`);
@@ -129,13 +129,14 @@ class ConfigManager {
   async set(key, value) {
     try {
       // Validate the key-value pair
-      const testConfig = { ...this.config.store, [key]: value };
+      const config = { ...this.getDefaults(), ...this.config.store };
+      const testConfig = { ...config, [key]: value };
       const { error } = this.schema.validate(testConfig);
-      
+
       if (error) {
         throw new Error(`Invalid configuration value: ${error.message}`);
       }
-      
+
       this.config.set(key, value);
     } catch (error) {
       throw new Error(`Failed to set configuration value: ${error.message}`);
@@ -148,13 +149,14 @@ class ConfigManager {
   async setMultiple(values) {
     try {
       // Validate all values
-      const testConfig = { ...this.config.store, ...values };
+      const config = { ...this.getDefaults(), ...this.config.store };
+      const testConfig = { ...config, ...values };
       const { error } = this.schema.validate(testConfig);
-      
+
       if (error) {
         throw new Error(`Invalid configuration values: ${error.message}`);
       }
-      
+
       Object.entries(values).forEach(([key, value]) => {
         this.config.set(key, value);
       });
