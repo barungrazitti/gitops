@@ -246,12 +246,17 @@ class AICommitGenerator {
     ]);
 
     // Save configuration
-    await this.configManager.setMultiple({
+    const configToSet = {
       defaultProvider: answers.provider,
-      apiKey: answers.apiKey,
       conventionalCommits: answers.conventionalCommits,
       language: answers.language
-    });
+    };
+
+    if (answers.apiKey) {
+      configToSet.apiKey = answers.apiKey;
+    }
+
+    await this.configManager.setMultiple(configToSet);
 
     console.log(chalk.green('\n✅ Setup completed successfully!'));
     console.log(chalk.cyan('You can now use "aicommit" to generate commit messages.'));
