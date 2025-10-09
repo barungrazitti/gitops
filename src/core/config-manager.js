@@ -2,18 +2,18 @@
  * Configuration Manager - Handles application configuration
  */
 
-const Conf = require('conf');
-const path = require('path');
-const fs = require('fs-extra');
-const Joi = require('joi');
+const Conf = require("conf");
+const path = require("path");
+const fs = require("fs-extra");
+const Joi = require("joi");
 
 class ConfigManager {
   constructor() {
     this.config = new Conf({
-      projectName: 'ai-commit-generator',
-      defaults: this.getDefaults()
+      projectName: "ai-commit-generator",
+      defaults: this.getDefaults(),
     });
-    
+
     this.schema = this.getValidationSchema();
   }
 
@@ -22,11 +22,11 @@ class ConfigManager {
    */
   getDefaults() {
     return {
-      defaultProvider: 'openai',
+      defaultProvider: "groq",
       apiKey: null,
       model: null,
       conventionalCommits: true,
-      language: 'en',
+      language: "en",
       messageCount: 3,
       maxTokens: 150,
       temperature: 0.7,
@@ -37,31 +37,31 @@ class ConfigManager {
       retries: 3,
       customPrompts: {},
       excludeFiles: [
-        '*.log',
-        '*.tmp',
-        'node_modules/**',
-        '.git/**',
-        'dist/**',
-        'build/**'
+        "*.log",
+        "*.tmp",
+        "node_modules/**",
+        ".git/**",
+        "dist/**",
+        "build/**",
       ],
       commitTypes: [
-        'feat',
-        'fix',
-        'docs',
-        'style',
-        'refactor',
-        'perf',
-        'test',
-        'chore',
-        'ci',
-        'build'
+        "feat",
+        "fix",
+        "docs",
+        "style",
+        "refactor",
+        "perf",
+        "test",
+        "chore",
+        "ci",
+        "build",
       ],
       scopes: [],
       templates: {
-        conventional: '{type}({scope}): {description}',
-        simple: '{description}',
-        detailed: '{type}({scope}): {description}\n\n{body}'
-      }
+        conventional: "{type}({scope}): {description}",
+        simple: "{description}",
+        detailed: "{type}({scope}): {description}\n\n{body}",
+      },
     };
   }
 
@@ -70,14 +70,11 @@ class ConfigManager {
    */
   getValidationSchema() {
     return Joi.object({
-      defaultProvider: Joi.string().valid(
-        'openai', 'anthropic', 'gemini', 'mistral', 
-        'cohere', 'groq', 'ollama'
-      ).required(),
+      defaultProvider: Joi.string().valid("groq", "ollama").required(),
       apiKey: Joi.string().allow(null),
       model: Joi.string().allow(null),
       conventionalCommits: Joi.boolean(),
-      language: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja'),
+      language: Joi.string().valid("en", "es", "fr", "de", "zh", "ja"),
       messageCount: Joi.number().integer().min(1).max(10),
       maxTokens: Joi.number().integer().min(50).max(1000),
       temperature: Joi.number().min(0).max(2),
@@ -90,7 +87,7 @@ class ConfigManager {
       excludeFiles: Joi.array().items(Joi.string()),
       commitTypes: Joi.array().items(Joi.string()),
       scopes: Joi.array().items(Joi.string()),
-      templates: Joi.object()
+      templates: Joi.object(),
     });
   }
 
@@ -204,11 +201,11 @@ class ConfigManager {
     try {
       const config = await fs.readJson(filePath);
       const { error } = this.schema.validate(config);
-      
+
       if (error) {
         throw new Error(`Invalid configuration file: ${error.message}`);
       }
-      
+
       this.config.store = config;
     } catch (error) {
       throw new Error(`Failed to import configuration: ${error.message}`);
@@ -228,32 +225,33 @@ class ConfigManager {
         temperature: config.temperature,
         timeout: config.timeout,
         retries: config.retries,
-        proxy: config.proxy
+        proxy: config.proxy,
       };
 
       // Provider-specific defaults
       switch (provider) {
-        case 'openai':
-          providerConfig.model = providerConfig.model || 'gpt-3.5-turbo';
+        case "openai":
+          providerConfig.model = providerConfig.model || "gpt-3.5-turbo";
           break;
-        case 'anthropic':
-          providerConfig.model = providerConfig.model || 'claude-3-sonnet-20240229';
+        case "anthropic":
+          providerConfig.model =
+            providerConfig.model || "claude-3-sonnet-20240229";
           break;
-        case 'gemini':
-          providerConfig.model = providerConfig.model || 'gemini-pro';
+        case "gemini":
+          providerConfig.model = providerConfig.model || "gemini-pro";
           break;
-        case 'mistral':
-          providerConfig.model = providerConfig.model || 'mistral-medium';
+        case "mistral":
+          providerConfig.model = providerConfig.model || "mistral-medium";
           break;
-        case 'cohere':
-          providerConfig.model = providerConfig.model || 'command';
+        case "cohere":
+          providerConfig.model = providerConfig.model || "command";
           break;
-        case 'groq':
-          providerConfig.model = providerConfig.model || 'mixtral-8x7b-32768';
+        case "groq":
+          providerConfig.model = providerConfig.model || "mixtral-8x7b-32768";
           break;
-        case 'ollama':
-          providerConfig.model = providerConfig.model || 'llama2';
-          providerConfig.baseURL = 'http://localhost:11434';
+        case "ollama":
+          providerConfig.model = providerConfig.model || "llama2";
+          providerConfig.baseURL = "http://localhost:11434";
           break;
       }
 
@@ -268,15 +266,17 @@ class ConfigManager {
    */
   async validateApiKey(provider) {
     const config = await this.load();
-    
-    if (provider === 'ollama') {
+
+    if (provider === "ollama") {
       return true; // Ollama doesn't require API key
     }
-    
+
     if (!config.apiKey) {
-      throw new Error(`API key not configured for ${provider}. Run 'aicommit setup' to configure.`);
+      throw new Error(
+        `API key not configured for ${provider}. Run 'aicommit setup' to configure.`,
+      );
     }
-    
+
     return true;
   }
 }
