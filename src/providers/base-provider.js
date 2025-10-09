@@ -116,18 +116,21 @@ Generate ${options.count || 3} commit messages (one per line, no numbering or bu
    * Parse AI response into commit messages
    */
   parseResponse(response) {
-    if (!response || typeof response !== 'string') {
+    if (typeof response !== 'string') {
       throw new Error('Invalid response from AI provider');
     }
 
     // Split by lines and clean up
     const messages = response
       .split('\n')
-      .map(line => line.trim())
+      .map(line =>
+        line
+          .trim()
+          .replace(/^\d+\.?\s*/, '') // Strip numbering
+          .replace(/^- \s*/, '')      // Strip dashes
+          .replace(/^\* \s*/, '')      // Strip asterisks
+      )
       .filter(line => line.length > 0)
-      .filter(line => !line.match(/^\d+\.?\s/)) // Remove numbered items
-      .filter(line => !line.startsWith('-')) // Remove bullet points
-      .filter(line => !line.startsWith('*')) // Remove asterisk bullets
       .slice(0, 10); // Limit to 10 messages max
 
     if (messages.length === 0) {
@@ -175,25 +178,24 @@ Generate ${options.count || 3} commit messages (one per line, no numbering or bu
    */
   async withRetry(fn, maxRetries = 3, delay = 1000) {
     let lastError;
-    
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         return await fn();
       } catch (error) {
         lastError = error;
-        
-        // Don't retry on authentication errors
-        if (error.message.includes('Authentication failed') || 
-            error.message.includes('API key')) {
+
+        // Do not retry on client-side errors (e.g., 401, 403)
+        const status = error.response?.status;
+        if (status && status >= 400 && status < 500) {
           throw error;
         }
-        
+
         if (attempt < maxRetries) {
-          await new Promise(resolve => setTimeout(resolve, delay * attempt));
+          // Use exponential backoff
+          await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
         }
       }
     }
-    
     throw lastError;
   }
 

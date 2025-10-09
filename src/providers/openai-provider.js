@@ -50,37 +50,36 @@ class OpenAIProvider extends BaseProvider {
 
     const prompt = this.buildPrompt(diff, options);
 
-    return await this.withRetry(async () => {
-      try {
-        const response = await this.client.chat.completions.create({
+    try {
+      const response = await this.withRetry(async () => {
+        return this.client.chat.completions.create({
           model: config.model,
           messages: [
             {
               role: 'system',
-              content: 'You are an expert software developer who writes clear, concise commit messages.'
+              content: 'You are an expert software developer who writes clear, concise commit messages.',
             },
             {
               role: 'user',
-              content: prompt
-            }
+              content: prompt,
+            },
           ],
           max_tokens: config.maxTokens || 150,
           temperature: config.temperature || 0.7,
-          n: 1
+          n: 1,
         });
+      }, config.retries || 3);
 
-        const content = response.choices[0]?.message?.content;
-        if (!content) {
-          throw new Error('No response content from OpenAI');
-        }
-
-        const messages = this.parseResponse(content);
-        return messages.filter(msg => this.validateCommitMessage(msg));
-
-      } catch (error) {
-        this.handleError(error, 'OpenAI');
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response content from OpenAI');
       }
-    }, config.retries || 3);
+
+      const messages = this.parseResponse(content);
+      return messages.filter(msg => this.validateCommitMessage(msg));
+    } catch (error) {
+      this.handleError(error, 'OpenAI');
+    }
   }
 
   /**
