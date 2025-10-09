@@ -49,66 +49,53 @@ class AICommitGenerator {
         return;
       }
 
-      let selectedMessage = null;
-      while (!selectedMessage) {
-        // Check cache
-        let messages = [];
-        if (mergedOptions.cache !== false) {
-          spinner.text = 'Checking cache...';
-          messages = await this.cacheManager.get(diff);
-        }
-
-        if (!messages || messages.length === 0) {
-          // Analyze repository context
-          spinner.text = 'Analyzing repository context...';
-          const context = await this.analysisEngine.analyzeRepository();
-
-          // Generate commit messages using AI
-          spinner.text = 'Generating commit messages...';
-          const provider = AIProviderFactory.create(mergedOptions.provider || config.defaultProvider);
-
-          messages = await provider.generateCommitMessages(diff, {
-            context,
-            count: parseInt(mergedOptions.count) || 3,
-            type: mergedOptions.type,
-            language: mergedOptions.language || 'en',
-            conventional: mergedOptions.conventional || config.conventionalCommits,
-          });
-
-          // Cache the results
-          if (mergedOptions.cache !== false) {
-            await this.cacheManager.set(diff, messages);
-          }
-        }
-
-        spinner.succeed('Commit messages generated successfully!');
-
-        // Format messages
-        const formattedMessages = messages.map((msg) =>
-          this.messageFormatter.format(msg, mergedOptions)
-        );
-
-        // Show interactive selection
-        if (mergedOptions.dryRun) {
-          console.log(chalk.yellow('\n🔍 Dry run - Generated messages:'));
-          formattedMessages.forEach((msg, index) => {
-            console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
-          });
-          return;
-        }
-
-        const userChoice = await this.selectMessage(formattedMessages);
-
-        if (userChoice === 'regenerate') {
-          spinner.start('Regenerating messages...');
-          if (mergedOptions.cache !== false) {
-            await this.cacheManager.del(diff); // Clear cache for this diff
-          }
-          continue; // Loop to regenerate
-        }
-
-        selectedMessage = userChoice; // This will be the message string or null
+      // Check cache
+      let messages = [];
+      if (mergedOptions.cache !== false) {
+        spinner.text = 'Checking cache...';
+        messages = await this.cacheManager.get(diff);
       }
+
+      if (!messages || messages.length === 0) {
+        // Analyze repository context
+        spinner.text = 'Analyzing repository context...';
+        const context = await this.analysisEngine.analyzeRepository();
+
+        // Generate commit messages using AI
+        spinner.text = 'Generating commit messages...';
+        const provider = AIProviderFactory.create(mergedOptions.provider || config.defaultProvider);
+
+        messages = await provider.generateCommitMessages(diff, {
+          context,
+          count: parseInt(mergedOptions.count) || 3,
+          type: mergedOptions.type,
+          language: mergedOptions.language || 'en',
+          conventional: mergedOptions.conventional || config.conventionalCommits
+        });
+
+        // Cache the results
+        if (mergedOptions.cache !== false) {
+          await this.cacheManager.set(diff, messages);
+        }
+      }
+
+      spinner.succeed('Commit messages generated successfully!');
+
+      // Format messages
+      const formattedMessages = messages.map(msg =>
+        this.messageFormatter.format(msg, mergedOptions)
+      );
+
+      // Show interactive selection
+      if (mergedOptions.dryRun) {
+        console.log(chalk.yellow('\n🔍 Dry run - Generated messages:'));
+        formattedMessages.forEach((msg, index) => {
+          console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
+        });
+        return;
+      }
+
+      const selectedMessage = await this.selectMessage(formattedMessages);
 
       if (selectedMessage) {
         // Commit with selected message
@@ -118,6 +105,7 @@ class AICommitGenerator {
         // Update statistics
         await this.statsManager.recordCommit(mergedOptions.provider || config.defaultProvider);
       }
+
     } catch (error) {
       spinner.fail(`Failed to generate commit message: ${error.message}`);
       throw error;
@@ -132,54 +120,56 @@ class AICommitGenerator {
       ...messages.map((msg, index) => ({
         name: `${index + 1}. ${msg}`,
         value: msg,
-        short: `Message ${index + 1}`,
+        short: `Message ${index + 1}`
       })),
       {
         name: chalk.gray('🔄 Regenerate messages'),
-        value: 'regenerate',
+        value: 'regenerate'
       },
       {
-        name: chalk.gray('✏️ Write custom message'),
-        value: 'custom',
+        name: chalk.gray('✏️  Write custom message'),
+        value: 'custom'
       },
       {
         name: chalk.gray('❌ Cancel'),
-        value: 'cancel',
-      },
+        value: 'cancel'
+      }
     ];
 
-    const { selected } = await inquirer.prompt([
+    const { selectedMessage } = await inquirer.prompt([
       {
         type: 'list',
-        name: 'selected',
+        name: 'selectedMessage',
         message: 'Select a commit message:',
         choices,
-        pageSize: 10,
-      },
+        pageSize: 10
+      }
     ]);
 
-    if (selected === 'cancel') {
+    if (selectedMessage === 'cancel') {
       console.log(chalk.yellow('Commit cancelled.'));
       return null;
     }
 
-    if (selected === 'regenerate') {
-      return 'regenerate';
+    if (selectedMessage === 'regenerate') {
+      // TODO: Implement regeneration logic
+      console.log(chalk.yellow('Regeneration not implemented yet.'));
+      return null;
     }
 
-    if (selected === 'custom') {
+    if (selectedMessage === 'custom') {
       const { customMessage } = await inquirer.prompt([
         {
           type: 'input',
           name: 'customMessage',
           message: 'Enter your custom commit message:',
-          validate: (input) => input.trim().length > 0 || 'Message cannot be empty',
-        },
+          validate: (input) => input.trim().length > 0 || 'Message cannot be empty'
+        }
       ]);
       return customMessage;
     }
 
-    return selected;
+    return selectedMessage;
   }
 
   /**
@@ -256,17 +246,12 @@ class AICommitGenerator {
     ]);
 
     // Save configuration
-    const configToSet = {
+    await this.configManager.setMultiple({
       defaultProvider: answers.provider,
+      apiKey: answers.apiKey,
       conventionalCommits: answers.conventionalCommits,
       language: answers.language
-    };
-
-    if (answers.apiKey) {
-      configToSet.apiKey = answers.apiKey;
-    }
-
-    await this.configManager.setMultiple(configToSet);
+    });
 
     console.log(chalk.green('\n✅ Setup completed successfully!'));
     console.log(chalk.cyan('You can now use "aicommit" to generate commit messages.'));

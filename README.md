@@ -112,6 +112,15 @@ aic status    # Show git and AI configuration
 aic --help    # Show all commands
 ```
 
+### Interactive Mode
+
+When you run `aicommit` without a message, it enters interactive mode, which presents you with a list of AI-generated commit messages. In this mode, you have several options:
+
+- **Select a message:** Choose one of the generated messages to use for your commit.
+- **Regenerate messages:** If you're not satisfied with the suggestions, select this option to request a new batch of messages from the AI.
+- **Write custom message:** Choose this option to write your own commit message from scratch.
+- **Cancel:** Exit the interactive mode without making a commit.
+
 **📖 For detailed installation, setup, and usage examples, see [EXAMPLES.md](EXAMPLES.md)**
 
 ### Command Options
