@@ -184,7 +184,7 @@ class MessageFormatter {
 
     // Use the inferred scope from file analysis with confidence scoring
     const fileScope = context.files.scope;
-    if (fileScope && fileScope !== 'general' && fileScope !== 'unknown') {
+    if (fileScope && fileScope !== "general" && fileScope !== "unknown") {
       // Verify scope matches message content
       const messageScope = this.inferScopeFromMessage(message);
       if (messageScope && messageScope !== fileScope) {
@@ -203,66 +203,63 @@ class MessageFormatter {
    */
   inferScopeFromMessage(message) {
     const lowerMessage = message.toLowerCase();
-    
+
     // Enhanced scope patterns with better specificity
     const scopePatterns = {
-      'api': [
+      api: [
         /api|endpoint|route|server|handler|controller/,
-        /request|response|http|rest|graphql/
+        /request|response|http|rest|graphql/,
       ],
-      'ui': [
+      ui: [
         /ui|component|interface|frontend|client/,
-        /view|page|template|render|jsx|tsx|html/
+        /view|page|template|render|jsx|tsx|html/,
       ],
-      'auth': [
+      auth: [
         /auth|login|user|session|security/,
-        /jwt|passport|token|password|credential/
+        /jwt|passport|token|password|credential/,
       ],
-      'db': [
+      db: [
         /database|db|model|schema|migration/,
-        /sql|query|repository|dao|entity/
+        /sql|query|repository|dao|entity/,
       ],
-      'config': [
+      config: [
         /config|setting|env|environment/,
-        /constant|variable|parameter|option/
+        /constant|variable|parameter|option/,
       ],
-      'test': [
+      test: [
         /test|spec|mock|fixture|cypress/,
-        /jest|mocha|unit|integration|e2e/
+        /jest|mocha|unit|integration|e2e/,
       ],
-      'utils': [
-        /util|helper|common|shared|lib/,
-        /tool|function|method|utility/
-      ],
-      'deps': [
+      utils: [/util|helper|common|shared|lib/, /tool|function|method|utility/],
+      deps: [
         /dependency|package|npm|yarn|requirement/,
-        /module|import|export|bundle/
+        /module|import|export|bundle/,
       ],
-      'perf': [
+      perf: [
         /performance|optimize|cache|lazy|memo/,
-        /speed|fast|async|parallel|concurrent/
+        /speed|fast|async|parallel|concurrent/,
       ],
-      'docs': [
+      docs: [
         /doc|readme|guide|tutorial|example/,
-        /comment|documentation|explanation/
+        /comment|documentation|explanation/,
       ],
-      'build': [
+      build: [
         /build|webpack|rollup|vite|babel/,
-        /compile|transpile|bundle|package/
+        /compile|transpile|bundle|package/,
       ],
-      'ci': [
+      ci: [
         /ci|pipeline|workflow|github|gitlab/,
-        /action|deploy|release|continuous/
+        /action|deploy|release|continuous/,
       ],
-      'types': [
+      types: [
         /type|interface|dto|entity|model/,
-        /schema|definition|declaration/
-      ]
+        /schema|definition|declaration/,
+      ],
     };
 
     // Score each scope based on pattern matches
     const scopeScores = {};
-    
+
     for (const [scope, patterns] of Object.entries(scopePatterns)) {
       let score = 0;
       for (const pattern of patterns) {
@@ -277,34 +274,7 @@ class MessageFormatter {
 
     // Return scope with highest score
     if (Object.keys(scopeScores).length > 0) {
-      return Object.entries(scopeScores)
-        .sort((a, b) => b[1] - a[1])[0][0];
-    }
-
-    return null;
-  }
-
-    // Use the inferred scope from file analysis
-    const fileScope = context.files.scope;
-    if (fileScope && fileScope !== "general" && fileScope !== "unknown") {
-      return fileScope;
-    }
-
-    // Try to infer from message content
-    const lowerMessage = message.toLowerCase();
-    const scopePatterns = {
-      api: /api|endpoint|route|server/,
-      ui: /ui|component|interface|frontend/,
-      auth: /auth|login|user|session/,
-      db: /database|db|model|schema/,
-      config: /config|setting|env/,
-      deps: /dependency|package|npm|yarn/,
-    };
-
-    for (const [scope, pattern] of Object.entries(scopePatterns)) {
-      if (pattern.test(lowerMessage)) {
-        return scope;
-      }
+      return Object.entries(scopeScores).sort((a, b) => b[1] - a[1])[0][0];
     }
 
     return null;

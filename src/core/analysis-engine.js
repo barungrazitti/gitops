@@ -328,10 +328,10 @@ class AnalysisEngine {
    * Analyze code complexity with enhanced detection
    */
   async analyzeComplexity(diff) {
-    const lines = diff.split('\n');
-    const addedLines = lines.filter(line => line.startsWith('+')).length;
-    const removedLines = lines.filter(line => line.startsWith('-')).length;
-    
+    const lines = diff.split("\n");
+    const addedLines = lines.filter((line) => line.startsWith("+")).length;
+    const removedLines = lines.filter((line) => line.startsWith("-")).length;
+
     // Enhanced complexity indicators
     const complexity = {
       linesAdded: addedLines,
@@ -352,28 +352,28 @@ class AnalysisEngine {
       hasRefactor: /refactor|restructure|reorganize|clean|improve/.test(diff),
       hasPerf: /performance|optimize|cache|lazy|memo|speed/.test(diff),
       hasDocs: /doc|readme|comment|documentation/.test(diff),
-      hasDeps: /package|npm|yarn|dependency|requirement/.test(diff)
+      hasDeps: /package|npm|yarn|dependency|requirement/.test(diff),
     };
 
     // Enhanced change type determination with priority scoring
     const typeScores = {
-      'test': complexity.hasTests ? 10 : 0,
-      'fix': complexity.hasFix ? 9 : 0,
-      'feat': complexity.hasFeature ? 8 : 0,
-      'refactor': complexity.hasRefactor ? 7 : 0,
-      'perf': complexity.hasPerf ? 6 : 0,
-      'docs': complexity.hasDocs ? 5 : 0,
-      'deps': complexity.hasDeps ? 4 : 0,
-      'chore': complexity.hasConfig ? 3 : 0,
-      'build': 0,
-      'ci': 0,
-      'style': 0
+      test: complexity.hasTests ? 10 : 0,
+      fix: complexity.hasFix ? 9 : 0,
+      feat: complexity.hasFeature ? 8 : 0,
+      refactor: complexity.hasRefactor ? 7 : 0,
+      perf: complexity.hasPerf ? 6 : 0,
+      docs: complexity.hasDocs ? 5 : 0,
+      deps: complexity.hasDeps ? 4 : 0,
+      chore: complexity.hasConfig ? 3 : 0,
+      build: 0,
+      ci: 0,
+      style: 0,
     };
 
     // Determine primary change type based on highest score
     let maxScore = 0;
-    let primaryType = 'chore';
-    
+    let primaryType = "chore";
+
     for (const [type, score] of Object.entries(typeScores)) {
       if (score > maxScore) {
         maxScore = score;
@@ -384,21 +384,18 @@ class AnalysisEngine {
     // Fallback logic for edge cases
     if (maxScore === 0) {
       if (complexity.hasImports || complexity.hasExports) {
-        primaryType = 'refactor';
+        primaryType = "refactor";
       } else if (addedLines === 0 && removedLines > 0) {
-        primaryType = 'remove';
+        primaryType = "remove";
       } else if (complexity.hasFunctions && addedLines > removedLines) {
-        primaryType = 'feat';
+        primaryType = "feat";
       } else if (complexity.hasLogic) {
-        primaryType = 'fix';
+        primaryType = "fix";
       }
     }
 
     complexity.changeType = primaryType;
     complexity.confidence = maxScore > 0 ? maxScore / 10 : 0.1;
-    
-    return complexity;
-  }
 
     return complexity;
   }
