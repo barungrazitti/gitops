@@ -5,8 +5,16 @@
 class MessageFormatter {
   constructor() {
     this.conventionalTypes = [
-      'feat', 'fix', 'docs', 'style', 'refactor', 
-      'perf', 'test', 'chore', 'ci', 'build'
+      "feat",
+      "fix",
+      "docs",
+      "style",
+      "refactor",
+      "perf",
+      "test",
+      "chore",
+      "ci",
+      "build",
     ];
   }
 
@@ -14,7 +22,7 @@ class MessageFormatter {
    * Format commit message according to options
    */
   format(message, options = {}) {
-    if (!message || typeof message !== 'string') {
+    if (!message || typeof message !== "string") {
       return message;
     }
 
@@ -26,7 +34,7 @@ class MessageFormatter {
     }
 
     // Apply language-specific formatting
-    if (options.language && options.language !== 'en') {
+    if (options.language && options.language !== "en") {
       formatted = this.applyLanguageFormatting(formatted, options.language);
     }
 
@@ -57,7 +65,7 @@ class MessageFormatter {
     if (scope) {
       conventional += `(${scope})`;
     }
-    conventional += ': ';
+    conventional += ": ";
 
     // Clean the message description
     const description = this.cleanDescription(message);
@@ -75,57 +83,222 @@ class MessageFormatter {
   }
 
   /**
-   * Infer commit type from message content
+   * Infer commit type from message content with enhanced patterns
    */
   inferType(message) {
     const lowerMessage = message.toLowerCase();
 
+    // Enhanced type patterns with better specificity
     const typePatterns = {
-      'feat': /add|new|implement|create|introduce|feature/,
-      'fix': /fix|bug|issue|error|problem|resolve|correct/,
-      'docs': /doc|readme|comment|documentation/,
-      'style': /format|style|lint|prettier|whitespace/,
-      'refactor': /refactor|restructure|reorganize|clean/,
-      'perf': /performance|perf|optimize|speed|fast/,
-      'test': /test|spec|coverage|jest|mocha/,
-      'chore': /chore|maintenance|update|upgrade|bump/,
-      'ci': /ci|pipeline|workflow|github|gitlab/,
-      'build': /build|webpack|rollup|babel|compile/
+      feat: [
+        /add\s+(new\s+)?(feature|functionality|capability)/,
+        /implement|create|introduce|build/,
+        /new\s+(feature|function|class|component|endpoint|service)/,
+        /enable|support|add\s+support/,
+      ],
+      fix: [
+        /fix|bug|issue|error|problem|resolve|correct/,
+        /broken|crash|fail|exception|throw/,
+        /patch|hotfix|regression/,
+        /prevent|handle|catch|guard/,
+      ],
+      docs: [
+        /doc|readme|comment|documentation/,
+        /guide|tutorial|example|explanation/,
+        /update\s+doc|add\s+doc|improve\s+doc/,
+      ],
+      style: [
+        /format|style|lint|prettier|whitespace/,
+        /indentation|spacing|line\s+ending/,
+        /cosmetic|visual|appearance/,
+      ],
+      refactor: [
+        /refactor|restructure|reorganize|clean/,
+        /improve|optimize|simplify|streamline/,
+        /extract|consolidate|merge|split/,
+        /rename|reorder|rearrange/,
+      ],
+      perf: [
+        /performance|perf|optimize|speed|fast/,
+        /cache|lazy|memo|async|parallel/,
+        /improve\s+performance|boost|accelerate/,
+      ],
+      test: [
+        /test|spec|coverage|jest|mocha|cypress/,
+        /unit\s+test|integration\s+test|e2e/,
+        /add\s+test|fix\s+test|improve\s+test/,
+      ],
+      chore: [
+        /chore|maintenance|update|upgrade|bump/,
+        /version|dependency|package|npm|yarn/,
+        /cleanup|housekeeping|tidy/,
+      ],
+      ci: [
+        /ci|pipeline|workflow|github|gitlab/,
+        /action|build|deploy|release/,
+        /continuous|integration|delivery/,
+      ],
+      build: [
+        /build|webpack|rollup|babel|compile/,
+        /bundle|package|transpile|minify/,
+        /script|task|automation/,
+      ],
     };
 
-    for (const [type, pattern] of Object.entries(typePatterns)) {
-      if (pattern.test(lowerMessage)) {
-        return type;
+    // Score each type based on pattern matches
+    const typeScores = {};
+
+    for (const [type, patterns] of Object.entries(typePatterns)) {
+      let score = 0;
+      for (const pattern of patterns) {
+        if (pattern.test(lowerMessage)) {
+          // Higher score for more specific patterns
+          score += pattern.source.length > 20 ? 2 : 1;
+        }
+      }
+      if (score > 0) {
+        typeScores[type] = score;
       }
     }
 
-    // Default fallback
-    return 'chore';
+    // Return type with highest score, or default
+    if (Object.keys(typeScores).length > 0) {
+      return Object.entries(typeScores).sort((a, b) => b[1] - a[1])[0][0];
+    }
+
+    // Enhanced fallback logic
+    if (/(add|new|create|implement)/.test(lowerMessage)) return "feat";
+    if (/(fix|bug|error|issue)/.test(lowerMessage)) return "fix";
+    if (/(update|upgrade|bump)/.test(lowerMessage)) return "chore";
+
+    return "chore";
   }
 
   /**
-   * Infer scope from message and context
+   * Infer scope from message and context with enhanced detection
    */
   inferScope(message, context) {
     if (!context || !context.files) {
-      return null;
+      return this.inferScopeFromMessage(message);
     }
+
+    // Use the inferred scope from file analysis with confidence scoring
+    const fileScope = context.files.scope;
+    if (fileScope && fileScope !== 'general' && fileScope !== 'unknown') {
+      // Verify scope matches message content
+      const messageScope = this.inferScopeFromMessage(message);
+      if (messageScope && messageScope !== fileScope) {
+        // If message suggests different scope, use message scope (more specific)
+        return messageScope;
+      }
+      return fileScope;
+    }
+
+    // Try to infer from message content
+    return this.inferScopeFromMessage(message);
+  }
+
+  /**
+   * Infer scope from message content only
+   */
+  inferScopeFromMessage(message) {
+    const lowerMessage = message.toLowerCase();
+    
+    // Enhanced scope patterns with better specificity
+    const scopePatterns = {
+      'api': [
+        /api|endpoint|route|server|handler|controller/,
+        /request|response|http|rest|graphql/
+      ],
+      'ui': [
+        /ui|component|interface|frontend|client/,
+        /view|page|template|render|jsx|tsx|html/
+      ],
+      'auth': [
+        /auth|login|user|session|security/,
+        /jwt|passport|token|password|credential/
+      ],
+      'db': [
+        /database|db|model|schema|migration/,
+        /sql|query|repository|dao|entity/
+      ],
+      'config': [
+        /config|setting|env|environment/,
+        /constant|variable|parameter|option/
+      ],
+      'test': [
+        /test|spec|mock|fixture|cypress/,
+        /jest|mocha|unit|integration|e2e/
+      ],
+      'utils': [
+        /util|helper|common|shared|lib/,
+        /tool|function|method|utility/
+      ],
+      'deps': [
+        /dependency|package|npm|yarn|requirement/,
+        /module|import|export|bundle/
+      ],
+      'perf': [
+        /performance|optimize|cache|lazy|memo/,
+        /speed|fast|async|parallel|concurrent/
+      ],
+      'docs': [
+        /doc|readme|guide|tutorial|example/,
+        /comment|documentation|explanation/
+      ],
+      'build': [
+        /build|webpack|rollup|vite|babel/,
+        /compile|transpile|bundle|package/
+      ],
+      'ci': [
+        /ci|pipeline|workflow|github|gitlab/,
+        /action|deploy|release|continuous/
+      ],
+      'types': [
+        /type|interface|dto|entity|model/,
+        /schema|definition|declaration/
+      ]
+    };
+
+    // Score each scope based on pattern matches
+    const scopeScores = {};
+    
+    for (const [scope, patterns] of Object.entries(scopePatterns)) {
+      let score = 0;
+      for (const pattern of patterns) {
+        if (pattern.test(lowerMessage)) {
+          score += pattern.source.length > 15 ? 2 : 1;
+        }
+      }
+      if (score > 0) {
+        scopeScores[scope] = score;
+      }
+    }
+
+    // Return scope with highest score
+    if (Object.keys(scopeScores).length > 0) {
+      return Object.entries(scopeScores)
+        .sort((a, b) => b[1] - a[1])[0][0];
+    }
+
+    return null;
+  }
 
     // Use the inferred scope from file analysis
     const fileScope = context.files.scope;
-    if (fileScope && fileScope !== 'general' && fileScope !== 'unknown') {
+    if (fileScope && fileScope !== "general" && fileScope !== "unknown") {
       return fileScope;
     }
 
     // Try to infer from message content
     const lowerMessage = message.toLowerCase();
     const scopePatterns = {
-      'api': /api|endpoint|route|server/,
-      'ui': /ui|component|interface|frontend/,
-      'auth': /auth|login|user|session/,
-      'db': /database|db|model|schema/,
-      'config': /config|setting|env/,
-      'deps': /dependency|package|npm|yarn/
+      api: /api|endpoint|route|server/,
+      ui: /ui|component|interface|frontend/,
+      auth: /auth|login|user|session/,
+      db: /database|db|model|schema/,
+      config: /config|setting|env/,
+      deps: /dependency|package|npm|yarn/,
     };
 
     for (const [scope, pattern] of Object.entries(scopePatterns)) {
@@ -149,11 +322,11 @@ class MessageFormatter {
       /^(fix|fixed|fixes)\s+/i,
       /^(update|updated|updates)\s+/i,
       /^(remove|removed|removes)\s+/i,
-      /^(implement|implemented|implements)\s+/i
+      /^(implement|implemented|implements)\s+/i,
     ];
 
     for (const prefix of prefixes) {
-      description = description.replace(prefix, '');
+      description = description.replace(prefix, "");
     }
 
     // Ensure first letter is lowercase (conventional commit style)
@@ -162,7 +335,7 @@ class MessageFormatter {
     }
 
     // Remove trailing periods
-    description = description.replace(/\.$/, '');
+    description = description.replace(/\.$/, "");
 
     return description;
   }
@@ -180,19 +353,19 @@ class MessageFormatter {
    * Apply length constraints
    */
   applyLengthConstraints(message) {
-    const lines = message.split('\n');
+    const lines = message.split("\n");
     const title = lines[0];
-    const body = lines.slice(1).join('\n').trim();
+    const body = lines.slice(1).join("\n").trim();
 
     // Limit title to 72 characters (GitHub's limit)
     let formattedTitle = title;
     if (title.length > 72) {
-      formattedTitle = title.substring(0, 69) + '...';
+      formattedTitle = title.substring(0, 69) + "...";
     }
 
     // If there's a body, add it back
     if (body) {
-      return formattedTitle + '\n\n' + body;
+      return formattedTitle + "\n\n" + body;
     }
 
     return formattedTitle;
@@ -203,8 +376,8 @@ class MessageFormatter {
    */
   cleanupFormatting(message) {
     return message
-      .replace(/\s+/g, ' ') // Multiple spaces to single space
-      .replace(/\n\s*\n\s*\n/g, '\n\n') // Multiple newlines to double newline
+      .replace(/\s+/g, " ") // Multiple spaces to single space
+      .replace(/\n\s*\n\s*\n/g, "\n\n") // Multiple newlines to double newline
       .trim();
   }
 
@@ -213,14 +386,14 @@ class MessageFormatter {
    */
   formatWithTemplate(data, template) {
     const { type, scope, description, body } = data;
-    
+
     return template
-      .replace('{type}', type || '')
-      .replace('{scope}', scope || '')
-      .replace('{description}', description || '')
-      .replace('{body}', body || '')
-      .replace(/\(\)/g, '') // Remove empty parentheses
-      .replace(/\s+/g, ' ') // Clean up spaces
+      .replace("{type}", type || "")
+      .replace("{scope}", scope || "")
+      .replace("{description}", description || "")
+      .replace("{body}", body || "")
+      .replace(/\(\)/g, "") // Remove empty parentheses
+      .replace(/\s+/g, " ") // Clean up spaces
       .trim();
   }
 
@@ -229,25 +402,25 @@ class MessageFormatter {
    */
   parseConventionalCommit(message) {
     const match = message.match(/^(\w+)(\(([^)]+)\))?: (.+)$/);
-    
+
     if (!match) {
       return {
         type: null,
         scope: null,
         description: message,
-        body: null
+        body: null,
       };
     }
 
     const [, type, , scope, description] = match;
-    const lines = message.split('\n');
-    const body = lines.slice(1).join('\n').trim() || null;
+    const lines = message.split("\n");
+    const body = lines.slice(1).join("\n").trim() || null;
 
     return {
       type,
       scope: scope || null,
       description,
-      body
+      body,
     };
   }
 
@@ -258,47 +431,52 @@ class MessageFormatter {
     const errors = [];
     const warnings = [];
 
-    if (!message || typeof message !== 'string') {
-      errors.push('Message is required');
+    if (!message || typeof message !== "string") {
+      errors.push("Message is required");
       return { valid: false, errors, warnings };
     }
 
     const trimmed = message.trim();
-    
+
     // Length validation
-    const lines = trimmed.split('\n');
+    const lines = trimmed.split("\n");
     const title = lines[0];
-    
+
     if (title.length === 0) {
-      errors.push('Title cannot be empty');
+      errors.push("Title cannot be empty");
     } else if (title.length > 72) {
-      warnings.push('Title should be 72 characters or less');
+      warnings.push("Title should be 72 characters or less");
     }
 
     // Conventional commit validation
     if (options.conventional) {
       const parsed = this.parseConventionalCommit(title);
-      
+
       if (!parsed.type) {
-        errors.push('Conventional commit format required: type(scope): description');
+        errors.push(
+          "Conventional commit format required: type(scope): description",
+        );
       } else if (!this.conventionalTypes.includes(parsed.type)) {
         warnings.push(`Unknown commit type: ${parsed.type}`);
       }
     }
 
     // General formatting validation
-    if (title.endsWith('.')) {
-      warnings.push('Title should not end with a period');
+    if (title.endsWith(".")) {
+      warnings.push("Title should not end with a period");
     }
 
-    if (title.charAt(0) === title.charAt(0).toUpperCase() && !options.conventional) {
-      warnings.push('Title should start with lowercase letter');
+    if (
+      title.charAt(0) === title.charAt(0).toUpperCase() &&
+      !options.conventional
+    ) {
+      warnings.push("Title should start with lowercase letter");
     }
 
     return {
       valid: errors.length === 0,
       errors,
-      warnings
+      warnings,
     };
   }
 
@@ -310,7 +488,7 @@ class MessageFormatter {
     const validation = this.validate(message, options);
 
     if (validation.warnings.length > 0) {
-      suggestions.push(...validation.warnings.map(w => `Consider: ${w}`));
+      suggestions.push(...validation.warnings.map((w) => `Consider: ${w}`));
     }
 
     // Suggest conventional format if not used
