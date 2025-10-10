@@ -17,7 +17,7 @@ class OllamaProvider extends BaseProvider {
    */
   async generateCommitMessages(diff, options = {}) {
     const config = await this.getConfig();
-    const model = config.model || "qwen2.5-coder:latest";
+    const model = options.model || config.model || "deepseek-v3.1:671b-cloud";
 
     const prompt = this.buildPrompt(diff, options);
 
@@ -75,7 +75,7 @@ class OllamaProvider extends BaseProvider {
         timeout: 5000,
       });
 
-      const model = config.model || "mistral:7b-instruct";
+      const model = config.model || "deepseek-v3.1:671b-cloud";
       const availableModels = tagsResponse.data.models || [];
 
       if (!availableModels.some((m) => m.name.includes(model))) {
@@ -144,27 +144,72 @@ class OllamaProvider extends BaseProvider {
       return models.map((model) => ({
         id: model.name,
         name: model.name,
-        description: `Size: ${this.formatSize(model.size)}`,
+        description: this.getModelDescription(model.name),
         size: model.size,
         modified: model.modified_at,
+        available: true,
+        recommended: model.name.includes("deepseek-v3.1"),
       }));
     } catch (error) {
-      // Return common models if API call fails
+      // Return your specific models if API call fails
       return [
-        { id: "llama2", name: "Llama 2", description: "Meta's Llama 2 model" },
         {
-          id: "codellama",
-          name: "Code Llama",
-          description: "Code-specialized Llama model",
+          id: "deepseek-v3.1:671b-cloud",
+          name: "DeepSeek V3.1 (671B)",
+          description:
+            "Large language model with advanced reasoning capabilities",
+          available: true,
+          recommended: true,
         },
-        { id: "mistral", name: "Mistral", description: "Mistral 7B model" },
         {
-          id: "neural-chat",
-          name: "Neural Chat",
-          description: "Intel's neural chat model",
+          id: "qwen3-coder:480b-cloud",
+          name: "Qwen3 Coder (480B)",
+          description:
+            "Code-specialized model with excellent programming skills",
+          available: true,
+          recommended: false,
+        },
+        {
+          id: "qwen2.5-coder:latest",
+          name: "Qwen2.5 Coder (7.6B)",
+          description: "Efficient code generation model",
+          available: true,
+          recommended: false,
+        },
+        {
+          id: "mistral:7b-instruct",
+          name: "Mistral 7B Instruct",
+          description: "Instruction-tuned model for general tasks",
+          available: true,
+          recommended: false,
+        },
+        {
+          id: "deepseek-r1:8b",
+          name: "DeepSeek R1 (8B)",
+          description: "Reasoning-optimized model",
+          available: true,
+          recommended: false,
         },
       ];
     }
+  }
+
+  /**
+   * Get model description based on model name
+   */
+  getModelDescription(modelName) {
+    const descriptions = {
+      "deepseek-v3.1:671b-cloud":
+        "Large language model with advanced reasoning capabilities (671B parameters)",
+      "qwen3-coder:480b-cloud":
+        "Code-specialized model with excellent programming skills (480B parameters)",
+      "qwen2.5-coder:latest":
+        "Efficient code generation model (7.6B parameters)",
+      "mistral:7b-instruct":
+        "Instruction-tuned model for general tasks (7.2B parameters)",
+      "deepseek-r1:8b": "Reasoning-optimized model (8.2B parameters)",
+    };
+    return descriptions[modelName] || `AI model: ${modelName}`;
   }
 
   /**

@@ -250,7 +250,8 @@ class ConfigManager {
           providerConfig.model = providerConfig.model || "mixtral-8x7b-32768";
           break;
         case "ollama":
-          providerConfig.model = providerConfig.model || "llama2";
+          providerConfig.model =
+            providerConfig.model || "deepseek-v3.1:671b-cloud";
           providerConfig.baseURL = "http://localhost:11434";
           break;
       }
