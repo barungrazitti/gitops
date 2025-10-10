@@ -169,6 +169,11 @@ class BaseProvider {
     // Analyze diff for better context
     const diffAnalysis = this.analyzeDiffContent(diff);
 
+    // Ensure options has count
+    if (!options.count) {
+      options.count = 3;
+    }
+
     let prompt = `You are an expert software developer specializing in writing precise, meaningful commit messages. Analyze the following git diff and generate ${options.count || 3} highly relevant commit messages.
 
 CRITICAL REQUIREMENTS:
@@ -202,17 +207,28 @@ CONVENTIONAL COMMIT FORMAT:
     if (context) {
       prompt += `\n\nREPOSITORY CONTEXT:`;
       if (context.patterns) {
+        const commonTypes = context.patterns.mostUsedTypes
+          ? context.patterns.mostUsedTypes.map(([type]) => type).join(", ")
+          : "none detected";
+        const commonScopes = context.patterns.mostUsedScopes
+          ? context.patterns.mostUsedScopes.map(([scope]) => scope).join(", ")
+          : "none detected";
+
         prompt += `
-- Preferred format: ${context.patterns.preferredFormat}
-- Common types: ${context.patterns.mostUsedTypes.map(([type]) => type).join(", ")}
-- Common scopes: ${context.patterns.mostUsedScopes.map(([scope]) => scope).join(", ")}`;
+- Preferred format: ${context.patterns.preferredFormat || "freeform"}
+- Common types: ${commonTypes}
+- Common scopes: ${commonScopes}`;
       }
       if (context.files) {
+        const fileTypes = context.files.fileTypes || {};
+        const changedTypes =
+          Object.entries(fileTypes)
+            .filter(([_, count]) => count > 0)
+            .map(([type, count]) => `${type}(${count})`)
+            .join(", ") || "none";
+
         prompt += `
-- File types changed: ${Object.entries(context.files.fileTypes || {})
-          .filter(([_, count]) => count > 0)
-          .map(([type, count]) => `${type}(${count})`)
-          .join(", ")}
+- File types changed: ${changedTypes}
 - Inferred scope: ${context.files.scope || "general"}
 - Changes: +${context.files.changes?.insertions || 0} -${context.files.changes?.deletions || 0}`;
       }
@@ -286,11 +302,11 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
     // Detect likely purpose
     if (patterns.authentication.test(diff)) {
       analysis.likelyPurpose = "authentication/security enhancement";
-    } else if (patterns.api.endpoints.test(diff)) {
+    } else if (patterns["api endpoints"].test(diff)) {
       analysis.likelyPurpose = "API functionality change";
     } else if (patterns.database.test(diff)) {
       analysis.likelyPurpose = "database schema or query modification";
-    } else if (patterns.ui.components.test(diff)) {
+    } else if (patterns["ui components"].test(diff)) {
       analysis.likelyPurpose = "user interface update";
     } else if (patterns.testing.test(diff)) {
       analysis.likelyPurpose = "test coverage or test logic change";
@@ -361,38 +377,12 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
   }
 
   /**
-   * Parse AI response into commit messages
-   */
-  parseResponse(response) {
-    if (typeof response !== "string") {
-      throw new Error("Invalid response from AI provider");
-    }
-
-    // Split by lines and clean up
-    const messages = response
-      .split("\n")
-      .map(
-        (line) =>
-          line
-            .trim()
-            .replace(/^\d+\.?\s*/, "") // Strip numbering
-            .replace(/^- \s*/, "") // Strip dashes
-            .replace(/^\* \s*/, ""), // Strip asterisks
-      )
-      .filter((line) => line.length > 0)
-      .slice(0, 10); // Limit to 10 messages max
-
-    if (messages.length === 0) {
-      throw new Error("No valid commit messages found in AI response");
-    }
-
-    return messages;
-  }
-
-  /**
    * Handle API errors consistently
    */
   handleError(error, providerName) {
+    // Log the original error for debugging
+    console.warn(`Original error from ${providerName}:`, error);
+
     if (error.response) {
       // HTTP error response
       const status = error.response.status;
@@ -431,8 +421,39 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         `Request to ${providerName} timed out. Please try again.`,
       );
     } else {
-      throw new Error(`${providerName} error: ${error.message}`);
+      // Handle undefined error message safely
+      const errorMessage = error?.message || "Unknown error occurred";
+      throw new Error(`${providerName} error: ${errorMessage}`);
     }
+  }
+
+  /**
+   * Parse AI response into commit messages
+   */
+  parseResponse(response) {
+    if (typeof response !== "string") {
+      throw new Error("Invalid response from AI provider");
+    }
+
+    // Split by lines and clean up
+    const messages = response
+      .split("\n")
+      .map(
+        (line) =>
+          line
+            .trim()
+            .replace(/^\d+\.?\s*/, "") // Strip numbering
+            .replace(/^- \s*/, "") // Strip dashes
+            .replace(/^\* \s*/, ""), // Strip asterisks
+      )
+      .filter((line) => line.length > 0)
+      .slice(0, 10); // Limit to 10 messages max
+
+    if (messages.length === 0) {
+      throw new Error("No valid commit messages found in AI response");
+    }
+
+    return messages;
   }
 
   /**
@@ -495,7 +516,13 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
    * Get provider-specific configuration
    */
   async getConfig() {
-    return await this.configManager.getProviderConfig(this.name);
+    try {
+      const config = await this.configManager.getProviderConfig(this.name);
+      return config || {};
+    } catch (error) {
+      console.warn(`Failed to get config for ${this.name}:`, error.message);
+      return {};
+    }
   }
 }
 

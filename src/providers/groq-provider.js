@@ -28,6 +28,7 @@ class GroqProvider extends BaseProvider {
 
     this.client = new Groq({
       apiKey: config.apiKey,
+      dangerouslyAllowBrowser: false,
     });
   }
 
@@ -35,41 +36,45 @@ class GroqProvider extends BaseProvider {
    * Generate commit messages using Groq
    */
   async generateCommitMessages(diff, options = {}) {
-    await this.initializeClient();
-    const config = await this.getConfig();
+    try {
+      await this.initializeClient();
+      const config = await this.getConfig();
 
-    const prompt = this.buildPrompt(diff, options);
+      const prompt = this.buildPrompt(diff, options);
 
-    return await this.withRetry(async () => {
-      try {
-        const response = await this.client.chat.completions.create({
-          model: options.model || config.model || "llama-3.1-8b-instant",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are an expert software developer who writes clear, concise commit messages.",
-            },
-            {
-              role: "user",
-              content: prompt,
-            },
-          ],
-          max_tokens: config.maxTokens || 150,
-          temperature: config.temperature || 0.7,
-        });
+      return await this.withRetry(async () => {
+        try {
+          const response = await this.client.chat.completions.create({
+            model: options.model || config.model || "llama-3.1-8b-instant",
+            messages: [
+              {
+                role: "system",
+                content:
+                  "You are an expert software developer who writes clear, concise commit messages.",
+              },
+              {
+                role: "user",
+                content: prompt,
+              },
+            ],
+            max_tokens: config.maxTokens || 150,
+            temperature: config.temperature || 0.7,
+          });
 
-        const content = response.choices[0]?.message?.content;
-        if (!content) {
-          throw new Error("No response content from Groq");
+          const content = response.choices[0]?.message?.content;
+          if (!content) {
+            throw new Error("No response content from Groq");
+          }
+
+          const messages = this.parseResponse(content);
+          return messages.filter((msg) => this.validateCommitMessage(msg));
+        } catch (error) {
+          this.handleError(error, "Groq");
         }
-
-        const messages = this.parseResponse(content);
-        return messages.filter((msg) => this.validateCommitMessage(msg));
-      } catch (error) {
-        this.handleError(error, "Groq");
-      }
-    }, config.retries || 3);
+      }, config.retries || 3);
+    } catch (error) {
+      this.handleError(error, "Groq");
+    }
   }
 
   /**
