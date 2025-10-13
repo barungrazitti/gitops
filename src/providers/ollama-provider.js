@@ -78,7 +78,7 @@ class OllamaProvider extends BaseProvider {
       const model = config.model || "deepseek-v3.1:671b-cloud";
       const availableModels = tagsResponse.data.models || [];
 
-      if (!availableModels.some((m) => m.name.includes(model))) {
+      if (!availableModels.some((m) => m.name === model)) {
         return {
           success: false,
           message: `Model "${model}" not found. Available models: ${availableModels.map((m) => m.name).join(", ")}`,
