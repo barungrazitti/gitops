@@ -60,6 +60,7 @@ class AnalysisEngine {
           modified: fileStats.changed,
         },
         scope: this.inferScope(stagedFiles),
+        wordpress: this.detectWordPressContext(stagedFiles),
       };
 
       return context;
@@ -134,6 +135,17 @@ class AnalysisEngine {
       types: /type|interface|dto|entity|model/i,
       deps: /package|npm|yarn|dependency|requirement/i,
       perf: /performance|optimize|cache|lazy|memo/i,
+      // WordPress-specific patterns
+      wordpress: /wp-content|wp-includes|wp-admin|wordpress|wp-|\.php$/i,
+      plugins: /plugins?\/[^\/]+|wp-content\/plugins/i,
+      themes: /themes?\/[^\/]+|wp-content\/themes/i,
+      core: /wp-includes|wp-admin|wordpress\/wp-|\/wp-[^\/]+\.php$/i,
+      posts: /posts?|article|blog|content/i,
+      pages: /pages?|template|page-[^\/]*\.php/i,
+      media: /media|uploads|images?|assets?\/uploads/i,
+      widgets: /widgets?|sidebar|footer|header/i,
+      customizer: /customizer|customize|theme-options/i,
+      woocommerce: /woocommerce|wc-|shop|product|cart|checkout/i,
     };
 
     const scopeCounts = {};
@@ -146,10 +158,176 @@ class AnalysisEngine {
       }
     });
 
-    // Return the most common scope
-    const topScope = Object.entries(scopeCounts).sort((a, b) => b[1] - a[1])[0];
+    // Enhanced scope prioritization for WordPress
+    const prioritizedScopes = [
+      "wordpress",
+      "plugins",
+      "themes",
+      "core",
+      "posts",
+      "pages",
+      "media",
+      "widgets",
+      "customizer",
+      "woocommerce",
+      "api",
+      "ui",
+      "auth",
+      "db",
+      "config",
+      "test",
+      "docs",
+      "build",
+      "ci",
+      "utils",
+      "types",
+      "deps",
+      "perf",
+    ];
+
+    // Sort by count first, then by priority
+    const sortedScopes = Object.entries(scopeCounts).sort((a, b) => {
+      // First sort by count (descending)
+      if (b[1] !== a[1]) {
+        return b[1] - a[1];
+      }
+      // Then sort by priority
+      const aPriority = prioritizedScopes.indexOf(a[0]);
+      const bPriority = prioritizedScopes.indexOf(b[0]);
+      return aPriority - bPriority;
+    });
+
+    const topScope = sortedScopes[0];
+
+    // If WordPress is detected but not the top scope, check if we should prioritize it
+    if (scopeCounts.wordpress && topScope && topScope[0] !== "wordpress") {
+      const wordpressFiles = files.filter((file) =>
+        /wp-content|wp-includes|wp-admin|wp-config\.php/i.test(file),
+      );
+
+      // If more than half the files are WordPress-related, prioritize WordPress scope
+      if (wordpressFiles.length > files.length / 2) {
+        return "wordpress";
+      }
+    }
 
     return topScope ? topScope[0] : "general";
+  }
+
+  /**
+   * Detect WordPress-specific context from files
+   */
+  detectWordPressContext(files) {
+    const context = {
+      isWordPress: false,
+      type: null,
+      components: [],
+      specificPages: [],
+      plugins: [],
+      themes: [],
+    };
+
+    // Check if this is a WordPress project
+    const hasWordPressFiles = files.some((file) =>
+      /wp-content|wp-includes|wp-admin|wp-config\.php/i.test(file),
+    );
+
+    if (!hasWordPressFiles) {
+      return context;
+    }
+
+    context.isWordPress = true;
+
+    // Analyze each file for WordPress-specific context
+    files.forEach((file) => {
+      const lowerFile = file.toLowerCase();
+
+      // Detect WordPress components
+      if (/wp-content\/plugins/i.test(lowerFile)) {
+        context.type = "plugin";
+        const pluginMatch = file.match(/wp-content\/plugins\/([^\/]+)/i);
+        if (pluginMatch && !context.plugins.includes(pluginMatch[1])) {
+          context.plugins.push(pluginMatch[1]);
+        }
+      }
+
+      if (/wp-content\/themes/i.test(lowerFile)) {
+        context.type = "theme";
+        const themeMatch = file.match(/wp-content\/themes\/([^\/]+)/i);
+        if (themeMatch && !context.themes.includes(themeMatch[1])) {
+          context.themes.push(themeMatch[1]);
+        }
+      }
+
+      if (/wp-includes|wp-admin/i.test(lowerFile)) {
+        context.type = "core";
+      }
+
+      // Detect specific pages or templates
+      const pagePatterns = [
+        /page-([^.]+)\.php/,
+        /template-([^.]+)\.php/,
+        /single-([^.]+)\.php/,
+        /archive-([^.]+)\.php/,
+        /category-([^.]+)\.php/,
+        /tag-([^.]+)\.php/,
+        /taxonomy-([^.]+)\.php/,
+        /author-([^.]+)\.php/,
+        /date-([^.]+)\.php/,
+        /search-([^.]+)\.php/,
+        /404\.php/,
+        /front-page\.php/,
+        /home\.php/,
+        /index\.php/,
+      ];
+
+      for (const pattern of pagePatterns) {
+        const match = file.match(pattern);
+        if (match) {
+          const pageName = match[1] || match[0].replace(".php", "");
+          if (!context.specificPages.includes(pageName)) {
+            context.specificPages.push(pageName);
+          }
+        }
+      }
+
+      // Detect WordPress components
+      if (/functions\.php/i.test(lowerFile)) {
+        context.components.push("theme-functions");
+      }
+      if (/style\.css/i.test(lowerFile)) {
+        context.components.push("theme-styles");
+      }
+      if (/script\.js|main\.js/i.test(lowerFile)) {
+        context.components.push("theme-scripts");
+      }
+      if (/customizer/i.test(lowerFile)) {
+        context.components.push("customizer");
+      }
+      if (/widget/i.test(lowerFile)) {
+        context.components.push("widgets");
+      }
+      if (/sidebar/i.test(lowerFile)) {
+        context.components.push("sidebar");
+      }
+      if (/header|footer/i.test(lowerFile)) {
+        context.components.push("layout");
+      }
+      if (/loop|content/i.test(lowerFile)) {
+        context.components.push("content-loop");
+      }
+      if (/comment/i.test(lowerFile)) {
+        context.components.push("comments");
+      }
+      if (/woocommerce|wc-/i.test(lowerFile)) {
+        context.components.push("woocommerce");
+      }
+    });
+
+    // Remove duplicates
+    context.components = [...new Set(context.components)];
+
+    return context;
   }
 
   /**
@@ -177,6 +355,7 @@ class AnalysisEngine {
         go: ["go.mod", "main.go"],
         rust: ["Cargo.toml", "src/main.rs"],
         docker: ["Dockerfile", "docker-compose.yml"],
+        wordpress: ["wp-config.php", "wp-content", "wp-includes", "wp-admin"],
       };
 
       const detectedTypes = [];
@@ -219,6 +398,43 @@ class AnalysisEngine {
             }
           } catch (error) {
             // Ignore package.json parsing errors
+          }
+        }
+      }
+
+      // Special handling for WordPress
+      if (detectedTypes.includes("wordpress")) {
+        // Check for WordPress-specific indicators
+        const wpContentPath = path.join(repoRoot, "wp-content");
+        if (await fs.pathExists(wpContentPath)) {
+          const hasPlugins = await fs.pathExists(
+            path.join(wpContentPath, "plugins"),
+          );
+          const hasThemes = await fs.pathExists(
+            path.join(wpContentPath, "themes"),
+          );
+
+          if (hasPlugins) {
+            detectedTypes.push("wordpress-plugins");
+          }
+          if (hasThemes) {
+            detectedTypes.push("wordpress-themes");
+          }
+        }
+
+        // Check for common WordPress files
+        const wpConfigPath = path.join(repoRoot, "wp-config.php");
+        if (await fs.pathExists(wpConfigPath)) {
+          try {
+            const wpConfigContent = await fs.readFile(wpConfigPath, "utf8");
+            if (
+              wpConfigContent.includes("WP_DEBUG") ||
+              wpConfigContent.includes("DB_NAME")
+            ) {
+              detectedTypes.push("wordpress-core");
+            }
+          } catch (error) {
+            // Ignore file reading errors
           }
         }
       }

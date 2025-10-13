@@ -95,43 +95,75 @@ class MessageFormatter {
         /implement|create|introduce|build/,
         /new\s+(feature|function|class|component|endpoint|service)/,
         /enable|support|add\s+support/,
+        // WordPress-specific
+        /add\s+(plugin|theme|widget|shortcode|hook|filter)/,
+        /register\s+(post\s+type|taxonomy|menu|sidebar|widget)/,
+        /create\s+(template|page|post|custom\s+post)/,
       ],
       fix: [
         /fix|bug|issue|error|problem|resolve|correct/,
         /broken|crash|fail|exception|throw/,
         /patch|hotfix|regression/,
         /prevent|handle|catch|guard/,
+        // WordPress-specific
+        /fix\s+(plugin|theme|widget|shortcode)/,
+        /resolve\s+(conflict|error|issue)\s+with\s+(plugin|theme)/,
+        /debug\s+(wordpress|wp|hook|filter)/,
       ],
       docs: [
         /doc|readme|comment|documentation/,
         /guide|tutorial|example|explanation/,
         /update\s+doc|add\s+doc|improve\s+doc/,
+        // WordPress-specific
+        /update\s+(readme|changelog|documentation)\s+for\s+(plugin|theme)/,
+        /add\s+(inline|php|code)\s+comments/,
+        /document\s+(hook|filter|action|function)/,
       ],
       style: [
         /format|style|lint|prettier|whitespace/,
         /indentation|spacing|line\s+ending/,
         /cosmetic|visual|appearance/,
+        // WordPress-specific
+        /update\s+(css|scss|style)\s+for\s+(theme|plugin)/,
+        /improve\s+(design|layout|visual|ui|ux)/,
+        /adjust\s+(spacing|color|typography|font)/,
       ],
       refactor: [
         /refactor|restructure|reorganize|clean/,
         /improve|optimize|simplify|streamline/,
         /extract|consolidate|merge|split/,
         /rename|reorder|rearrange/,
+        // WordPress-specific
+        /refactor\s+(wordpress|wp|hook|filter|function)/,
+        /reorganize\s+(theme|plugin)\s+(structure|code)/,
+        /optimize\s+(wordpress|database|query)/,
       ],
       perf: [
         /performance|perf|optimize|speed|fast/,
         /cache|lazy|memo|async|parallel/,
         /improve\s+performance|boost|accelerate/,
+        // WordPress-specific
+        /optimize\s+(wordpress|wp|database|query|performance)/,
+        /improve\s+(page\s+load|loading|site\s+speed)/,
+        /add\s+(caching|cache)\s+to\s+(plugin|theme)/,
       ],
       test: [
         /test|spec|coverage|jest|mocha|cypress/,
         /unit\s+test|integration\s+test|e2e/,
         /add\s+test|fix\s+test|improve\s+test/,
+        // WordPress-specific
+        /test\s+(wordpress|plugin|theme|hook|filter)/,
+        /add\s+(php|wordpress)\s+tests/,
+        /improve\s+(plugin|theme)\s+testing/,
       ],
       chore: [
         /chore|maintenance|update|upgrade|bump/,
         /version|dependency|package|npm|yarn/,
         /cleanup|housekeeping|tidy/,
+        // WordPress-specific
+        /update\s+(wordpress|wp|plugin|theme)\s+version/,
+        /upgrade\s+(wordpress|plugin|theme)/,
+        /cleanup\s+(wordpress|wp|database|code)/,
       ],
       ci: [
         /ci|pipeline|workflow|github|gitlab/,
@@ -142,6 +174,10 @@ class MessageFormatter {
         /build|webpack|rollup|babel|compile/,
         /bundle|package|transpile|minify/,
         /script|task|automation/,
+        // WordPress-specific
+        /build\s+(wordpress|theme|plugin)/,
+        /compile\s+(assets|css|js|scss)\s+for\s+(theme|plugin)/,
+        /minify\s+(css|js|assets)/,
       ],
     };
 
@@ -180,6 +216,17 @@ class MessageFormatter {
   inferScope(message, context) {
     if (!context || !context.files) {
       return this.inferScopeFromMessage(message);
+    }
+
+    // Handle WordPress-specific context
+    if (context.files.wordpress && context.files.wordpress.isWordPress) {
+      const wpScope = this.inferWordPressScope(
+        message,
+        context.files.wordpress,
+      );
+      if (wpScope) {
+        return wpScope;
+      }
     }
 
     // Use the inferred scope from file analysis with confidence scoring
@@ -278,6 +325,91 @@ class MessageFormatter {
     }
 
     return null;
+  }
+
+  /**
+   * Infer WordPress-specific scope from context
+   */
+  inferWordPressScope(message, wordpressContext) {
+    const { type, specificPages, plugins, themes, components } =
+      wordpressContext;
+    const lowerMessage = message.toLowerCase();
+
+    // Priority 1: Specific pages/templates
+    if (specificPages.length > 0) {
+      for (const page of specificPages) {
+        if (lowerMessage.includes(page.toLowerCase())) {
+          return page;
+        }
+      }
+      // If no specific match but we have page changes, use the first page
+      if (specificPages.length === 1) {
+        return specificPages[0];
+      }
+    }
+
+    // Priority 2: Plugin or theme names
+    if (plugins.length > 0) {
+      for (const plugin of plugins) {
+        if (lowerMessage.includes(plugin.toLowerCase())) {
+          return plugin;
+        }
+      }
+      if (plugins.length === 1) {
+        return plugins[0];
+      }
+    }
+
+    if (themes.length > 0) {
+      for (const theme of themes) {
+        if (lowerMessage.includes(theme.toLowerCase())) {
+          return theme;
+        }
+      }
+      if (themes.length === 1) {
+        return themes[0];
+      }
+    }
+
+    // Priority 3: WordPress component types
+    if (components.length > 0) {
+      const componentScopeMap = {
+        "theme-functions": "functions",
+        "theme-styles": "styles",
+        "theme-scripts": "scripts",
+        customizer: "customizer",
+        widgets: "widgets",
+        sidebar: "sidebar",
+        layout: "layout",
+        "content-loop": "content",
+        comments: "comments",
+        woocommerce: "woocommerce",
+      };
+
+      for (const component of components) {
+        if (lowerMessage.includes(component.replace("-", " "))) {
+          return componentScopeMap[component] || component;
+        }
+      }
+
+      // If single component, use it
+      if (components.length === 1) {
+        return componentScopeMap[components[0]] || components[0];
+      }
+    }
+
+    // Priority 4: WordPress type (plugin/theme/core)
+    if (type) {
+      const typeScopeMap = {
+        plugin: "plugin",
+        theme: "theme",
+        core: "wordpress-core",
+      };
+      return typeScopeMap[type];
+    }
+
+    // Priority 5: General WordPress
+    return "wordpress";
   }
 
   /**
