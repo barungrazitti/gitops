@@ -7,11 +7,13 @@ Complete installation, setup, and usage guide with real-world examples.
 ### Installation Options
 
 **Global Installation (Recommended):**
+
 ```bash
 npm install -g ai-commit-generator
 ```
 
 **Local Installation:**
+
 ```bash
 # In your project directory
 npm install ai-commit-generator
@@ -21,6 +23,7 @@ npx aic
 ```
 
 **From Source (Development):**
+
 ```bash
 git clone <repository-url>
 cd ai-commit-generator
@@ -31,17 +34,19 @@ npm link  # Makes 'aic' available globally
 ### Initial Setup
 
 **Run Setup Wizard:**
+
 ```bash
 aic setup
 ```
 
 **Example Setup Flow:**
+
 ```bash
 $ aic setup
 
 🚀 AI Commit Generator Setup Wizard
 
-? Select your preferred AI provider: 
+? Select your preferred AI provider:
 ❯ OpenAI (GPT-3.5/GPT-4)
   Anthropic Claude
   Google Gemini
@@ -59,21 +64,23 @@ $ aic setup
 
 ### Getting API Keys
 
-| Provider | URL | Notes |
-|----------|-----|-------|
-| **OpenAI** | [platform.openai.com](https://platform.openai.com/api-keys) | Most popular, starts with `sk-` |
-| **Anthropic** | [console.anthropic.com](https://console.anthropic.com/) | Claude 3 models |
-| **Google Gemini** | [makersuite.google.com](https://makersuite.google.com/app/apikey) | Free tier available |
-| **Ollama** | [ollama.ai](https://ollama.ai/) | Local models, no API key needed |
+| Provider          | URL                                                               | Notes                           |
+| ----------------- | ----------------------------------------------------------------- | ------------------------------- |
+| **OpenAI**        | [platform.openai.com](https://platform.openai.com/api-keys)       | Most popular, starts with `sk-` |
+| **Anthropic**     | [console.anthropic.com](https://console.anthropic.com/)           | Claude 3 models                 |
+| **Google Gemini** | [makersuite.google.com](https://makersuite.google.com/app/apikey) | Free tier available             |
+| **Ollama**        | [ollama.ai](https://ollama.ai/)                                   | Local models, no API key needed |
 
 ### Verification
 
 **Check if everything is working:**
+
 ```bash
 aic status
 ```
 
 **Expected output:**
+
 ```
 📊 AIC Status
 
@@ -94,22 +101,26 @@ aic status
 ### First Commit Example
 
 1. **Navigate to your project:**
+
    ```bash
    cd my-project
    ```
 
 2. **Make some changes:**
+
    ```bash
    echo "console.log('Hello World');" > app.js
    echo "# My Project" > README.md
    ```
 
 3. **Run AIC:**
+
    ```bash
    aic
    ```
 
 4. **Select commit message:**
+
    ```
    ? Select commit message:
    ❯ 1. feat: add hello world application and project documentation
@@ -139,6 +150,7 @@ aic config --list             # Show all settings
 ### Common Issues & Solutions
 
 **"Command not found: aic"**
+
 ```bash
 # Reinstall globally
 npm install -g ai-commit-generator
@@ -151,6 +163,7 @@ npx aic
 ```
 
 **"Not a git repository"**
+
 ```bash
 # Initialize git
 git init
@@ -160,6 +173,7 @@ git remote add origin https://github.com/username/repo.git
 ```
 
 **"AI provider not configured"**
+
 ```bash
 # Run setup again
 aic setup
@@ -170,6 +184,7 @@ aic config --set apiKey=your-api-key
 ```
 
 **"No changes detected"**
+
 ```bash
 # Check git status
 git status
@@ -182,6 +197,7 @@ aic --force
 ```
 
 **"API key invalid"**
+
 ```bash
 # Check current key
 aic config --get apiKey
@@ -192,6 +208,7 @@ aic setup
 ```
 
 **"Push failed"**
+
 ```bash
 # Check git authentication
 git push origin main
@@ -203,6 +220,7 @@ git remote -v
 ## 🚀 Daily Development
 
 ### Morning Routine
+
 ```bash
 # Pull latest changes and start working
 git pull
@@ -217,6 +235,7 @@ aic
 ```
 
 ### Quick Fixes
+
 ```bash
 # Fix a bug
 sed -i 's/bug/fixed/g' src/utils.js
@@ -227,6 +246,7 @@ aic "fix: resolve utils bug"
 ```
 
 ### End of Day
+
 ```bash
 # Commit all your work
 aic
@@ -236,6 +256,7 @@ aic
 ## 🔧 Different Project Types
 
 ### Frontend Development
+
 ```bash
 # Working on React components
 touch src/components/NewButton.jsx
@@ -246,6 +267,7 @@ aic
 ```
 
 ### Backend API
+
 ```bash
 # Add new API endpoint
 echo "app.get('/api/users', handler)" >> server.js
@@ -255,6 +277,7 @@ aic
 ```
 
 ### Documentation Updates
+
 ```bash
 # Update README
 echo "## New Section" >> README.md
@@ -264,6 +287,7 @@ aic
 ```
 
 ### Configuration Changes
+
 ```bash
 # Update package.json
 npm install express
@@ -275,6 +299,7 @@ aic
 ## 🎯 Team Workflows
 
 ### Feature Development
+
 ```bash
 # Create feature branch
 git checkout -b feature/user-auth
@@ -299,6 +324,7 @@ git merge feature/user-auth
 ```
 
 ### Bug Fixes
+
 ```bash
 # Hotfix branch
 git checkout -b hotfix/critical-bug
@@ -315,6 +341,7 @@ git merge hotfix/critical-bug
 ```
 
 ### Code Reviews
+
 ```bash
 # Address review comments
 echo "// Added comment as requested" >> src/app.js
@@ -326,6 +353,7 @@ aic
 ## 🔄 Conflict Resolution Examples
 
 ### Automatic Resolution
+
 ```bash
 # Someone else pushed changes
 aic
@@ -335,6 +363,7 @@ aic
 ```
 
 ### Manual Resolution
+
 ```bash
 # Complex conflict in source code
 aic
@@ -347,6 +376,7 @@ aic
 ## 🎨 Customization Examples
 
 ### Provider Switching
+
 ```bash
 # Use different AI provider for this commit
 aic --provider anthropic
@@ -356,6 +386,7 @@ aic config --set defaultProvider=anthropic
 ```
 
 ### Language Preferences
+
 ```bash
 # Spanish commit messages
 aic config --set language=es
@@ -364,6 +395,7 @@ aic
 ```
 
 ### Conventional Commits
+
 ```bash
 # Enable conventional commits
 aic config --set conventionalCommits=true
@@ -374,6 +406,7 @@ aic
 ## 🚀 Advanced Scenarios
 
 ### Monorepo Management
+
 ```bash
 # Working in packages/frontend
 cd packages/frontend
@@ -382,7 +415,7 @@ echo "new component" > Button.jsx
 aic
 # ✅ AI generates: "feat(frontend): add Button component"
 
-# Working in packages/backend  
+# Working in packages/backend
 cd ../backend
 echo "new route" > routes.js
 
@@ -391,6 +424,7 @@ aic
 ```
 
 ### Release Preparation
+
 ```bash
 # Update version
 npm version patch
@@ -403,6 +437,7 @@ aic "chore: prepare v1.0.1 release"
 ```
 
 ### Emergency Fixes
+
 ```bash
 # Critical production issue
 echo "emergency fix" > hotfix.js
@@ -415,6 +450,7 @@ aic "fix: critical production hotfix - deploy immediately"
 ## 🛠️ Integration Examples
 
 ### CI/CD Integration
+
 ```bash
 # In your CI script
 if [ "$CI" != "true" ]; then
@@ -423,6 +459,7 @@ fi
 ```
 
 ### Git Hooks
+
 ```bash
 # Pre-commit hook using AIC
 #!/bin/sh
@@ -432,11 +469,12 @@ fi
 ```
 
 ### IDE Integration
+
 ```bash
 # VS Code task
 {
   "label": "AIC Commit",
-  "type": "shell", 
+  "type": "shell",
   "command": "aic",
   "group": "build"
 }
@@ -445,6 +483,7 @@ fi
 ## 📊 Productivity Examples
 
 ### Before AIC
+
 ```bash
 git add .
 git status
@@ -459,20 +498,23 @@ git push
 ```
 
 ### With AIC
+
 ```bash
 aic
 # 😎 1 command, 30 seconds
 ```
 
 ### Time Savings
+
 - **Daily commits**: 5 minutes → 30 seconds
-- **Conflict resolution**: 10 minutes → 2 minutes  
+- **Conflict resolution**: 10 minutes → 2 minutes
 - **Message quality**: Poor → AI-generated excellence
 - **Workflow errors**: Common → Rare
 
 ## 🎯 Best Practices from Examples
 
 ### Do's ✅
+
 - Use `aic` for regular development
 - Use custom messages for releases: `aic "v1.0.0"`
 - Use `--dry-run` when unsure
@@ -480,6 +522,7 @@ aic
 - Let AI learn your patterns
 
 ### Don'ts ❌
+
 - Don't use for sensitive commits without review
 - Don't ignore conflict resolution prompts
 - Don't skip `aic setup` configuration
@@ -488,18 +531,21 @@ aic
 ## 🔍 Debugging Examples
 
 ### Check Status
+
 ```bash
 aic status
 # Shows git state, AI config, pending changes
 ```
 
 ### Dry Run First
+
 ```bash
 aic --dry-run
 # See what would happen without doing it
 ```
 
 ### Manual Fallback
+
 ```bash
 # If AIC fails, you can always fall back:
 git add .
@@ -514,4 +560,4 @@ git push
 
 ---
 
-**Created by [Barun Tayenjam](https://github.com/baruntayenjam) with the help of [RovoDev](https://rovodev.com)**
+**Created by [Barun Tayenjam](https://github.com/baruntayenjam)**

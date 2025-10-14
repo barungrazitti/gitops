@@ -18,8 +18,9 @@ aic
 ```
 
 **What `aic` does:**
+
 1. 🔍 Checks repository & changes
-2. 📦 Stages all changes  
+2. 📦 Stages all changes
 3. 🤖 Generates AI commit message
 4. 💾 Commits changes
 5. ⬇️ Pulls latest changes
@@ -31,6 +32,7 @@ aic
 ## 🚀 Features
 
 ### ✨ Core Features
+
 - **Multi-AI Provider Support**: OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Groq, Ollama
 - **Context-Aware Generation**: Analyzes staged changes via `git diff`
 - **Repository Learning**: Learns from commit history to match team style
@@ -41,6 +43,7 @@ aic
 - **Multi-language Support**: Localization for commit messages
 
 ### 🔧 Advanced Features
+
 - **Team Style Adaptation**: Automatically adapt to project-specific commit patterns
 - **File-specific Analysis**: Analyze changes per file for better context
 - **Statistics & Analytics**: Track usage and AI provider performance
@@ -49,11 +52,13 @@ aic
 ## 📦 Installation
 
 ### Global Installation (Recommended)
+
 ```bash
 npm install -g ai-commit-generator
 ```
 
 ### Local Installation
+
 ```bash
 npm install ai-commit-generator
 npx aicommit setup
@@ -68,6 +73,7 @@ aicommit setup
 ```
 
 This will guide you through:
+
 - Selecting an AI provider
 - Configuring API keys
 - Setting commit message preferences
@@ -76,16 +82,19 @@ This will guide you through:
 ## 🎯 Usage
 
 ### Installation
+
 ```bash
 npm install -g ai-commit-generator
 ```
 
 ### Setup (One Time)
+
 ```bash
 aic setup
 ```
 
 ### Basic Usage
+
 ```bash
 # One command does everything:
 aic
@@ -98,8 +107,9 @@ aic quick feat
 ```
 
 **What `aic` does:**
+
 1. 🔍 Checks repository & changes
-2. 📦 Stages all changes  
+2. 📦 Stages all changes
 3. 🤖 Generates AI commit message
 4. 💾 Commits changes
 5. ⬇️ Pulls latest changes
@@ -107,6 +117,7 @@ aic quick feat
 7. ⬆️ Pushes to remote
 
 ### Check Status
+
 ```bash
 aic status    # Show git and AI configuration
 aic --help    # Show all commands
@@ -159,15 +170,15 @@ aicommit hook --uninstall
 
 ## 🤖 Supported AI Providers
 
-| Provider | Models | API Key Required | Local |
-|----------|--------|------------------|-------|
-| **OpenAI** | GPT-3.5, GPT-4 | ✅ | ❌ |
-| **Anthropic** | Claude 3 (Haiku, Sonnet, Opus) | ✅ | ❌ |
-| **Google Gemini** | Gemini Pro | ✅ | ❌ |
-| **Mistral** | Tiny, Small, Medium, Large | ✅ | ❌ |
-| **Cohere** | Command, Command Light | ✅ | ❌ |
-| **Groq** | Mixtral, Llama 2, Gemma | ✅ | ❌ |
-| **Ollama** | Any local model | ❌ | ✅ |
+| Provider          | Models                         | API Key Required | Local |
+| ----------------- | ------------------------------ | ---------------- | ----- |
+| **OpenAI**        | GPT-3.5, GPT-4                 | ✅               | ❌    |
+| **Anthropic**     | Claude 3 (Haiku, Sonnet, Opus) | ✅               | ❌    |
+| **Google Gemini** | Gemini Pro                     | ✅               | ❌    |
+| **Mistral**       | Tiny, Small, Medium, Large     | ✅               | ❌    |
+| **Cohere**        | Command, Command Light         | ✅               | ❌    |
+| **Groq**          | Mixtral, Llama 2, Gemma        | ✅               | ❌    |
+| **Ollama**        | Any local model                | ❌               | ✅    |
 
 ### Getting API Keys
 
@@ -199,16 +210,16 @@ aicommit config --reset
 
 ### Configuration Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `defaultProvider` | AI provider to use | `openai` |
-| `apiKey` | API key for the provider | `null` |
-| `conventionalCommits` | Use conventional commit format | `true` |
-| `language` | Commit message language | `en` |
-| `messageCount` | Number of messages to generate | `3` |
-| `maxTokens` | Maximum tokens for AI response | `150` |
-| `temperature` | AI creativity level (0-2) | `0.7` |
-| `cache` | Enable response caching | `true` |
+| Option                | Description                    | Default  |
+| --------------------- | ------------------------------ | -------- |
+| `defaultProvider`     | AI provider to use             | `openai` |
+| `apiKey`              | API key for the provider       | `null`   |
+| `conventionalCommits` | Use conventional commit format | `true`   |
+| `language`            | Commit message language        | `en`     |
+| `messageCount`        | Number of messages to generate | `3`      |
+| `maxTokens`           | Maximum tokens for AI response | `150`    |
+| `temperature`         | AI creativity level (0-2)      | `0.7`    |
+| `cache`               | Enable response caching        | `true`   |
 
 ## 📊 Statistics
 
@@ -275,11 +286,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-**Created by [Barun Tayenjam](https://github.com/baruntayenjam) with the help of [RovoDev](https://rovodev.com)**
+**Created by [Barun Tayenjam](https://github.com/baruntayenjam)**
 
 ## 🙏 Acknowledgments
 
 Inspired by:
+
 - [aicommits](https://github.com/Nutlope/aicommits) by Nutlope
 - [aicommit2](https://github.com/tak-bro/aicommit2) by tak-bro
 - [gcop](https://github.com/yegor256/gcop) by yegor256
@@ -292,4 +304,4 @@ Inspired by:
 
 ---
 
-Made with ❤️ by [Barun Tayenjam](https://github.com/baruntayenjam) with the help of [RovoDev](https://rovodev.com)
+Made with ❤️ by [Barun Tayenjam](https://github.com/baruntayenjam)
