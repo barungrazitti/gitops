@@ -2,6 +2,31 @@
 
 A powerful, context-aware AI commit message generator built in Node.js that combines the best features from successful tools like aicommits, aicommit2, and gcop. This tool analyzes git diffs, learns from repository history, and generates meaningful commit messages using multiple AI providers.
 
+## 🎉 Version 1.0.0 Release
+
+We're excited to announce the first stable release of AI Commit Message Generator! This milestone represents months of development and testing, bringing you a production-ready tool for intelligent commit message generation.
+
+### ✨ What's New in v1.0.0
+
+- **🔧 Enhanced Configuration Management**: Environment-driven configuration with provider-specific model handling
+- **🛡️ Improved Security**: Added AuthService with password hashing and JWT token support
+- **📊 Smart Analysis Engine**: WordPress-specific pattern detection and enhanced file analysis
+- **🔄 Better Error Handling**: Comprehensive error handling across all AI providers
+- **🎯 Refined Message Generation**: Improved context awareness and commit message relevance
+- **🧪 Extensive Testing**: Comprehensive test coverage for all core components
+- **📚 Better Documentation**: Updated examples and improved setup guides
+
+### 🚀 Key Features Delivered
+
+- Multi-AI provider support (OpenAI, Anthropic, Gemini, Mistral, Cohere, Groq, Ollama)
+- Simple one-command workflow with `aic`
+- Interactive mode with message regeneration
+- Git hook integration
+- Conventional commits support
+- Smart caching and statistics
+- Team style adaptation
+- Proxy support for enterprise environments
+
 ## 🚀 **NEW: Super Simple Workflow**
 
 **Just type `aic` and let AI handle your entire git workflow!**
@@ -18,8 +43,9 @@ aic
 ```
 
 **What `aic` does:**
+
 1. 🔍 Checks repository & changes
-2. 📦 Stages all changes  
+2. 📦 Stages all changes
 3. 🤖 Generates AI commit message
 4. 💾 Commits changes
 5. ⬇️ Pulls latest changes
@@ -31,6 +57,7 @@ aic
 ## 🚀 Features
 
 ### ✨ Core Features
+
 - **Multi-AI Provider Support**: OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Groq, Ollama
 - **Context-Aware Generation**: Analyzes staged changes via `git diff`
 - **Repository Learning**: Learns from commit history to match team style
@@ -41,6 +68,7 @@ aic
 - **Multi-language Support**: Localization for commit messages
 
 ### 🔧 Advanced Features
+
 - **Team Style Adaptation**: Automatically adapt to project-specific commit patterns
 - **File-specific Analysis**: Analyze changes per file for better context
 - **Statistics & Analytics**: Track usage and AI provider performance
@@ -49,11 +77,13 @@ aic
 ## 📦 Installation
 
 ### Global Installation (Recommended)
+
 ```bash
 npm install -g ai-commit-generator
 ```
 
 ### Local Installation
+
 ```bash
 npm install ai-commit-generator
 npx aicommit setup
@@ -68,6 +98,7 @@ aicommit setup
 ```
 
 This will guide you through:
+
 - Selecting an AI provider
 - Configuring API keys
 - Setting commit message preferences
@@ -76,16 +107,19 @@ This will guide you through:
 ## 🎯 Usage
 
 ### Installation
+
 ```bash
 npm install -g ai-commit-generator
 ```
 
 ### Setup (One Time)
+
 ```bash
 aic setup
 ```
 
 ### Basic Usage
+
 ```bash
 # One command does everything:
 aic
@@ -98,8 +132,9 @@ aic quick feat
 ```
 
 **What `aic` does:**
+
 1. 🔍 Checks repository & changes
-2. 📦 Stages all changes  
+2. 📦 Stages all changes
 3. 🤖 Generates AI commit message
 4. 💾 Commits changes
 5. ⬇️ Pulls latest changes
@@ -107,6 +142,7 @@ aic quick feat
 7. ⬆️ Pushes to remote
 
 ### Check Status
+
 ```bash
 aic status    # Show git and AI configuration
 aic --help    # Show all commands
@@ -159,15 +195,15 @@ aicommit hook --uninstall
 
 ## 🤖 Supported AI Providers
 
-| Provider | Models | API Key Required | Local |
-|----------|--------|------------------|-------|
-| **OpenAI** | GPT-3.5, GPT-4 | ✅ | ❌ |
-| **Anthropic** | Claude 3 (Haiku, Sonnet, Opus) | ✅ | ❌ |
-| **Google Gemini** | Gemini Pro | ✅ | ❌ |
-| **Mistral** | Tiny, Small, Medium, Large | ✅ | ❌ |
-| **Cohere** | Command, Command Light | ✅ | ❌ |
-| **Groq** | Mixtral, Llama 2, Gemma | ✅ | ❌ |
-| **Ollama** | Any local model | ❌ | ✅ |
+| Provider          | Models                         | API Key Required | Local |
+| ----------------- | ------------------------------ | ---------------- | ----- |
+| **OpenAI**        | GPT-3.5, GPT-4                 | ✅               | ❌    |
+| **Anthropic**     | Claude 3 (Haiku, Sonnet, Opus) | ✅               | ❌    |
+| **Google Gemini** | Gemini Pro                     | ✅               | ❌    |
+| **Mistral**       | Tiny, Small, Medium, Large     | ✅               | ❌    |
+| **Cohere**        | Command, Command Light         | ✅               | ❌    |
+| **Groq**          | Mixtral, Llama 2, Gemma        | ✅               | ❌    |
+| **Ollama**        | Any local model                | ❌               | ✅    |
 
 ### Getting API Keys
 
@@ -199,16 +235,16 @@ aicommit config --reset
 
 ### Configuration Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `defaultProvider` | AI provider to use | `openai` |
-| `apiKey` | API key for the provider | `null` |
-| `conventionalCommits` | Use conventional commit format | `true` |
-| `language` | Commit message language | `en` |
-| `messageCount` | Number of messages to generate | `3` |
-| `maxTokens` | Maximum tokens for AI response | `150` |
-| `temperature` | AI creativity level (0-2) | `0.7` |
-| `cache` | Enable response caching | `true` |
+| Option                | Description                    | Default  |
+| --------------------- | ------------------------------ | -------- |
+| `defaultProvider`     | AI provider to use             | `openai` |
+| `apiKey`              | API key for the provider       | `null`   |
+| `conventionalCommits` | Use conventional commit format | `true`   |
+| `language`            | Commit message language        | `en`     |
+| `messageCount`        | Number of messages to generate | `3`      |
+| `maxTokens`           | Maximum tokens for AI response | `150`    |
+| `temperature`         | AI creativity level (0-2)      | `0.7`    |
+| `cache`               | Enable response caching        | `true`   |
 
 ## 📊 Statistics
 
@@ -280,6 +316,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 Inspired by:
+
 - [aicommits](https://github.com/Nutlope/aicommits) by Nutlope
 - [aicommit2](https://github.com/tak-bro/aicommit2) by tak-bro
 - [gcop](https://github.com/yegor256/gcop) by yegor256
@@ -289,6 +326,43 @@ Inspired by:
 - 📧 Email: support@ai-commit-generator.com
 - 🐛 Issues: [GitHub Issues](https://github.com/your-username/ai-commit-generator/issues)
 - 💬 Discussions: [GitHub Discussions](https://github.com/your-username/ai-commit-generator/discussions)
+
+## 📋 Changelog
+
+### v1.0.0 (2025-10-14) - Initial Stable Release
+
+#### 🎯 Major Features
+
+- **Multi-AI Provider Support**: Full integration with OpenAI, Anthropic, Gemini, Mistral, Cohere, Groq, and Ollama
+- **Simple Workflow**: One-command `aic` that handles entire git workflow automatically
+- **Interactive Mode**: Message selection, regeneration, and custom message options
+- **Git Hook Integration**: Seamless `prepare-commit-msg` hook integration
+
+#### 🔧 Enhancements
+
+- **Configuration Management**: Environment-driven configuration with provider-specific model handling
+- **Analysis Engine**: Enhanced file analysis with WordPress-specific pattern detection
+- **Message Formatting**: Improved context awareness and commit message relevance
+- **Security Layer**: AuthService with password hashing and JWT token support
+
+#### 🛠️ Technical Improvements
+
+- **Error Handling**: Comprehensive error handling across all AI providers
+- **Caching System**: Smart caching to reduce API calls and improve performance
+- **Statistics**: Usage tracking and AI provider performance metrics
+- **Testing**: Extensive test coverage for all core components
+
+#### 📚 Documentation
+
+- **Updated README**: Comprehensive installation, setup, and usage guides
+- **Examples**: Detailed examples for different use cases
+- **Agent Guidelines**: Development and contribution guidelines
+
+#### 🐛 Bug Fixes
+
+- **API Key Management**: Fixed API key overwrite issues during setup
+- **Provider Configuration**: Resolved undefined endpoints error in AI providers
+- **Model Validation**: Enhanced provider-specific model validation
 
 ---
 
