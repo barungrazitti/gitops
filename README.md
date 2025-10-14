@@ -311,7 +311,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-**Created by [Barun Tayenjam](https://github.com/baruntayenjam) with the help of [RovoDev](https://rovodev.com)**
+**Created by [Barun Tayenjam](https://github.com/baruntayenjam)**
 
 ## 🙏 Acknowledgments
 
@@ -366,4 +366,4 @@ Inspired by:
 
 ---
 
-Made with ❤️ by [Barun Tayenjam](https://github.com/baruntayenjam) with the help of [RovoDev](https://rovodev.com)
+Made with ❤️ by [Barun Tayenjam](https://github.com/baruntayenjam)
