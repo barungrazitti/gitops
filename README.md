@@ -296,12 +296,6 @@ Inspired by:
 - [aicommit2](https://github.com/tak-bro/aicommit2) by tak-bro
 - [gcop](https://github.com/yegor256/gcop) by yegor256
 
-## 📞 Support
-
-- 📧 Email: support@ai-commit-generator.com
-- 🐛 Issues: [GitHub Issues](https://github.com/your-username/ai-commit-generator/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/your-username/ai-commit-generator/discussions)
-
 ---
 
 Made with ❤️ by [Barun Tayenjam](https://github.com/baruntayenjam)
