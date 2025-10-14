@@ -346,12 +346,6 @@ Inspired by:
 - [aicommit2](https://github.com/tak-bro/aicommit2) by tak-bro
 - [gcop](https://github.com/yegor256/gcop) by yegor256
 
-## 📞 Support
-
-- 📧 Email: support@ai-commit-generator.com
-- 🐛 Issues: [GitHub Issues](https://github.com/your-username/ai-commit-generator/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/your-username/ai-commit-generator/discussions)
-
 ## 📋 Changelog
 
 ### v1.0.0 (2025-10-14) - Initial Stable Release
