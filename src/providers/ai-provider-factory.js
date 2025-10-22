@@ -2,8 +2,8 @@
  * AI Provider Factory - Creates AI provider instances
  */
 
-const GroqProvider = require("./groq-provider");
-const OllamaProvider = require("./ollama-provider");
+const GroqProvider = require('./groq-provider');
+const OllamaProvider = require('./ollama-provider');
 
 class AIProviderFactory {
   /**
@@ -11,14 +11,14 @@ class AIProviderFactory {
    */
   static create(providerName) {
     switch (providerName.toLowerCase()) {
-      case "groq":
-        return new GroqProvider();
-      case "ollama":
-        return new OllamaProvider();
-      default:
-        throw new Error(
-          `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`,
-        );
+    case 'groq':
+      return new GroqProvider();
+    case 'ollama':
+      return new OllamaProvider();
+    default:
+      throw new Error(
+        `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
+      );
     }
   }
 
@@ -28,29 +28,29 @@ class AIProviderFactory {
   static getAvailableProviders() {
     return [
       {
-        name: "groq",
-        displayName: "Groq",
-        description: "Fast inference models",
+        name: 'groq',
+        displayName: 'Groq',
+        description: 'Fast inference models',
         requiresApiKey: true,
         models: [
-          "mixtral-8x7b-32768",
-          "llama2-70b-4096",
-          "gemma-7b-it",
-          "llama3-8b-8192",
-          "llama3-70b-8192",
+          'mixtral-8x7b-32768',
+          'llama2-70b-4096',
+          'gemma-7b-it',
+          'llama3-8b-8192',
+          'llama3-70b-8192',
         ],
       },
       {
-        name: "ollama",
-        displayName: "Ollama (Local)",
-        description: "Local models via Ollama",
+        name: 'ollama',
+        displayName: 'Ollama (Local)',
+        description: 'Local models via Ollama',
         requiresApiKey: false,
         models: [
-          "deepseek-v3.1:671b-cloud",
-          "qwen3-coder:480b-cloud",
-          "qwen2.5-coder:latest",
-          "mistral:7b-instruct",
-          "deepseek-r1:8b",
+          'deepseek-v3.1:671b-cloud',
+          'qwen3-coder:480b-cloud',
+          'qwen2.5-coder:latest',
+          'mistral:7b-instruct',
+          'deepseek-r1:8b',
         ],
       },
     ];
@@ -95,7 +95,7 @@ class AIProviderFactory {
       return await provider.getAvailableModels();
     } catch (error) {
       console.warn(
-        `Failed to get models for ${providerName}: ${error.message}`,
+        `Failed to get models for ${providerName}: ${error.message}`
       );
       return [];
     }
@@ -140,7 +140,7 @@ class AIProviderFactory {
     const allModels = await this.getAllAvailableModels(configs);
 
     // Priority order for providers (best to worst for commit messages)
-    const providerPriority = ["groq", "ollama"];
+    const providerPriority = ['groq', 'ollama'];
 
     for (const providerName of providerPriority) {
       const providerData = allModels[providerName];
@@ -151,7 +151,7 @@ class AIProviderFactory {
       ) {
         // Find recommended model or use first available
         const recommendedModel = providerData.models.find(
-          (m) => m.recommended && m.available,
+          (m) => m.recommended && m.available
         );
         const firstAvailable = providerData.models.find((m) => m.available);
 
@@ -178,7 +178,7 @@ class AIProviderFactory {
 
     if (!bestOption) {
       throw new Error(
-        "No available AI providers found. Please configure at least one provider.",
+        'No available AI providers found. Please configure at least one provider.'
       );
     }
 
@@ -188,7 +188,7 @@ class AIProviderFactory {
       recommendation: {
         reason: `Selected ${bestOption.model.name} from ${bestOption.providerInfo.displayName}`,
         alternatives: Object.keys(configs).filter(
-          (p) => p !== bestOption.provider,
+          (p) => p !== bestOption.provider
         ),
       },
     };

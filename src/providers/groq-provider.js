@@ -2,13 +2,13 @@
  * Groq Provider - Fast inference models
  */
 
-const Groq = require("groq-sdk");
-const BaseProvider = require("./base-provider");
+const Groq = require('groq-sdk');
+const BaseProvider = require('./base-provider');
 
 class GroqProvider extends BaseProvider {
   constructor() {
     super();
-    this.name = "groq";
+    this.name = 'groq';
     this.client = null;
   }
 
@@ -22,7 +22,7 @@ class GroqProvider extends BaseProvider {
 
     if (!config.apiKey) {
       throw new Error(
-        'Groq API key not configured. Run "aicommit setup" to configure.',
+        'Groq API key not configured. Run "aicommit setup" to configure.'
       );
     }
 
@@ -45,15 +45,15 @@ class GroqProvider extends BaseProvider {
       return await this.withRetry(async () => {
         try {
           const response = await this.client.chat.completions.create({
-            model: options.model || config.model || "llama-3.1-8b-instant",
+            model: options.model || config.model || 'llama-3.1-8b-instant',
             messages: [
               {
-                role: "system",
+                role: 'system',
                 content:
-                  "You are an expert software developer who writes clear, concise commit messages.",
+                  'You are an expert software developer who writes clear, concise commit messages.',
               },
               {
-                role: "user",
+                role: 'user',
                 content: prompt,
               },
             ],
@@ -63,17 +63,17 @@ class GroqProvider extends BaseProvider {
 
           const content = response.choices[0]?.message?.content;
           if (!content) {
-            throw new Error("No response content from Groq");
+            throw new Error('No response content from Groq');
           }
 
           const messages = this.parseResponse(content);
           return messages.filter((msg) => this.validateCommitMessage(msg));
         } catch (error) {
-          this.handleError(error, "Groq");
+          this.handleError(error, 'Groq');
         }
       }, config.retries || 3);
     } catch (error) {
-      this.handleError(error, "Groq");
+      this.handleError(error, 'Groq');
     }
   }
 
@@ -82,7 +82,7 @@ class GroqProvider extends BaseProvider {
    */
   async validate(config) {
     if (!config.apiKey) {
-      throw new Error("Groq API key is required");
+      throw new Error('Groq API key is required');
     }
 
     return true;
@@ -98,10 +98,10 @@ class GroqProvider extends BaseProvider {
       });
 
       const response = await client.chat.completions.create({
-        model: config.model || "mixtral-8x7b-32768",
+        model: config.model || 'mixtral-8x7b-32768',
         messages: [
           {
-            role: "user",
+            role: 'user',
             content: 'Say "test successful" if you can read this.',
           },
         ],
@@ -111,13 +111,13 @@ class GroqProvider extends BaseProvider {
 
       const content = response.choices[0]?.message?.content;
       if (!content) {
-        throw new Error("No response from Groq");
+        throw new Error('No response from Groq');
       }
 
       return {
         success: true,
-        message: "Groq connection successful",
-        model: config.model || "mixtral-8x7b-32768",
+        message: 'Groq connection successful',
+        model: config.model || 'mixtral-8x7b-32768',
         response: content.trim(),
       };
     } catch (error) {
@@ -135,19 +135,19 @@ class GroqProvider extends BaseProvider {
   async getAvailableModels() {
     return [
       {
-        id: "mixtral-8x7b-32768",
-        name: "Mixtral 8x7B",
-        description: "High-performance mixture of experts model",
+        id: 'mixtral-8x7b-32768',
+        name: 'Mixtral 8x7B',
+        description: 'High-performance mixture of experts model',
       },
       {
-        id: "llama2-70b-4096",
-        name: "Llama 2 70B",
-        description: "Large language model by Meta",
+        id: 'llama2-70b-4096',
+        name: 'Llama 2 70B',
+        description: 'Large language model by Meta',
       },
       {
-        id: "gemma-7b-it",
-        name: "Gemma 7B IT",
-        description: "Instruction-tuned model by Google",
+        id: 'gemma-7b-it',
+        name: 'Gemma 7B IT',
+        description: 'Instruction-tuned model by Google',
       },
     ];
   }

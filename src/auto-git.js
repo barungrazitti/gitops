@@ -38,7 +38,20 @@ class AutoGit {
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
 
-      // Step 4: Generate or use provided commit message
+      // Step 4: Run test validation if requested
+      if (options.testValidate) {
+        const fixes = await this.runTestValidation(options);
+        if (fixes === false && options.autoFix !== false) {
+          console.log(
+            chalk.yellow(
+              'Validation failed and auto-fix is disabled. Aborting.'
+            )
+          );
+          return;
+        }
+      }
+
+      // Step 5: Generate or use provided commit message
       let commitMessage;
       if (options.manualMessage) {
         commitMessage = options.manualMessage;
@@ -51,8 +64,8 @@ class AutoGit {
         }
       }
 
-      // Step 5: Commit changes
-      await this.commitChanges(commitMessage);
+      // Step 6: Commit changes
+      await this.commitChanges(commitMessage, options);
 
       // Step 6: Pull latest changes and handle conflicts (unless skipped)
       if (!options.skipPull) {
@@ -61,14 +74,14 @@ class AutoGit {
         } catch (pullError) {
           // Offer to skip pull if it fails
           console.log(chalk.yellow(`\nPull failed: ${pullError.message}`));
-          
+
           const { skipPull } = await inquirer.prompt([
             {
               type: 'confirm',
               name: 'skipPull',
               message: 'Skip pull and continue with push?',
-              default: false
-            }
+              default: false,
+            },
           ]);
 
           if (!skipPull) {
@@ -83,11 +96,10 @@ class AutoGit {
       }
 
       console.log(chalk.green('\nAuto Git workflow completed successfully!'));
-      
     } catch (error) {
       if (this.spinner) this.spinner.fail();
       console.error(chalk.red('\nAuto Git workflow failed:'), error.message);
-      
+
       // Provide helpful recovery suggestions
       await this.suggestRecovery(error);
       process.exit(1);
@@ -99,7 +111,7 @@ class AutoGit {
    */
   async validateRepository() {
     this.spinner = ora('Checking git repository...').start();
-    
+
     try {
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
@@ -110,7 +122,9 @@ class AutoGit {
       const remotes = await this.git.getRemotes();
       if (remotes.length === 0) {
         this.spinner.warn('No remote repository configured');
-        console.log(chalk.yellow('No remote found. Only local commit will be performed.'));
+        console.log(
+          chalk.yellow('No remote found. Only local commit will be performed.')
+        );
       }
 
       this.spinner.succeed('Git repository validated');
@@ -125,21 +139,21 @@ class AutoGit {
    */
   async checkForChanges() {
     this.spinner = ora('Checking for changes...').start();
-    
+
     try {
       const status = await this.git.status();
       const hasChanges = status.files.length > 0;
-      
+
       if (hasChanges) {
         this.spinner.succeed(`Found ${status.files.length} changed files`);
-        
+
         // Show summary of changes
         const summary = this.summarizeChanges(status);
         console.log(chalk.dim(summary));
       } else {
         this.spinner.succeed('No changes detected');
       }
-      
+
       return hasChanges;
     } catch (error) {
       this.spinner.fail();
@@ -152,7 +166,7 @@ class AutoGit {
    */
   async stageChanges() {
     this.spinner = ora('Staging changes...').start();
-    
+
     try {
       await this.git.add('.');
       this.spinner.succeed('All changes staged');
@@ -167,21 +181,21 @@ class AutoGit {
    */
   async generateCommitMessage(options) {
     this.spinner = ora('Generating AI commit message...').start();
-    
+
     try {
       // Check if AI is configured
       const config = await this.aiCommit.configManager.load();
       if (!config.apiKey && config.defaultProvider !== 'ollama') {
         this.spinner.fail();
         console.log(chalk.yellow('\nAI provider not configured.'));
-        
+
         const { setupNow } = await inquirer.prompt([
           {
             type: 'confirm',
             name: 'setupNow',
             message: 'Would you like to set up AI provider now?',
-            default: true
-          }
+            default: true,
+          },
         ]);
 
         if (setupNow) {
@@ -205,12 +219,11 @@ class AutoGit {
 
       // Let user select message
       return await this.selectCommitMessage(messages);
-
     } catch (error) {
       this.spinner.fail();
       console.log(chalk.yellow(`\nAI generation failed: ${error.message}`));
       console.log(chalk.dim('Falling back to manual commit message...'));
-      
+
       return await this.manualCommitMessage();
     }
   }
@@ -221,17 +234,19 @@ class AutoGit {
   async generateAIMessages(diff, options) {
     const config = await this.aiCommit.configManager.load();
     const AIProviderFactory = require('./providers/ai-provider-factory');
-    
-    const provider = AIProviderFactory.create(options.provider || config.defaultProvider);
-    
+
+    const provider = AIProviderFactory.create(
+      options.provider || config.defaultProvider
+    );
+
     // Analyze repository context
     const context = await this.aiCommit.analysisEngine.analyzeRepository();
-    
+
     const messages = await provider.generateCommitMessages(diff, {
       context,
       count: 3,
       language: config.language || 'en',
-      conventional: config.conventionalCommits
+      conventional: config.conventionalCommits,
     });
 
     return messages;
@@ -249,16 +264,16 @@ class AutoGit {
       ...messages.map((msg, index) => ({
         name: `${index + 1}. ${msg}`,
         value: msg,
-        short: `Message ${index + 1}`
+        short: `Message ${index + 1}`,
       })),
       {
         name: chalk.dim('Write custom message'),
-        value: 'custom'
+        value: 'custom',
       },
       {
         name: chalk.dim('Cancel'),
-        value: 'cancel'
-      }
+        value: 'cancel',
+      },
     ];
 
     const { selectedMessage } = await inquirer.prompt([
@@ -267,8 +282,8 @@ class AutoGit {
         name: 'selectedMessage',
         message: 'Select commit message:',
         choices,
-        pageSize: 10
-      }
+        pageSize: 10,
+      },
     ]);
 
     if (selectedMessage === 'cancel') {
@@ -291,8 +306,9 @@ class AutoGit {
         type: 'input',
         name: 'message',
         message: 'Enter commit message:',
-        validate: (input) => input.trim().length > 0 || 'Message cannot be empty'
-      }
+        validate: (input) =>
+          input.trim().length > 0 || 'Message cannot be empty',
+      },
     ]);
 
     return message.trim();
@@ -301,12 +317,30 @@ class AutoGit {
   /**
    * Commit changes
    */
-  async commitChanges(message) {
+  async commitChanges(message, options = {}) {
     this.spinner = ora('Committing changes...').start();
-    
+
     try {
-      await this.git.commit(message);
-      this.spinner.succeed(`Committed: ${message}`);
+      // If test validation was requested, use dual commit functionality
+      if (options.testValidate) {
+        const commits =
+          await this.aiCommit.gitManager.createDualCommits(message);
+
+        this.spinner.succeed(`Created ${commits.length} commit(s):`);
+        commits.forEach((commit, index) => {
+          const type =
+            commit.type === 'original' ? '📝 Original' : '🔧 Corrected';
+          console.log(
+            chalk.cyan(
+              `  ${index + 1}. ${type}: ${commit.hash.substring(0, 8)}`
+            )
+          );
+        });
+      } else {
+        // Standard single commit
+        await this.git.commit(message);
+        this.spinner.succeed(`Committed: ${message}`);
+      }
     } catch (error) {
       this.spinner.fail();
       throw new Error(`Failed to commit: ${error.message}`);
@@ -318,7 +352,7 @@ class AutoGit {
    */
   async pullAndHandleConflicts() {
     this.spinner = ora('Pulling latest changes...').start();
-    
+
     try {
       const remotes = await this.git.getRemotes();
       if (remotes.length === 0) {
@@ -332,54 +366,76 @@ class AutoGit {
 
       try {
         // Use explicit pull strategy to avoid rebase conflicts
-        await this.git.pull('origin', currentBranch, {'--no-rebase': null});
+        await this.git.pull('origin', currentBranch, { '--no-rebase': null });
         this.spinner.succeed('Successfully pulled latest changes');
       } catch (pullError) {
         this.spinner.warn('Pull resulted in conflicts');
-        
+
         // Check for specific rebase error
-        if (pullError.message.includes('Cannot rebase onto multiple branches')) {
-          console.log(chalk.yellow('\nDetected rebase conflict. Falling back to merge strategy...'));
-          
+        if (
+          pullError.message.includes('Cannot rebase onto multiple branches')
+        ) {
+          console.log(
+            chalk.yellow(
+              '\nDetected rebase conflict. Falling back to merge strategy...'
+            )
+          );
+
           // Retry with merge strategy
           try {
-            await this.git.pull('origin', currentBranch, {'--no-rebase': null, '--no-ff': null});
+            await this.git.pull('origin', currentBranch, {
+              '--no-rebase': null,
+              '--no-ff': null,
+            });
             this.spinner.succeed('Successfully pulled with merge strategy');
             return;
           } catch (mergeError) {
-            console.log(chalk.yellow('Merge strategy also failed. Checking for conflicts...'));
+            console.log(
+              chalk.yellow(
+                'Merge strategy also failed. Checking for conflicts...'
+              )
+            );
           }
         }
-        
+
         // Check if there are merge conflicts
         const status = await this.git.status();
         const conflicts = status.conflicted;
 
         if (conflicts.length > 0) {
-          console.log(chalk.yellow(`\nFound ${conflicts.length} conflicted files:`));
-          conflicts.forEach(file => console.log(chalk.red(`   - ${file}`)));
+          console.log(
+            chalk.yellow(`\nFound ${conflicts.length} conflicted files:`)
+          );
+          conflicts.forEach((file) => console.log(chalk.red(`   - ${file}`)));
 
           // Attempt standard auto-resolution first
           const standardResolved = await this.autoResolveConflicts(conflicts);
-          
+
           if (!standardResolved && conflicts.length > 0) {
             // Try AI-assisted resolution for remaining conflicts
-            console.log(chalk.blue('\nStandard resolution failed. Trying AI-assisted resolution...'));
-            const aiResolved = await this.aiAssistedConflictResolution(conflicts);
-            
+            console.log(
+              chalk.blue(
+                '\nStandard resolution failed. Trying AI-assisted resolution...'
+              )
+            );
+            const aiResolved =
+              await this.aiAssistedConflictResolution(conflicts);
+
             if (aiResolved) {
               // Check if all conflicts are resolved
               const remainingStatus = await this.git.status();
               if (remainingStatus.conflicted.length === 0) {
                 this.spinner = ora('Finalizing merge...').start();
                 await this.git.add('.');
-                await this.git.commit('Merge conflicts resolved with AI assistance');
+                await this.git.commit(
+                  'Merge conflicts resolved with AI assistance'
+                );
                 this.spinner.succeed('Conflicts resolved with AI assistance');
                 return;
               }
             }
           }
-          
+
           if (standardResolved) {
             this.spinner = ora('Finalizing merge...').start();
             await this.git.add('.');
@@ -391,10 +447,16 @@ class AutoGit {
           }
         } else {
           // Some other pull error - provide more specific guidance
-          if (pullError.message.includes('Cannot rebase onto multiple branches')) {
-            throw new Error(`Git rebase conflict. This can happen with complex branch setups. Try: git pull --no-rebase`);
+          if (
+            pullError.message.includes('Cannot rebase onto multiple branches')
+          ) {
+            throw new Error(
+              'Git rebase conflict. This can happen with complex branch setups. Try: git pull --no-rebase'
+            );
           } else if (pullError.message.includes('fatal:')) {
-            throw new Error(`Git fatal error: ${pullError.message.replace('fatal: ', '').trim()}`);
+            throw new Error(
+              `Git fatal error: ${pullError.message.replace('fatal: ', '').trim()}`
+            );
           } else {
             throw pullError;
           }
@@ -411,10 +473,10 @@ class AutoGit {
    */
   async autoResolveConflicts(conflicts) {
     this.spinner = ora('Attempting auto-resolution...').start();
-    
+
     try {
       let resolvedCount = 0;
-      
+
       for (const file of conflicts) {
         const resolved = await this.autoResolveFile(file);
         if (resolved) {
@@ -426,7 +488,9 @@ class AutoGit {
         this.spinner.succeed(`Auto-resolved ${resolvedCount} conflicts`);
         return true;
       } else {
-        this.spinner.warn(`Auto-resolved ${resolvedCount}/${conflicts.length} conflicts`);
+        this.spinner.warn(
+          `Auto-resolved ${resolvedCount}/${conflicts.length} conflicts`
+        );
         return false;
       }
     } catch (error) {
@@ -442,26 +506,32 @@ class AutoGit {
     try {
       const fs = require('fs-extra');
       const content = await fs.readFile(filePath, 'utf8');
-      
+
       // Simple auto-resolution strategies
       let resolved = content;
-      
+
       // Strategy 1: Take "ours" for package-lock.json and similar files
-      if (filePath.includes('package-lock.json') || 
-          filePath.includes('yarn.lock') ||
-          filePath.includes('.lock')) {
+      if (
+        filePath.includes('package-lock.json') ||
+        filePath.includes('yarn.lock') ||
+        filePath.includes('.lock')
+      ) {
         resolved = this.resolveConflictTakeOurs(content);
       }
       // Strategy 2: Take "theirs" for documentation files
-      else if (filePath.includes('README') || 
-               filePath.includes('.md') ||
-               filePath.includes('CHANGELOG')) {
+      else if (
+        filePath.includes('README') ||
+        filePath.includes('.md') ||
+        filePath.includes('CHANGELOG')
+      ) {
         resolved = this.resolveConflictTakeTheirs(content);
       }
       // Strategy 3: Enhanced JSON conflict resolution
-      else if (filePath.includes('.json') || 
-               filePath.includes('.yml') ||
-               filePath.includes('.yaml')) {
+      else if (
+        filePath.includes('.json') ||
+        filePath.includes('.yml') ||
+        filePath.includes('.yaml')
+      ) {
         resolved = this.resolveEnhancedConfigConflict(content, filePath);
       }
       // Strategy 4: TypeScript/JavaScript conflict resolution
@@ -469,16 +539,20 @@ class AutoGit {
         resolved = this.resolveJavaScriptConflict(content, filePath);
       }
       // Strategy 5: CSS/SCSS conflict resolution
-      else if (filePath.includes('.css') || filePath.includes('.scss') || filePath.includes('.sass')) {
+      else if (
+        filePath.includes('.css') ||
+        filePath.includes('.scss') ||
+        filePath.includes('.sass')
+      ) {
         resolved = this.resolveStyleConflict(content, filePath);
       }
-      
+
       // Check if we actually resolved anything
       if (resolved !== content && !resolved.includes('<<<<<<<')) {
         await fs.writeFile(filePath, resolved);
         return true;
       }
-      
+
       return false;
     } catch (error) {
       return false;
@@ -508,11 +582,15 @@ class AutoGit {
         continue;
       } else if (line.startsWith('>>>>>>>')) {
         inConflict = false;
-        
+
         // Resolve the conflict based on file type and content
-        const resolution = this.resolveConfigConflict(ourLines, theirLines, filePath);
+        const resolution = this.resolveConfigConflict(
+          ourLines,
+          theirLines,
+          filePath
+        );
         resolvedLines.push(...resolution);
-        
+
         ourLines = [];
         theirLines = [];
         currentSection = 'none';
@@ -551,10 +629,10 @@ class AutoGit {
     try {
       const ourObj = this.parseConfigLines(ourLines);
       const theirObj = this.parseConfigLines(theirLines);
-      
+
       // Merge objects: their values take precedence except for local config
       const merged = { ...theirObj, ...ourObj };
-      
+
       // Convert back to lines
       return Object.entries(merged).map(([key, value]) => {
         if (typeof value === 'string' && value.includes(' ')) {
@@ -575,14 +653,17 @@ class AutoGit {
     try {
       const ourSection = this.parseJsonSection(ourLines);
       const theirSection = this.parseJsonSection(theirLines);
-      
-      if (ourSection.type === 'dependencies' || theirSection.type === 'dependencies') {
+
+      if (
+        ourSection.type === 'dependencies' ||
+        theirSection.type === 'dependencies'
+      ) {
         // Merge dependencies
         const merged = { ...theirSection.content, ...ourSection.content };
         const keys = Object.keys(merged).sort();
-        return keys.map(key => `    "${key}": "${merged[key]}"`);
+        return keys.map((key) => `    "${key}": "${merged[key]}"`);
       }
-      
+
       // For other sections, prefer theirs (upstream)
       return theirLines;
     } catch (error) {
@@ -596,20 +677,24 @@ class AutoGit {
   parseJsonSection(lines) {
     const content = {};
     let type = 'unknown';
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed.startsWith('"')) {
         const match = trimmed.match(/"([^"]+)"\s*:\s*"([^"]+)"/);
         if (match) {
           content[match[1]] = match[2];
-          if (['dependencies', 'devDependencies', 'peerDependencies'].includes(match[1])) {
+          if (
+            ['dependencies', 'devDependencies', 'peerDependencies'].includes(
+              match[1]
+            )
+          ) {
             type = 'dependencies';
           }
         }
       }
     }
-    
+
     return { type, content };
   }
 
@@ -618,7 +703,7 @@ class AutoGit {
    */
   parseConfigLines(lines) {
     const config = {};
-    
+
     for (const line of lines) {
       const trimmed = line.trim();
       if (trimmed && !trimmed.startsWith('#')) {
@@ -628,7 +713,7 @@ class AutoGit {
         }
       }
     }
-    
+
     return config;
   }
 
@@ -653,11 +738,14 @@ class AutoGit {
         continue;
       } else if (line.startsWith('>>>>>>>')) {
         inConflict = false;
-        
+
         // Prefer lines with function definitions or imports
-        const resolution = this.resolveJavaScriptConflictHelper(ourLines, theirLines);
+        const resolution = this.resolveJavaScriptConflictHelper(
+          ourLines,
+          theirLines
+        );
         resolvedLines.push(...resolution);
-        
+
         ourLines = [];
         theirLines = [];
         continue;
@@ -693,18 +781,22 @@ class AutoGit {
   resolveJavaScriptConflictHelper(ourLines, theirLines) {
     // Prioritize lines with function definitions, imports, exports
     const hasImportantContent = (lines) => {
-      return lines.some(line => 
-        line.includes('function') || 
-        line.includes('import') || 
-        line.includes('export') ||
-        line.includes('class') ||
-        line.includes('const')
+      return lines.some(
+        (line) =>
+          line.includes('function') ||
+          line.includes('import') ||
+          line.includes('export') ||
+          line.includes('class') ||
+          line.includes('const')
       );
     };
 
     if (hasImportantContent(ourLines) && !hasImportantContent(theirLines)) {
       return ourLines;
-    } else if (!hasImportantContent(ourLines) && hasImportantContent(theirLines)) {
+    } else if (
+      !hasImportantContent(ourLines) &&
+      hasImportantContent(theirLines)
+    ) {
       return theirLines;
     }
 
@@ -733,13 +825,13 @@ class AutoGit {
         continue;
       } else if (line.startsWith('>>>>>>>')) {
         inConflict = false;
-        
+
         // Merge CSS rules
-        const merged = [...theirRules, ...ourRules].filter((rule, index, arr) => 
-          arr.indexOf(rule) === index
+        const merged = [...theirRules, ...ourRules].filter(
+          (rule, index, arr) => arr.indexOf(rule) === index
         );
         resolvedLines.push(...merged);
-        
+
         ourRules.clear();
         theirRules.clear();
         continue;
@@ -773,14 +865,20 @@ class AutoGit {
    * Resolve conflict by taking "ours" (current branch)
    */
   resolveConflictTakeOurs(content) {
-    return content.replace(/<<<<<<< HEAD\n([\s\S]*?)\n=======\n[\s\S]*?\n>>>>>>> .*/g, '$1');
+    return content.replace(
+      /<<<<<<< HEAD\n([\s\S]*?)\n=======\n[\s\S]*?\n>>>>>>> .*/g,
+      '$1'
+    );
   }
 
   /**
    * Resolve conflict by taking "theirs" (incoming branch)
    */
   resolveConflictTakeTheirs(content) {
-    return content.replace(/<<<<<<< HEAD\n[\s\S]*?\n=======\n([\s\S]*?)\n>>>>>>> .*/g, '$1');
+    return content.replace(
+      /<<<<<<< HEAD\n[\s\S]*?\n=======\n([\s\S]*?)\n>>>>>>> .*/g,
+      '$1'
+    );
   }
 
   /**
@@ -790,10 +888,10 @@ class AutoGit {
     if (conflicts.length === 0) return false;
 
     this.spinner = ora('Attempting AI-assisted conflict resolution...').start();
-    
+
     try {
       const resolvedCount = await this.aiResolveConflicts(conflicts);
-      
+
       if (resolvedCount > 0) {
         this.spinner.succeed(`AI resolved ${resolvedCount} conflicts`);
         return true;
@@ -813,7 +911,7 @@ class AutoGit {
    */
   async aiResolveConflicts(conflicts) {
     let resolvedCount = 0;
-    
+
     for (const file of conflicts) {
       try {
         const resolved = await this.aiResolveFileConflict(file);
@@ -821,10 +919,12 @@ class AutoGit {
           resolvedCount++;
         }
       } catch (error) {
-        console.log(chalk.yellow(`Failed to AI-resolve ${file}: ${error.message}`));
+        console.log(
+          chalk.yellow(`Failed to AI-resolve ${file}: ${error.message}`)
+        );
       }
     }
-    
+
     return resolvedCount;
   }
 
@@ -833,10 +933,10 @@ class AutoGit {
    */
   async aiResolveFileConflict(filePath) {
     const fs = require('fs-extra');
-    
+
     try {
       const content = await fs.readFile(filePath, 'utf8');
-      
+
       // Skip if no conflict markers
       if (!content.includes('<<<<<<<')) {
         return false;
@@ -849,8 +949,11 @@ class AutoGit {
       }
 
       // Use AI to suggest resolution for complex conflicts
-      const aiSuggestion = await this.getAIConflictResolution(filePath, conflictSections);
-      
+      const aiSuggestion = await this.getAIConflictResolution(
+        filePath,
+        conflictSections
+      );
+
       if (aiSuggestion && aiSuggestion.resolved) {
         await fs.writeFile(filePath, aiSuggestion.resolution);
         return true;
@@ -879,7 +982,7 @@ class AutoGit {
           type: 'conflict',
           start: i,
           ours: [],
-          theirs: []
+          theirs: [],
         };
         startLine = i;
       } else if (line.startsWith('=======')) {
@@ -891,7 +994,7 @@ class AutoGit {
           currentSection.end = i;
           sections.push({
             ...currentSection,
-            context: this.getConflictContext(lines, startLine, i)
+            context: this.getConflictContext(lines, startLine, i),
           });
           currentSection = null;
         }
@@ -914,11 +1017,11 @@ class AutoGit {
     const contextLines = 3;
     const before = Math.max(0, start - contextLines);
     const after = Math.min(lines.length, end + contextLines + 1);
-    
+
     return {
       before: lines.slice(before, start).join('\n'),
       after: lines.slice(after, end + contextLines + 1).join('\n'),
-      fileTypes: this.inferFileType(lines.slice(start, end + 1))
+      fileTypes: this.inferFileType(lines.slice(start, end + 1)),
     };
   }
 
@@ -927,8 +1030,12 @@ class AutoGit {
    */
   inferFileType(lines) {
     const content = lines.join('\n');
-    
-    if (content.includes('import') || content.includes('export') || content.includes('function')) {
+
+    if (
+      content.includes('import') ||
+      content.includes('export') ||
+      content.includes('function')
+    ) {
       return 'javascript';
     } else if (content.includes('class ') || content.includes('def ')) {
       return content.includes('def ') ? 'python' : 'typescript';
@@ -939,7 +1046,7 @@ class AutoGit {
     } else if (content.includes('html') || content.includes('<')) {
       return 'html';
     }
-    
+
     return 'text';
   }
 
@@ -951,22 +1058,25 @@ class AutoGit {
       // Use the existing AI provider system
       const AIProviderFactory = require('./providers/ai-provider-factory');
       const config = await this.aiCommit.configManager.load();
-      
+
       if (!config.apiKey && config.defaultProvider !== 'ollama') {
         return null; // No AI available
       }
 
       const provider = AIProviderFactory.create(config.defaultProvider);
-      
+
       // Build a prompt for conflict resolution
-      const prompt = this.buildConflictResolutionPrompt(filePath, conflictSections);
-      
+      const prompt = this.buildConflictResolutionPrompt(
+        filePath,
+        conflictSections
+      );
+
       // Get AI suggestion
       const response = await provider.generateCommitMessages(prompt, {
         count: 1,
-        context: { type: 'conflict-resolution' }
+        context: { type: 'conflict-resolution' },
       });
-      
+
       if (response && response.length > 0) {
         // Parse the AI response for resolution
         return this.parseAIConflictResponse(response[0], conflictSections);
@@ -987,7 +1097,9 @@ class AutoGit {
 
 Below are the conflict sections that need to be resolved:
 
-${conflictSections.map((section, index) => `
+${conflictSections
+    .map(
+      (section, index) => `
 Conflict ${index + 1}:
 <<<<<<< HEAD (our changes)
 ${section.ours.join('\n')}
@@ -998,7 +1110,9 @@ ${section.theirs.join('\n')}
 Context around this conflict:
 Before: ${section.context.before}
 After: ${section.context.after}
-`).join('\n')}
+`
+    )
+    .join('\n')}
 
 Please provide a resolution that:
 1. Preserves important functionality from both sides
@@ -1018,13 +1132,17 @@ Respond with only the resolved conflict content, no explanation:`;
     }
 
     // Simple validation - check if conflict markers are removed
-    if (response.includes('<<<<<<<') || response.includes('=======') || response.includes('>>>>>>>')) {
+    if (
+      response.includes('<<<<<<<') ||
+      response.includes('=======') ||
+      response.includes('>>>>>>>')
+    ) {
       return null; // AI didn't properly resolve
     }
 
     return {
       resolved: true,
-      resolution: response.trim()
+      resolution: response.trim(),
     };
   }
 
@@ -1033,8 +1151,10 @@ Respond with only the resolved conflict content, no explanation:`;
    */
   async handleManualConflictResolution(conflicts) {
     console.log(chalk.yellow('\nManual conflict resolution required'));
-    console.log(chalk.dim('Please resolve the conflicts manually and then continue.'));
-    
+    console.log(
+      chalk.dim('Please resolve the conflicts manually and then continue.')
+    );
+
     const { action } = await inquirer.prompt([
       {
         type: 'list',
@@ -1043,30 +1163,30 @@ Respond with only the resolved conflict content, no explanation:`;
         choices: [
           {
             name: 'Open files for manual editing',
-            value: 'edit'
+            value: 'edit',
           },
           {
             name: 'Skip and continue (conflicts resolved externally)',
-            value: 'skip'
+            value: 'skip',
           },
           {
             name: 'Abort workflow',
-            value: 'abort'
-          }
-        ]
-      }
+            value: 'abort',
+          },
+        ],
+      },
     ]);
 
     switch (action) {
-      case 'edit':
-        await this.openConflictedFiles(conflicts);
-        await this.waitForConflictResolution();
-        break;
-      case 'skip':
-        console.log(chalk.yellow('Assuming conflicts are resolved...'));
-        break;
-      case 'abort':
-        throw new Error('Workflow aborted by user');
+    case 'edit':
+      await this.openConflictedFiles(conflicts);
+      await this.waitForConflictResolution();
+      break;
+    case 'skip':
+      console.log(chalk.yellow('Assuming conflicts are resolved...'));
+      break;
+    case 'abort':
+      throw new Error('Workflow aborted by user');
     }
   }
 
@@ -1075,20 +1195,20 @@ Respond with only the resolved conflict content, no explanation:`;
    */
   async openConflictedFiles(conflicts) {
     const { spawn } = require('child_process');
-    
+
     console.log(chalk.cyan('\nOpening conflicted files...'));
-    
+
     for (const file of conflicts) {
       console.log(chalk.dim(`Opening: ${file}`));
-      
+
       // Try different editors
       const editors = ['code', 'vim', 'nano', 'notepad'];
-      
+
       for (const editor of editors) {
         try {
-          spawn(editor, [file], { 
+          spawn(editor, [file], {
             stdio: 'inherit',
-            detached: true 
+            detached: true,
           });
           break;
         } catch (error) {
@@ -1104,15 +1224,15 @@ Respond with only the resolved conflict content, no explanation:`;
    */
   async waitForConflictResolution() {
     console.log(chalk.yellow('\nWaiting for conflict resolution...'));
-    
+
     while (true) {
       const { ready } = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'ready',
           message: 'Have you resolved all conflicts?',
-          default: false
-        }
+          default: false,
+        },
       ]);
 
       if (ready) {
@@ -1120,14 +1240,16 @@ Respond with only the resolved conflict content, no explanation:`;
         const status = await this.git.status();
         if (status.conflicted.length === 0) {
           console.log(chalk.green('All conflicts resolved!'));
-          
+
           // Stage resolved files and commit
           await this.git.add('.');
           await this.git.commit('Resolve merge conflicts');
           break;
         } else {
-          console.log(chalk.red(`${status.conflicted.length} conflicts still remain`));
-          status.conflicted.forEach(file => 
+          console.log(
+            chalk.red(`${status.conflicted.length} conflicts still remain`)
+          );
+          status.conflicted.forEach((file) =>
             console.log(chalk.red(`   - ${file}`))
           );
         }
@@ -1140,7 +1262,7 @@ Respond with only the resolved conflict content, no explanation:`;
    */
   async pushChanges() {
     this.spinner = ora('Pushing changes...').start();
-    
+
     try {
       const remotes = await this.git.getRemotes();
       if (remotes.length === 0) {
@@ -1164,7 +1286,7 @@ Respond with only the resolved conflict content, no explanation:`;
    */
   summarizeChanges(status) {
     const summary = [];
-    
+
     if (status.created.length > 0) {
       summary.push(`${status.created.length} new files`);
     }
@@ -1182,11 +1304,52 @@ Respond with only the resolved conflict content, no explanation:`;
   }
 
   /**
+   * Run test validation workflow
+   */
+  async runTestValidation(options) {
+    try {
+      console.log(chalk.blue('🧪 Running test validation...'));
+
+      // Use the AI commit generator's test validation
+      const fixes = await this.aiCommit.runTestValidation(options);
+
+      if (fixes && fixes.summary.totalFixes > 0) {
+        console.log(
+          chalk.green(`✅ Applied ${fixes.summary.totalFixes} fixes`)
+        );
+      } else if (fixes === null) {
+        console.log(chalk.green('✅ All validations passed!'));
+      }
+
+      return fixes;
+    } catch (error) {
+      console.error(chalk.red(`❌ Test validation failed: ${error.message}`));
+
+      if (options.autoFix !== false) {
+        const { continueAnyway } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'continueAnyway',
+            message: 'Continue with commit despite validation failures?',
+            default: false,
+          },
+        ]);
+
+        if (!continueAnyway) {
+          return false;
+        }
+      }
+
+      return null;
+    }
+  }
+
+  /**
    * Suggest recovery actions on failure
    */
   async suggestRecovery(error) {
     console.log(chalk.yellow('\nSuggested recovery actions:'));
-    
+
     if (error.message.includes('not a git repository')) {
       console.log(chalk.dim('   • Run: git init'));
       console.log(chalk.dim('   • Add remote: git remote add origin <url>'));
@@ -1199,7 +1362,9 @@ Respond with only the resolved conflict content, no explanation:`;
     } else if (error.message.includes('conflict')) {
       console.log(chalk.dim('   • Resolve conflicts manually'));
       console.log(chalk.dim('   • Run: git status to see conflicted files'));
-      console.log(chalk.dim('   • Run: git add . && git commit after resolving'));
+      console.log(
+        chalk.dim('   • Run: git add . && git commit after resolving')
+      );
     } else if (error.message.includes('Cannot rebase onto multiple branches')) {
       console.log(chalk.dim('   • Try: git pull --no-rebase'));
       console.log(chalk.dim('   • Or: git config pull.rebase false'));

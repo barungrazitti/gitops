@@ -2,26 +2,26 @@
  * Base AI Provider - Abstract class for all AI providers
  */
 
-const ConfigManager = require("../core/config-manager");
+const ConfigManager = require('../core/config-manager');
 
 class BaseProvider {
   constructor() {
     this.configManager = new ConfigManager();
-    this.name = "base";
+    this.name = 'base';
   }
 
   /**
    * Generate commit messages - must be implemented by subclasses
    */
   async generateCommitMessages(diff, options = {}) {
-    throw new Error("generateCommitMessages must be implemented by subclass");
+    throw new Error('generateCommitMessages must be implemented by subclass');
   }
 
   /**
    * Validate provider configuration
    */
   async validate(config) {
-    throw new Error("validate must be implemented by subclass");
+    throw new Error('validate must be implemented by subclass');
   }
 
   /**
@@ -31,11 +31,11 @@ class BaseProvider {
     // Remove binary file indicators
     let processed = diff.replace(
       /^Binary files? .* differ$/gm,
-      "[Binary file modified]",
+      '[Binary file modified]'
     );
 
     // Split into lines for intelligent processing
-    const lines = processed.split("\n");
+    const lines = processed.split('\n');
     const processedLines = [];
     const importantLines = [];
     const contextLines = [];
@@ -47,18 +47,18 @@ class BaseProvider {
 
       // Always keep diff headers
       if (
-        line.startsWith("diff --git") ||
-        line.startsWith("index ") ||
-        line.startsWith("---") ||
-        line.startsWith("+++") ||
-        line.startsWith("@@")
+        line.startsWith('diff --git') ||
+        line.startsWith('index ') ||
+        line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('@@')
       ) {
         processedLines.push(line);
         continue;
       }
 
       // Keep added/removed lines
-      if (line.startsWith("+") || line.startsWith("-")) {
+      if (line.startsWith('+') || line.startsWith('-')) {
         if (!this.isTrivialChange(line)) {
           importantLines.push(line);
 
@@ -83,55 +83,64 @@ class BaseProvider {
     // Add context lines with priority
     if (contextLines.length > 0) {
       const maxContextLines = 30;
-      const prioritizedContext = this.prioritizeContextLines(contextLines, functionSignatures);
-      processedLines.push(...prioritizedContext.slice(0, maxContextLines).map(line => " " + line));
+      const prioritizedContext = this.prioritizeContextLines(
+        contextLines,
+        functionSignatures
+      );
+      processedLines.push(
+        ...prioritizedContext
+          .slice(0, maxContextLines)
+          .map((line) => ' ' + line)
+      );
     }
 
     // Limit total size while preserving important content
     const maxLines = 250; // Increased limit for better context
     if (processedLines.length > maxLines) {
-      const headers = processedLines.filter(line =>
-        line.startsWith("diff --git") ||
-        line.startsWith("index ") ||
-        line.startsWith("---") ||
-        line.startsWith("+++") ||
-        line.startsWith("@@")
+      const headers = processedLines.filter(
+        (line) =>
+          line.startsWith('diff --git') ||
+          line.startsWith('index ') ||
+          line.startsWith('---') ||
+          line.startsWith('+++') ||
+          line.startsWith('@@')
       );
 
-      const changes = processedLines.filter(line =>
-        line.startsWith("+") || line.startsWith("-")
+      const changes = processedLines.filter(
+        (line) => line.startsWith('+') || line.startsWith('-')
       );
 
-      const context = processedLines.filter(line =>
-        !line.startsWith("diff --git") &&
-        !line.startsWith("index ") &&
-        !line.startsWith("---") &&
-        !line.startsWith("+++") &&
-        !line.startsWith("@@") &&
-        !line.startsWith("+") &&
-        !line.startsWith("-")
+      const context = processedLines.filter(
+        (line) =>
+          !line.startsWith('diff --git') &&
+          !line.startsWith('index ') &&
+          !line.startsWith('---') &&
+          !line.startsWith('+++') &&
+          !line.startsWith('@@') &&
+          !line.startsWith('+') &&
+          !line.startsWith('-')
       );
 
       const finalLines = [
         ...headers,
         ...changes.slice(0, maxLines - headers.length - 20),
-        ...context.slice(0, 20)
+        ...context.slice(0, 20),
       ];
 
-      processed = finalLines.join("\n") + "\n... (diff truncated)";
+      processed = finalLines.join('\n') + '\n... (diff truncated)';
     } else {
-      processed = processedLines.join("\n");
+      processed = processedLines.join('\n');
     }
 
     // Handle very long lines more intelligently
     processed = processed.replace(/^.{300,}$/gm, (match) => {
-      if (match.includes("import") || match.includes("require")) {
-        return match.substring(0, 150) + "... [import statement truncated]";
+      if (match.includes('import') || match.includes('require')) {
+        return match.substring(0, 150) + '... [import statement truncated]';
       }
-      if (match.includes("function") || match.includes("class")) {
-        return match.substring(0, 180) + "... [function/class truncated]";
+      if (match.includes('function') || match.includes('class')) {
+        return match.substring(0, 180) + '... [function/class truncated]';
       }
-      return "[Long line truncated]";
+      return '[Long line truncated]';
     });
 
     return processed;
@@ -141,7 +150,7 @@ class BaseProvider {
    * Check if a context line is important
    */
   isImportantContext(line) {
-    if (!line.trim() || line.startsWith(" ")) return false;
+    if (!line.trim() || line.startsWith(' ')) return false;
 
     const importantPatterns = [
       /function\s+\w+/,
@@ -162,7 +171,7 @@ class BaseProvider {
       /@.*\(/, // Decorators
     ];
 
-    return importantPatterns.some(pattern => pattern.test(line));
+    return importantPatterns.some((pattern) => pattern.test(line));
   }
 
   /**
@@ -224,7 +233,16 @@ class BaseProvider {
    * Build enhanced prompt for commit message generation
    */
   buildPrompt(diff, options = {}) {
-    const { context, type, language, conventional } = options;
+    const {
+      context,
+      type,
+      language,
+      conventional,
+      chunkIndex,
+      totalChunks,
+      isLastChunk,
+      chunkContext,
+    } = options;
     const diffAnalysis = this.analyzeDiffContent(diff);
 
     if (!options.count) {
@@ -239,6 +257,22 @@ CRITICAL REQUIREMENTS:
 - Keep titles under 72 characters, focus on the most important change
 - Prioritize semantic meaning over generic descriptions
 - Consider the business impact or technical significance`;
+
+    // Add chunking context if applicable
+    if (totalChunks && totalChunks > 1) {
+      prompt += `
+
+CHUNKING CONTEXT:
+- This is chunk ${chunkIndex + 1} of ${totalChunks}
+- Position: ${chunkContext} chunk
+- Focus on the changes in this specific chunk
+- Generate messages that accurately represent this portion of changes`;
+
+      if (isLastChunk) {
+        prompt += `
+- This is the final chunk - consider the overall impact`;
+      }
+    }
 
     if (conventional) {
       prompt += `
@@ -257,31 +291,32 @@ CONVENTIONAL COMMIT FORMAT:
       prompt += `
 
 REPOSITORY CONTEXT:`;
-      
+
       if (context.patterns) {
         const commonTypes = context.patterns.mostUsedTypes
-          ? context.patterns.mostUsedTypes.map(([type]) => type).join(", ")
-          : "none detected";
+          ? context.patterns.mostUsedTypes.map(([type]) => type).join(', ')
+          : 'none detected';
         const commonScopes = context.patterns.mostUsedScopes
-          ? context.patterns.mostUsedScopes.map(([scope]) => scope).join(", ")
-          : "none detected";
+          ? context.patterns.mostUsedScopes.map(([scope]) => scope).join(', ')
+          : 'none detected';
 
         prompt += `
-- Preferred format: ${context.patterns.preferredFormat || "freeform"}
+- Preferred format: ${context.patterns.preferredFormat || 'freeform'}
 - Common types: ${commonTypes}
 - Common scopes: ${commonScopes}`;
       }
 
       if (context.files) {
         const fileTypes = context.files.fileTypes || {};
-        const changedTypes = Object.entries(fileTypes)
-          .filter(([_, count]) => count > 0)
-          .map(([type, count]) => `${type}(${count})`)
-          .join(", ") || "none";
+        const changedTypes =
+          Object.entries(fileTypes)
+            .filter(([_, count]) => count > 0)
+            .map(([type, count]) => `${type}(${count})`)
+            .join(', ') || 'none';
 
         prompt += `
 - File types changed: ${changedTypes}
-- Inferred scope: ${context.files.scope || "general"}
+- Inferred scope: ${context.files.scope || 'general'}
 - Changes: +${context.files.changes?.insertions || 0} -${context.files.changes?.deletions || 0}`;
       }
 
@@ -291,30 +326,40 @@ REPOSITORY CONTEXT:`;
         const semanticInfo = [];
 
         if (semantic.functions && semantic.functions.length > 0) {
-          semanticInfo.push(`Functions: ${semantic.functions.slice(0, 5).join(", ")}`);
+          semanticInfo.push(
+            `Functions: ${semantic.functions.slice(0, 5).join(', ')}`
+          );
         }
         if (semantic.classes && semantic.classes.length > 0) {
-          semanticInfo.push(`Classes: ${semantic.classes.slice(0, 5).join(", ")}`);
+          semanticInfo.push(
+            `Classes: ${semantic.classes.slice(0, 5).join(', ')}`
+          );
         }
         if (semantic.components && semantic.components.length > 0) {
-          semanticInfo.push(`Components: ${semantic.components.slice(0, 5).join(", ")}`);
+          semanticInfo.push(
+            `Components: ${semantic.components.slice(0, 5).join(', ')}`
+          );
         }
         if (semantic.endpoints && semantic.endpoints.length > 0) {
-          semanticInfo.push(`Endpoints: ${semantic.endpoints.slice(0, 3).join(", ")}`);
+          semanticInfo.push(
+            `Endpoints: ${semantic.endpoints.slice(0, 3).join(', ')}`
+          );
         }
         if (semantic.wordpress_hooks && semantic.wordpress_hooks.length > 0) {
-          semanticInfo.push(`WordPress hooks: ${semantic.wordpress_hooks.slice(0, 3).join(", ")}`);
+          semanticInfo.push(
+            `WordPress hooks: ${semantic.wordpress_hooks.slice(0, 3).join(', ')}`
+          );
         }
 
         if (semanticInfo.length > 0) {
           prompt += `
-- Semantic context: ${semanticInfo.join("; ")}`;
+- Semantic context: ${semanticInfo.join('; ')}`;
         }
       }
 
       if (context.project) {
         prompt += `
-- Project type: ${context.project.primary || "unknown"}`;
+- Project type: ${context.project.primary || 'unknown'}`;
       }
     }
 
@@ -325,7 +370,7 @@ REPOSITORY CONTEXT:`;
 DIFF ANALYSIS:`;
       if (diffAnalysis.keyChanges.length > 0) {
         prompt += `
-- Key changes detected: ${diffAnalysis.keyChanges.join(", ")}`;
+- Key changes detected: ${diffAnalysis.keyChanges.join(', ')}`;
       }
       if (diffAnalysis.likelyPurpose) {
         prompt += `
@@ -333,7 +378,7 @@ DIFF ANALYSIS:`;
       }
       if (diffAnalysis.affectedAreas.length > 0) {
         prompt += `
-- Affected areas: ${diffAnalysis.affectedAreas.join(", ")}`;
+- Affected areas: ${diffAnalysis.affectedAreas.join(', ')}`;
       }
     }
 
@@ -365,21 +410,27 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         newComponents: [],
         apiChanges: [],
         databaseChanges: [],
-        configChanges: []
-      }
+        configChanges: [],
+      },
     };
 
-    const lines = diff.split("\n");
-    const addedLines = lines.filter(line => line.startsWith("+")).join("\n");
-    const removedLines = lines.filter(line => line.startsWith("-")).join("\n");
+    const lines = diff.split('\n');
+    const addedLines = lines.filter((line) => line.startsWith('+')).join('\n');
+    const removedLines = lines
+      .filter((line) => line.startsWith('-'))
+      .join('\n');
 
     // Enhanced semantic change detection
     const semanticPatterns = {
-      newFunctions: /^\+.*(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>|(\w+)\s*:\s*\([^)]*\)\s*=>)/gm,
+      newFunctions:
+        /^\+.*(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>|(\w+)\s*:\s*\([^)]*\)\s*=>)/gm,
       newClasses: /^\+.*class\s+(\w+)/gm,
-      newComponents: /^\+.*(?:function\s+(\w+)\s*\([^)]*\)\s*\{|const\s+(\w+)\s*=\s*(?:React\.)?(?:forwardRef\s*\()?\([^)]*\)\s*=>\s*{)/gm,
-      apiChanges: /^\+.*(?:app\.(get|post|put|delete|patch)|router\.(get|post|put|delete|patch))\s*\(\s*['"]([^'"]+)['"]/gm,
-      databaseChanges: /^\+.*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)\s+(TABLE|INDEX|DATABASE)/gm,
+      newComponents:
+        /^\+.*(?:function\s+(\w+)\s*\([^)]*\)\s*\{|const\s+(\w+)\s*=\s*(?:React\.)?(?:forwardRef\s*\()?\([^)]*\)\s*=>\s*{)/gm,
+      apiChanges:
+        /^\+.*(?:app\.(get|post|put|delete|patch)|router\.(get|post|put|delete|patch))\s*\(\s*['"]([^'"]+)['"]/gm,
+      databaseChanges:
+        /^\+.*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)\s+(TABLE|INDEX|DATABASE)/gm,
       configChanges: /^\+.*(?:process\.env|config\.|\.env|ENV\[)/gm,
     };
 
@@ -387,17 +438,27 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
     for (const [changeType, pattern] of Object.entries(semanticPatterns)) {
       let match;
       while ((match = pattern.exec(diff)) !== null) {
-        if (changeType === 'newFunctions' || changeType === 'newClasses' || changeType === 'newComponents') {
+        if (
+          changeType === 'newFunctions' ||
+          changeType === 'newClasses' ||
+          changeType === 'newComponents'
+        ) {
           const name = match[1] || match[2] || match[3];
           if (name) analysis.semanticChanges[changeType].push(name);
         } else if (changeType === 'apiChanges') {
           const method = match[1];
           const endpoint = match[2];
-          analysis.semanticChanges[changeType].push(`${method.toUpperCase()} ${endpoint}`);
+          analysis.semanticChanges[changeType].push(
+            `${method.toUpperCase()} ${endpoint}`
+          );
         } else if (changeType === 'configChanges') {
-          analysis.semanticChanges[changeType].push(match[0].substring(1).trim());
+          analysis.semanticChanges[changeType].push(
+            match[0].substring(1).trim()
+          );
         } else {
-          analysis.semanticChanges[changeType].push(match[0].substring(1).trim());
+          analysis.semanticChanges[changeType].push(
+            match[0].substring(1).trim()
+          );
         }
       }
     }
@@ -405,13 +466,17 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
     // Enhanced area patterns
     const patterns = {
       authentication: /auth|login|user|session|jwt|passport|password|token/i,
-      "api endpoints": /api|endpoint|route|controller|handler|service|express|router/i,
-      database: /database|db|model|schema|migration|sql|query|sequelize|mongoose|prisma/i,
-      "ui components": /component|view|template|render|jsx|tsx|html|react|vue|angular/i,
+      'api endpoints':
+        /api|endpoint|route|controller|handler|service|express|router/i,
+      database:
+        /database|db|model|schema|migration|sql|query|sequelize|mongoose|prisma/i,
+      'ui components':
+        /component|view|template|render|jsx|tsx|html|react|vue|angular/i,
       configuration: /config|env|setting|constant|environment|dotenv/i,
-      testing: /test|spec|mock|fixture|describe|it\(|expect|jest|mocha|cypress/i,
+      testing:
+        /test|spec|mock|fixture|describe|it\(|expect|jest|mocha|cypress/i,
       dependencies: /package|npm|yarn|require|import|dependency|node_modules/i,
-      "error handling": /error|exception|try|catch|throw|validation|sanitize/i,
+      'error handling': /error|exception|try|catch|throw|validation|sanitize/i,
       performance: /performance|optimize|cache|lazy|memo|async|await|promise/i,
       security: /security|sanitize|validate|escape|encrypt|hash|bcrypt|crypto/i,
       wordpress: /wordpress|wp-|add_action|add_filter|wp_enqueue|wp_localize/i,
@@ -426,17 +491,38 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
 
     // Enhanced likely purpose detection
     const purposeDetection = [
-      { patterns: [/authentication|login|user|session|jwt/i], purpose: "authentication/security enhancement" },
-      { patterns: [/api.*endpoint|route.*controller|handler/i], purpose: "API functionality change" },
-      { patterns: [/database.*schema|migration.*table|model.*change/i], purpose: "database schema or query modification" },
-      { patterns: [/component.*render|template.*update|ui.*change/i], purpose: "user interface update" },
-      { patterns: [/test.*coverage|spec.*add|mock.*create/i], purpose: "test coverage or test logic change" },
-      { patterns: [/wordpress.*hook|wp.*filter|add_action/i], purpose: "WordPress hook or filter modification" },
-      { patterns: [/typescript.*interface|type.*definition/i], purpose: "TypeScript type system update" },
+      {
+        patterns: [/authentication|login|user|session|jwt/i],
+        purpose: 'authentication/security enhancement',
+      },
+      {
+        patterns: [/api.*endpoint|route.*controller|handler/i],
+        purpose: 'API functionality change',
+      },
+      {
+        patterns: [/database.*schema|migration.*table|model.*change/i],
+        purpose: 'database schema or query modification',
+      },
+      {
+        patterns: [/component.*render|template.*update|ui.*change/i],
+        purpose: 'user interface update',
+      },
+      {
+        patterns: [/test.*coverage|spec.*add|mock.*create/i],
+        purpose: 'test coverage or test logic change',
+      },
+      {
+        patterns: [/wordpress.*hook|wp.*filter|add_action/i],
+        purpose: 'WordPress hook or filter modification',
+      },
+      {
+        patterns: [/typescript.*interface|type.*definition/i],
+        purpose: 'TypeScript type system update',
+      },
     ];
 
     for (const { patterns, purpose } of purposeDetection) {
-      if (patterns.some(p => p.test(diff))) {
+      if (patterns.some((p) => p.test(diff))) {
         analysis.likelyPurpose = purpose;
         break;
       }
@@ -444,27 +530,36 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
 
     // Detect key changes with semantic context
     if (analysis.semanticChanges.newFunctions.length > 0) {
-      analysis.keyChanges.push(`new functions: ${analysis.semanticChanges.newFunctions.slice(0, 3).join(", ")}`);
+      analysis.keyChanges.push(
+        `new functions: ${analysis.semanticChanges.newFunctions.slice(0, 3).join(', ')}`
+      );
     }
     if (analysis.semanticChanges.newClasses.length > 0) {
-      analysis.keyChanges.push(`new classes: ${analysis.semanticChanges.newClasses.slice(0, 3).join(", ")}`);
+      analysis.keyChanges.push(
+        `new classes: ${analysis.semanticChanges.newClasses.slice(0, 3).join(', ')}`
+      );
     }
     if (analysis.semanticChanges.apiChanges.length > 0) {
-      analysis.keyChanges.push(`API changes: ${analysis.semanticChanges.apiChanges.slice(0, 3).join(", ")}`);
+      analysis.keyChanges.push(
+        `API changes: ${analysis.semanticChanges.apiChanges.slice(0, 3).join(', ')}`
+      );
     }
     if (analysis.semanticChanges.configChanges.length > 0) {
-      analysis.keyChanges.push("configuration updates");
+      analysis.keyChanges.push('configuration updates');
     }
 
     // Traditional detection
-    if (/function|class|const|let|var/.test(addedLines) && !/function|class|const|let|var/.test(removedLines)) {
-      if (!analysis.keyChanges.some(k => k.includes("new functions"))) {
-        analysis.keyChanges.push("new functions/classes added");
+    if (
+      /function|class|const|let|var/.test(addedLines) &&
+      !/function|class|const|let|var/.test(removedLines)
+    ) {
+      if (!analysis.keyChanges.some((k) => k.includes('new functions'))) {
+        analysis.keyChanges.push('new functions/classes added');
       }
     }
     if (/export|module\.exports/.test(addedLines)) {
-      if (!analysis.keyChanges.some(k => k.includes("export"))) {
-        analysis.keyChanges.push("new exports added");
+      if (!analysis.keyChanges.some((k) => k.includes('export'))) {
+        analysis.keyChanges.push('new exports added');
       }
     }
 
@@ -472,7 +567,9 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       analysis.affectedAreas.length > 0,
       analysis.likelyPurpose !== null,
       analysis.keyChanges.length > 0,
-      Object.values(analysis.semanticChanges).some(changes => changes.length > 0)
+      Object.values(analysis.semanticChanges).some(
+        (changes) => changes.length > 0
+      ),
     ].some(Boolean);
 
     return analysis;
@@ -483,14 +580,14 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
    */
   getLanguageName(code) {
     const languages = {
-      en: "English",
-      es: "Spanish",
-      fr: "French",
-      de: "German",
-      zh: "Chinese",
-      ja: "Japanese",
+      en: 'English',
+      es: 'Spanish',
+      fr: 'French',
+      de: 'German',
+      zh: 'Chinese',
+      ja: 'Japanese',
     };
-    return languages[code] || "English";
+    return languages[code] || 'English';
   }
 
   /**
@@ -509,37 +606,37 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       switch (status) {
         case 401:
           throw new Error(
-            `Authentication failed for ${providerName}. Please check your API key.`,
+            `Authentication failed for ${providerName}. Please check your API key.`
           );
         case 403:
           throw new Error(
-            `Access forbidden for ${providerName}. Please check your permissions.`,
+            `Access forbidden for ${providerName}. Please check your permissions.`
           );
         case 429:
           throw new Error(
-            `Rate limit exceeded for ${providerName}. Please try again later.`,
+            `Rate limit exceeded for ${providerName}. Please try again later.`
           );
         case 500:
         case 502:
         case 503:
         case 504:
           throw new Error(
-            `${providerName} service is temporarily unavailable. Please try again later.`,
+            `${providerName} service is temporarily unavailable. Please try again later.`
           );
         default:
           throw new Error(`${providerName} API error (${status}): ${message}`);
       }
-    } else if (error.code === "ECONNREFUSED") {
+    } else if (error.code === 'ECONNREFUSED') {
       throw new Error(
-        `Cannot connect to ${providerName}. Please check your internet connection.`,
+        `Cannot connect to ${providerName}. Please check your internet connection.`
       );
-    } else if (error.code === "ETIMEDOUT") {
+    } else if (error.code === 'ETIMEDOUT') {
       throw new Error(
-        `Request to ${providerName} timed out. Please try again.`,
+        `Request to ${providerName} timed out. Please try again.`
       );
     } else {
       // Handle undefined error message safely
-      const errorMessage = error?.message || "Unknown error occurred";
+      const errorMessage = error?.message || 'Unknown error occurred';
       throw new Error(`${providerName} error: ${errorMessage}`);
     }
   }
@@ -548,26 +645,26 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
    * Parse AI response into commit messages
    */
   parseResponse(response) {
-    if (typeof response !== "string") {
-      throw new Error("Invalid response from AI provider");
+    if (typeof response !== 'string') {
+      throw new Error('Invalid response from AI provider');
     }
 
     // Split by lines and clean up
     const messages = response
-      .split("\n")
+      .split('\n')
       .map(
         (line) =>
           line
             .trim()
-            .replace(/^\d+\.?\s*/, "") // Strip numbering
-            .replace(/^- \s*/, "") // Strip dashes
-            .replace(/^\* \s*/, ""), // Strip asterisks
+            .replace(/^\d+\.?\s*/, '') // Strip numbering
+            .replace(/^- \s*/, '') // Strip dashes
+            .replace(/^\* \s*/, '') // Strip asterisks
       )
       .filter((line) => line.length > 0)
       .slice(0, 10); // Limit to 10 messages max
 
     if (messages.length === 0) {
-      throw new Error("No valid commit messages found in AI response");
+      throw new Error('No valid commit messages found in AI response');
     }
 
     return messages;
@@ -593,7 +690,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         if (attempt < maxRetries) {
           // Use exponential backoff
           await new Promise((resolve) =>
-            setTimeout(resolve, delay * Math.pow(2, attempt - 1)),
+            setTimeout(resolve, delay * Math.pow(2, attempt - 1))
           );
         }
       }
@@ -605,7 +702,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
    * Validate commit message format
    */
   validateCommitMessage(message) {
-    if (!message || typeof message !== "string") {
+    if (!message || typeof message !== 'string') {
       return false;
     }
 
@@ -617,7 +714,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
     }
 
     // Should not contain newlines in title
-    if (trimmed.includes("\n") && trimmed.indexOf("\n") < 50) {
+    if (trimmed.includes('\n') && trimmed.indexOf('\n') < 50) {
       return false;
     }
 

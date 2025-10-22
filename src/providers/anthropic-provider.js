@@ -21,15 +21,17 @@ class AnthropicProvider extends BaseProvider {
     if (this.client) return;
 
     const config = await this.getConfig();
-    
+
     if (!config.apiKey) {
-      throw new Error('Anthropic API key not configured. Run "aicommit setup" to configure.');
+      throw new Error(
+        'Anthropic API key not configured. Run "aicommit setup" to configure.'
+      );
     }
 
     this.client = new Anthropic({
       apiKey: config.apiKey,
       timeout: config.timeout || 30000,
-      maxRetries: config.retries || 3
+      maxRetries: config.retries || 3,
     });
   }
 
@@ -58,9 +60,9 @@ class AnthropicProvider extends BaseProvider {
           messages: [
             {
               role: 'user',
-              content: prompt
-            }
-          ]
+              content: prompt,
+            },
+          ],
         });
 
         const content = response.content[0]?.text;
@@ -69,8 +71,7 @@ class AnthropicProvider extends BaseProvider {
         }
 
         const messages = this.parseResponse(content);
-        return messages.filter(msg => this.validateCommitMessage(msg));
-
+        return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
         this.handleError(error, 'Anthropic');
       }
@@ -100,7 +101,7 @@ class AnthropicProvider extends BaseProvider {
     try {
       const client = new Anthropic({
         apiKey: config.apiKey,
-        timeout: 10000
+        timeout: 10000,
       });
 
       // Test with a simple request
@@ -110,9 +111,9 @@ class AnthropicProvider extends BaseProvider {
         messages: [
           {
             role: 'user',
-            content: 'Say "test successful" if you can read this.'
-          }
-        ]
+            content: 'Say "test successful" if you can read this.',
+          },
+        ],
       });
 
       const content = response.content[0]?.text;
@@ -124,14 +125,13 @@ class AnthropicProvider extends BaseProvider {
         success: true,
         message: 'Anthropic connection successful',
         model: config.model || 'claude-3-sonnet-20240229',
-        response: content.trim()
+        response: content.trim(),
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Anthropic connection failed: ${error.message}`,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -141,39 +141,44 @@ class AnthropicProvider extends BaseProvider {
    */
   async getAvailableModels(forceRefresh = false) {
     // Check cache first
-    if (!forceRefresh && this.cachedModels && this.modelsCacheTime && 
-        Date.now() - this.modelsCacheTime < 3600000) { // 1 hour cache
+    if (
+      !forceRefresh &&
+      this.cachedModels &&
+      this.modelsCacheTime &&
+      Date.now() - this.modelsCacheTime < 3600000
+    ) {
+      // 1 hour cache
       return this.cachedModels;
     }
 
     try {
       console.log('Checking available Anthropic models...');
-      
+
       // Anthropic doesn't have a models API endpoint, so we test known models
       const knownModels = [
-        { 
-          id: 'claude-3-haiku-20240307', 
-          name: 'Claude 3 Haiku', 
+        {
+          id: 'claude-3-haiku-20240307',
+          name: 'Claude 3 Haiku',
           description: 'Fastest and most compact model',
           recommended: true,
           contextLength: 200000,
-          costTier: 'low'
+          costTier: 'low',
         },
-        { 
-          id: 'claude-3-sonnet-20240229', 
-          name: 'Claude 3 Sonnet', 
+        {
+          id: 'claude-3-sonnet-20240229',
+          name: 'Claude 3 Sonnet',
           description: 'Balanced performance and speed',
           recommended: false,
           contextLength: 200000,
-          costTier: 'medium'
+          costTier: 'medium',
         },
-        { 
-          id: 'claude-3-opus-20240229', 
-          name: 'Claude 3 Opus', 
+        {
+          id: 'claude-3-opus-20240229',
+          name: 'Claude 3 Opus',
           description: 'Most powerful model for complex tasks',
           recommended: false,
           contextLength: 200000,
-          costTier: 'high'
+          costTier: 'high',
         },
         {
           id: 'claude-3-5-sonnet-20241022',
@@ -181,27 +186,27 @@ class AnthropicProvider extends BaseProvider {
           description: 'Latest and most capable model',
           recommended: true,
           contextLength: 200000,
-          costTier: 'medium'
-        }
+          costTier: 'medium',
+        },
       ];
 
       // Test model availability by making a small request
       const availableModels = [];
-      
+
       for (const model of knownModels) {
         try {
           const isAvailable = await this.testModelAvailability(model.id);
           if (isAvailable) {
             availableModels.push({
               ...model,
-              available: true
+              available: true,
             });
           }
         } catch (error) {
           console.warn(`Model ${model.id} not available: ${error.message}`);
           availableModels.push({
             ...model,
-            available: false
+            available: false,
           });
         }
       }
@@ -209,37 +214,36 @@ class AnthropicProvider extends BaseProvider {
       // Cache results
       this.cachedModels = availableModels;
       this.modelsCacheTime = Date.now();
-      
-      const availableCount = availableModels.filter(m => m.available).length;
+
+      const availableCount = availableModels.filter((m) => m.available).length;
       console.log(`Found ${availableCount} available Anthropic models`);
-      
+
       return availableModels;
-      
     } catch (error) {
       console.warn(`Failed to check Anthropic models: ${error.message}`);
-      
+
       // Return default models if check fails
       const defaultModels = [
-        { 
-          id: 'claude-3-haiku-20240307', 
-          name: 'Claude 3 Haiku', 
+        {
+          id: 'claude-3-haiku-20240307',
+          name: 'Claude 3 Haiku',
           description: 'Fastest and most compact model',
           available: true,
           recommended: true,
           contextLength: 200000,
-          costTier: 'low'
+          costTier: 'low',
         },
-        { 
-          id: 'claude-3-sonnet-20240229', 
-          name: 'Claude 3 Sonnet', 
+        {
+          id: 'claude-3-sonnet-20240229',
+          name: 'Claude 3 Sonnet',
           description: 'Balanced performance and speed',
           available: true,
           recommended: false,
           contextLength: 200000,
-          costTier: 'medium'
-        }
+          costTier: 'medium',
+        },
       ];
-      
+
       this.cachedModels = defaultModels;
       this.modelsCacheTime = Date.now();
       return defaultModels;
@@ -261,15 +265,18 @@ class AnthropicProvider extends BaseProvider {
         messages: [
           {
             role: 'user',
-            content: 'Hi'
-          }
-        ]
+            content: 'Hi',
+          },
+        ],
       });
-      
+
       return response && response.content && response.content.length > 0;
     } catch (error) {
       // If error is about model not found, return false
-      if (error.message.includes('model') || error.message.includes('not found')) {
+      if (
+        error.message.includes('model') ||
+        error.message.includes('not found')
+      ) {
         return false;
       }
       // For other errors (like rate limits), assume model is available
@@ -282,16 +289,20 @@ class AnthropicProvider extends BaseProvider {
    */
   async getBestAvailableModel() {
     const models = await this.getAvailableModels();
-    
+
     // Prefer available recommended models first
-    const availableRecommended = models.filter(m => m.available && m.recommended);
+    const availableRecommended = models.filter(
+      (m) => m.available && m.recommended
+    );
     if (availableRecommended.length > 0) {
       return availableRecommended[0];
     }
-    
+
     // Fall back to first available model
-    const available = models.filter(m => m.available);
-    return available[0] || { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' };
+    const available = models.filter((m) => m.available);
+    return (
+      available[0] || { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku' }
+    );
   }
 }
 

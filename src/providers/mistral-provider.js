@@ -19,9 +19,11 @@ class MistralProvider extends BaseProvider {
     if (this.client) return;
 
     const config = await this.getConfig();
-    
+
     if (!config.apiKey) {
-      throw new Error('Mistral API key not configured. Run "aicommit setup" to configure.');
+      throw new Error(
+        'Mistral API key not configured. Run "aicommit setup" to configure.'
+      );
     }
 
     this.client = new MistralClient(config.apiKey);
@@ -43,11 +45,11 @@ class MistralProvider extends BaseProvider {
           messages: [
             {
               role: 'user',
-              content: prompt
-            }
+              content: prompt,
+            },
           ],
           max_tokens: config.maxTokens || 150,
-          temperature: config.temperature || 0.7
+          temperature: config.temperature || 0.7,
         });
 
         const content = response.choices[0]?.message?.content;
@@ -56,8 +58,7 @@ class MistralProvider extends BaseProvider {
         }
 
         const messages = this.parseResponse(content);
-        return messages.filter(msg => this.validateCommitMessage(msg));
-
+        return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
         this.handleError(error, 'Mistral');
       }
@@ -87,11 +88,11 @@ class MistralProvider extends BaseProvider {
         messages: [
           {
             role: 'user',
-            content: 'Say "test successful" if you can read this.'
-          }
+            content: 'Say "test successful" if you can read this.',
+          },
         ],
         max_tokens: 10,
-        temperature: 0
+        temperature: 0,
       });
 
       const content = response.choices[0]?.message?.content;
@@ -103,14 +104,13 @@ class MistralProvider extends BaseProvider {
         success: true,
         message: 'Mistral connection successful',
         model: config.model || 'mistral-medium',
-        response: content.trim()
+        response: content.trim(),
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Mistral connection failed: ${error.message}`,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -120,26 +120,26 @@ class MistralProvider extends BaseProvider {
    */
   async getAvailableModels() {
     return [
-      { 
-        id: 'mistral-tiny', 
-        name: 'Mistral Tiny', 
-        description: 'Fastest and most economical model' 
+      {
+        id: 'mistral-tiny',
+        name: 'Mistral Tiny',
+        description: 'Fastest and most economical model',
       },
-      { 
-        id: 'mistral-small', 
-        name: 'Mistral Small', 
-        description: 'Balanced performance and cost' 
+      {
+        id: 'mistral-small',
+        name: 'Mistral Small',
+        description: 'Balanced performance and cost',
       },
-      { 
-        id: 'mistral-medium', 
-        name: 'Mistral Medium', 
-        description: 'Higher performance for complex tasks' 
+      {
+        id: 'mistral-medium',
+        name: 'Mistral Medium',
+        description: 'Higher performance for complex tasks',
       },
-      { 
-        id: 'mistral-large-latest', 
-        name: 'Mistral Large', 
-        description: 'Most capable model' 
-      }
+      {
+        id: 'mistral-large-latest',
+        name: 'Mistral Large',
+        description: 'Most capable model',
+      },
     ];
   }
 }

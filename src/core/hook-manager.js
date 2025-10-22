@@ -26,7 +26,7 @@ class HookManager {
       // Check if hook already exists
       if (await fs.pathExists(hookPath)) {
         const existingContent = await fs.readFile(hookPath, 'utf8');
-        
+
         // Check if our hook is already installed
         if (existingContent.includes('ai-commit-generator')) {
           throw new Error('AI commit generator hook is already installed');
@@ -45,9 +45,8 @@ class HookManager {
       return {
         success: true,
         message: 'Git hook installed successfully',
-        path: hookPath
+        path: hookPath,
       };
-
     } catch (error) {
       throw new Error(`Failed to install git hook: ${error.message}`);
     }
@@ -59,14 +58,19 @@ class HookManager {
   async uninstall() {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
+      const hookPath = path.join(
+        repoRoot,
+        '.git',
+        'hooks',
+        'prepare-commit-msg'
+      );
 
-      if (!await fs.pathExists(hookPath)) {
+      if (!(await fs.pathExists(hookPath))) {
         throw new Error('Git hook is not installed');
       }
 
       const content = await fs.readFile(hookPath, 'utf8');
-      
+
       // Check if it's our hook
       if (!content.includes('ai-commit-generator')) {
         throw new Error('Existing hook was not created by ai-commit-generator');
@@ -78,7 +82,7 @@ class HookManager {
       // Look for backup files and offer to restore
       const hooksDir = path.dirname(hookPath);
       const backupFiles = await fs.readdir(hooksDir);
-      const backups = backupFiles.filter(file => 
+      const backups = backupFiles.filter((file) =>
         file.startsWith('prepare-commit-msg.backup.')
       );
 
@@ -86,7 +90,7 @@ class HookManager {
         // Get the most recent backup
         const latestBackup = backups.sort().pop();
         const backupPath = path.join(hooksDir, latestBackup);
-        
+
         console.log(`Found backup: ${latestBackup}`);
         console.log('To restore it, run:');
         console.log(`mv "${backupPath}" "${hookPath}"`);
@@ -95,9 +99,8 @@ class HookManager {
       return {
         success: true,
         message: 'Git hook uninstalled successfully',
-        backupsFound: backups.length
+        backupsFound: backups.length,
       };
-
     } catch (error) {
       throw new Error(`Failed to uninstall git hook: ${error.message}`);
     }
@@ -109,15 +112,19 @@ class HookManager {
   async isInstalled() {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
+      const hookPath = path.join(
+        repoRoot,
+        '.git',
+        'hooks',
+        'prepare-commit-msg'
+      );
 
-      if (!await fs.pathExists(hookPath)) {
+      if (!(await fs.pathExists(hookPath))) {
         return false;
       }
 
       const content = await fs.readFile(hookPath, 'utf8');
       return content.includes('ai-commit-generator');
-
     } catch (error) {
       return false;
     }
@@ -184,7 +191,7 @@ exit 0
       skipOnMerge = true,
       skipOnRebase = true,
       provider = null,
-      conventional = true
+      conventional = true,
     } = options;
 
     return `#!/bin/sh
@@ -272,10 +279,17 @@ exit 0
   async updateHookConfig(options) {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
+      const hookPath = path.join(
+        repoRoot,
+        '.git',
+        'hooks',
+        'prepare-commit-msg'
+      );
 
-      if (!await this.isInstalled()) {
-        throw new Error('Hook is not installed. Install it first with --install');
+      if (!(await this.isInstalled())) {
+        throw new Error(
+          'Hook is not installed. Install it first with --install'
+        );
       }
 
       // Generate new hook script with options
@@ -285,9 +299,8 @@ exit 0
       return {
         success: true,
         message: 'Hook configuration updated successfully',
-        options
+        options,
       };
-
     } catch (error) {
       throw new Error(`Failed to update hook configuration: ${error.message}`);
     }
@@ -299,29 +312,33 @@ exit 0
   async getStatus() {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
-      
+      const hookPath = path.join(
+        repoRoot,
+        '.git',
+        'hooks',
+        'prepare-commit-msg'
+      );
+
       const status = {
         installed: await this.isInstalled(),
         path: hookPath,
-        exists: await fs.pathExists(hookPath)
+        exists: await fs.pathExists(hookPath),
       };
 
       if (status.exists) {
         const content = await fs.readFile(hookPath, 'utf8');
         status.isOurs = content.includes('ai-commit-generator');
         status.size = content.length;
-        
+
         // Try to extract configuration
         status.config = this.parseHookConfig(content);
       }
 
       return status;
-
     } catch (error) {
       return {
         installed: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -331,19 +348,20 @@ exit 0
    */
   parseHookConfig(content) {
     const config = {};
-    
+
     const patterns = {
       autoCommit: /AUTO_COMMIT=(\w+)/,
       skipOnMerge: /SKIP_ON_MERGE=(\w+)/,
       skipOnRebase: /SKIP_ON_REBASE=(\w+)/,
       provider: /PROVIDER="([^"]*)"/,
-      conventional: /CONVENTIONAL=(\w+)/
+      conventional: /CONVENTIONAL=(\w+)/,
     };
 
     for (const [key, pattern] of Object.entries(patterns)) {
       const match = content.match(pattern);
       if (match) {
-        config[key] = match[1] === 'true' ? true : match[1] === 'false' ? false : match[1];
+        config[key] =
+          match[1] === 'true' ? true : match[1] === 'false' ? false : match[1];
       }
     }
 
