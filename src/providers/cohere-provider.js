@@ -19,13 +19,15 @@ class CohereProvider extends BaseProvider {
     if (this.client) return;
 
     const config = await this.getConfig();
-    
+
     if (!config.apiKey) {
-      throw new Error('Cohere API key not configured. Run "aicommit setup" to configure.');
+      throw new Error(
+        'Cohere API key not configured. Run "aicommit setup" to configure.'
+      );
     }
 
     this.client = new CohereClient({
-      token: config.apiKey
+      token: config.apiKey,
     });
   }
 
@@ -45,7 +47,7 @@ class CohereProvider extends BaseProvider {
           prompt: prompt,
           max_tokens: config.maxTokens || 150,
           temperature: config.temperature || 0.7,
-          stop_sequences: ['\n\n']
+          stop_sequences: ['\n\n'],
         });
 
         const content = response.generations[0]?.text;
@@ -54,8 +56,7 @@ class CohereProvider extends BaseProvider {
         }
 
         const messages = this.parseResponse(content);
-        return messages.filter(msg => this.validateCommitMessage(msg));
-
+        return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
         this.handleError(error, 'Cohere');
       }
@@ -79,14 +80,14 @@ class CohereProvider extends BaseProvider {
   async test(config) {
     try {
       const client = new CohereClient({
-        token: config.apiKey
+        token: config.apiKey,
       });
 
       const response = await client.generate({
         model: config.model || 'command',
         prompt: 'Say "test successful" if you can read this.',
         max_tokens: 10,
-        temperature: 0
+        temperature: 0,
       });
 
       const content = response.generations[0]?.text;
@@ -98,14 +99,13 @@ class CohereProvider extends BaseProvider {
         success: true,
         message: 'Cohere connection successful',
         model: config.model || 'command',
-        response: content.trim()
+        response: content.trim(),
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Cohere connection failed: ${error.message}`,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -115,21 +115,21 @@ class CohereProvider extends BaseProvider {
    */
   async getAvailableModels() {
     return [
-      { 
-        id: 'command', 
-        name: 'Command', 
-        description: 'Most capable model for text generation' 
+      {
+        id: 'command',
+        name: 'Command',
+        description: 'Most capable model for text generation',
       },
-      { 
-        id: 'command-light', 
-        name: 'Command Light', 
-        description: 'Faster and more economical model' 
+      {
+        id: 'command-light',
+        name: 'Command Light',
+        description: 'Faster and more economical model',
       },
-      { 
-        id: 'command-nightly', 
-        name: 'Command Nightly', 
-        description: 'Latest experimental features' 
-      }
+      {
+        id: 'command-nightly',
+        name: 'Command Nightly',
+        description: 'Latest experimental features',
+      },
     ];
   }
 }

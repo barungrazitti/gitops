@@ -5,16 +5,16 @@
 class MessageFormatter {
   constructor() {
     this.conventionalTypes = [
-      "feat",
-      "fix",
-      "docs",
-      "style",
-      "refactor",
-      "perf",
-      "test",
-      "chore",
-      "ci",
-      "build",
+      'feat',
+      'fix',
+      'docs',
+      'style',
+      'refactor',
+      'perf',
+      'test',
+      'chore',
+      'ci',
+      'build',
     ];
   }
 
@@ -22,7 +22,7 @@ class MessageFormatter {
    * Format commit message according to options
    */
   format(message, options = {}) {
-    if (!message || typeof message !== "string") {
+    if (!message || typeof message !== 'string') {
       return message;
     }
 
@@ -34,7 +34,7 @@ class MessageFormatter {
     }
 
     // Apply language-specific formatting
-    if (options.language && options.language !== "en") {
+    if (options.language && options.language !== 'en') {
       formatted = this.applyLanguageFormatting(formatted, options.language);
     }
 
@@ -65,7 +65,7 @@ class MessageFormatter {
     if (scope) {
       conventional += `(${scope})`;
     }
-    conventional += ": ";
+    conventional += ': ';
 
     // Clean the message description
     const description = this.cleanDescription(message);
@@ -203,11 +203,11 @@ class MessageFormatter {
     }
 
     // Enhanced fallback logic
-    if (/(add|new|create|implement)/.test(lowerMessage)) return "feat";
-    if (/(fix|bug|error|issue)/.test(lowerMessage)) return "fix";
-    if (/(update|upgrade|bump)/.test(lowerMessage)) return "chore";
+    if (/(add|new|create|implement)/.test(lowerMessage)) return 'feat';
+    if (/(fix|bug|error|issue)/.test(lowerMessage)) return 'fix';
+    if (/(update|upgrade|bump)/.test(lowerMessage)) return 'chore';
 
-    return "chore";
+    return 'chore';
   }
 
   /**
@@ -222,7 +222,7 @@ class MessageFormatter {
     if (context.files.wordpress && context.files.wordpress.isWordPress) {
       const wpScope = this.inferWordPressScope(
         message,
-        context.files.wordpress,
+        context.files.wordpress
       );
       if (wpScope) {
         return wpScope;
@@ -231,7 +231,7 @@ class MessageFormatter {
 
     // Use the inferred scope from file analysis with confidence scoring
     const fileScope = context.files.scope;
-    if (fileScope && fileScope !== "general" && fileScope !== "unknown") {
+    if (fileScope && fileScope !== 'general' && fileScope !== 'unknown') {
       // Verify scope matches message content
       const messageScope = this.inferScopeFromMessage(message);
       if (messageScope && messageScope !== fileScope) {
@@ -374,20 +374,20 @@ class MessageFormatter {
     // Priority 3: WordPress component types
     if (components.length > 0) {
       const componentScopeMap = {
-        "theme-functions": "functions",
-        "theme-styles": "styles",
-        "theme-scripts": "scripts",
-        customizer: "customizer",
-        widgets: "widgets",
-        sidebar: "sidebar",
-        layout: "layout",
-        "content-loop": "content",
-        comments: "comments",
-        woocommerce: "woocommerce",
+        'theme-functions': 'functions',
+        'theme-styles': 'styles',
+        'theme-scripts': 'scripts',
+        customizer: 'customizer',
+        widgets: 'widgets',
+        sidebar: 'sidebar',
+        layout: 'layout',
+        'content-loop': 'content',
+        comments: 'comments',
+        woocommerce: 'woocommerce',
       };
 
       for (const component of components) {
-        if (lowerMessage.includes(component.replace("-", " "))) {
+        if (lowerMessage.includes(component.replace('-', ' '))) {
           return componentScopeMap[component] || component;
         }
       }
@@ -401,15 +401,15 @@ class MessageFormatter {
     // Priority 4: WordPress type (plugin/theme/core)
     if (type) {
       const typeScopeMap = {
-        plugin: "plugin",
-        theme: "theme",
-        core: "wordpress-core",
+        plugin: 'plugin',
+        theme: 'theme',
+        core: 'wordpress-core',
       };
       return typeScopeMap[type];
     }
 
     // Priority 5: General WordPress
-    return "wordpress";
+    return 'wordpress';
   }
 
   /**
@@ -428,7 +428,7 @@ class MessageFormatter {
     ];
 
     for (const prefix of prefixes) {
-      description = description.replace(prefix, "");
+      description = description.replace(prefix, '');
     }
 
     // Ensure first letter is lowercase (conventional commit style)
@@ -437,7 +437,7 @@ class MessageFormatter {
     }
 
     // Remove trailing periods
-    description = description.replace(/\.$/, "");
+    description = description.replace(/\.$/, '');
 
     return description;
   }
@@ -455,19 +455,19 @@ class MessageFormatter {
    * Apply length constraints
    */
   applyLengthConstraints(message) {
-    const lines = message.split("\n");
+    const lines = message.split('\n');
     const title = lines[0];
-    const body = lines.slice(1).join("\n").trim();
+    const body = lines.slice(1).join('\n').trim();
 
     // Limit title to 72 characters (GitHub's limit)
     let formattedTitle = title;
     if (title.length > 72) {
-      formattedTitle = title.substring(0, 69) + "...";
+      formattedTitle = title.substring(0, 69) + '...';
     }
 
     // If there's a body, add it back
     if (body) {
-      return formattedTitle + "\n\n" + body;
+      return formattedTitle + '\n\n' + body;
     }
 
     return formattedTitle;
@@ -478,8 +478,8 @@ class MessageFormatter {
    */
   cleanupFormatting(message) {
     return message
-      .replace(/\s+/g, " ") // Multiple spaces to single space
-      .replace(/\n\s*\n\s*\n/g, "\n\n") // Multiple newlines to double newline
+      .replace(/\s+/g, ' ') // Multiple spaces to single space
+      .replace(/\n\s*\n\s*\n/g, '\n\n') // Multiple newlines to double newline
       .trim();
   }
 
@@ -490,12 +490,12 @@ class MessageFormatter {
     const { type, scope, description, body } = data;
 
     return template
-      .replace("{type}", type || "")
-      .replace("{scope}", scope || "")
-      .replace("{description}", description || "")
-      .replace("{body}", body || "")
-      .replace(/\(\)/g, "") // Remove empty parentheses
-      .replace(/\s+/g, " ") // Clean up spaces
+      .replace('{type}', type || '')
+      .replace('{scope}', scope || '')
+      .replace('{description}', description || '')
+      .replace('{body}', body || '')
+      .replace(/\(\)/g, '') // Remove empty parentheses
+      .replace(/\s+/g, ' ') // Clean up spaces
       .trim();
   }
 
@@ -515,8 +515,8 @@ class MessageFormatter {
     }
 
     const [, type, , scope, description] = match;
-    const lines = message.split("\n");
-    const body = lines.slice(1).join("\n").trim() || null;
+    const lines = message.split('\n');
+    const body = lines.slice(1).join('\n').trim() || null;
 
     return {
       type,
@@ -533,21 +533,21 @@ class MessageFormatter {
     const errors = [];
     const warnings = [];
 
-    if (!message || typeof message !== "string") {
-      errors.push("Message is required");
+    if (!message || typeof message !== 'string') {
+      errors.push('Message is required');
       return { valid: false, errors, warnings };
     }
 
     const trimmed = message.trim();
 
     // Length validation
-    const lines = trimmed.split("\n");
+    const lines = trimmed.split('\n');
     const title = lines[0];
 
     if (title.length === 0) {
-      errors.push("Title cannot be empty");
+      errors.push('Title cannot be empty');
     } else if (title.length > 72) {
-      warnings.push("Title should be 72 characters or less");
+      warnings.push('Title should be 72 characters or less');
     }
 
     // Conventional commit validation
@@ -556,7 +556,7 @@ class MessageFormatter {
 
       if (!parsed.type) {
         errors.push(
-          "Conventional commit format required: type(scope): description",
+          'Conventional commit format required: type(scope): description'
         );
       } else if (!this.conventionalTypes.includes(parsed.type)) {
         warnings.push(`Unknown commit type: ${parsed.type}`);
@@ -564,15 +564,15 @@ class MessageFormatter {
     }
 
     // General formatting validation
-    if (title.endsWith(".")) {
-      warnings.push("Title should not end with a period");
+    if (title.endsWith('.')) {
+      warnings.push('Title should not end with a period');
     }
 
     if (
       title.charAt(0) === title.charAt(0).toUpperCase() &&
       !options.conventional
     ) {
-      warnings.push("Title should start with lowercase letter");
+      warnings.push('Title should start with lowercase letter');
     }
 
     return {

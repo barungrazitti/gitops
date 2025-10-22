@@ -11,11 +11,11 @@ const os = require('os');
 class CacheManager {
   constructor() {
     // Initialize in-memory cache with 24 hour TTL
-    this.memoryCache = new NodeCache({ 
+    this.memoryCache = new NodeCache({
       stdTTL: 86400, // 24 hours
-      checkperiod: 3600 // Check for expired keys every hour
+      checkperiod: 3600, // Check for expired keys every hour
     });
-    
+
     // Persistent cache directory
     this.cacheDir = path.join(os.homedir(), '.ai-commit-generator', 'cache');
     this.ensureCacheDir();
@@ -44,7 +44,7 @@ class CacheManager {
       .replace(/^--- .*$/gm, '') // Remove --- lines
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
-    
+
     return crypto.createHash('sha256').update(normalizedDiff).digest('hex');
   }
 
@@ -54,21 +54,22 @@ class CacheManager {
   async get(diff) {
     try {
       const key = this.generateKey(diff);
-      
+
       // Try memory cache first
       let cached = this.memoryCache.get(key);
       if (cached) {
         return cached.messages;
       }
-      
+
       // Try persistent cache
       const cacheFile = path.join(this.cacheDir, `${key}.json`);
       if (await fs.pathExists(cacheFile)) {
         const cacheData = await fs.readJson(cacheFile);
-        
+
         // Check if cache is still valid
         const now = Date.now();
-        if (now - cacheData.timestamp < 86400000) { // 24 hours
+        if (now - cacheData.timestamp < 86400000) {
+          // 24 hours
           // Add to memory cache for faster access
           this.memoryCache.set(key, cacheData);
           return cacheData.messages;
@@ -77,7 +78,7 @@ class CacheManager {
           await fs.remove(cacheFile);
         }
       }
-      
+
       return null;
     } catch (error) {
       console.warn('Cache get error:', error.message);
@@ -94,16 +95,15 @@ class CacheManager {
       const cacheData = {
         messages,
         timestamp: Date.now(),
-        diff: this.truncateDiff(diff) // Store truncated diff for debugging
+        diff: this.truncateDiff(diff), // Store truncated diff for debugging
       };
-      
+
       // Set in memory cache
       this.memoryCache.set(key, cacheData);
-      
+
       // Set in persistent cache
       const cacheFile = path.join(this.cacheDir, `${key}.json`);
       await fs.writeJson(cacheFile, cacheData);
-      
     } catch (error) {
       console.warn('Cache set error:', error.message);
     }
@@ -123,12 +123,12 @@ class CacheManager {
     try {
       // Clear memory cache
       this.memoryCache.flushAll();
-      
+
       // Clear persistent cache
       if (await fs.pathExists(this.cacheDir)) {
         const files = await fs.readdir(this.cacheDir);
         await Promise.all(
-          files.map(file => fs.remove(path.join(this.cacheDir, file)))
+          files.map((file) => fs.remove(path.join(this.cacheDir, file)))
         );
       }
     } catch (error) {
@@ -142,40 +142,41 @@ class CacheManager {
   async getStats() {
     try {
       const memoryStats = this.memoryCache.getStats();
-      
+
       // Count persistent cache files
       let persistentCount = 0;
       let persistentSize = 0;
-      
+
       if (await fs.pathExists(this.cacheDir)) {
         const files = await fs.readdir(this.cacheDir);
         persistentCount = files.length;
-        
+
         for (const file of files) {
           const filePath = path.join(this.cacheDir, file);
           const stats = await fs.stat(filePath);
           persistentSize += stats.size;
         }
       }
-      
+
       return {
         memory: {
           keys: memoryStats.keys,
           hits: memoryStats.hits,
           misses: memoryStats.misses,
-          hitRate: memoryStats.hits / (memoryStats.hits + memoryStats.misses) * 100
+          hitRate:
+            (memoryStats.hits / (memoryStats.hits + memoryStats.misses)) * 100,
         },
         persistent: {
           files: persistentCount,
           sizeBytes: persistentSize,
-          sizeMB: (persistentSize / 1024 / 1024).toFixed(2)
-        }
+          sizeMB: (persistentSize / 1024 / 1024).toFixed(2),
+        },
       };
     } catch (error) {
       console.warn('Cache stats error:', error.message);
       return {
         memory: { keys: 0, hits: 0, misses: 0, hitRate: 0 },
-        persistent: { files: 0, sizeBytes: 0, sizeMB: '0.00' }
+        persistent: { files: 0, sizeBytes: 0, sizeMB: '0.00' },
       };
     }
   }
@@ -185,20 +186,20 @@ class CacheManager {
    */
   async cleanup() {
     try {
-      if (!await fs.pathExists(this.cacheDir)) {
+      if (!(await fs.pathExists(this.cacheDir))) {
         return;
       }
-      
+
       const files = await fs.readdir(this.cacheDir);
       const now = Date.now();
       let cleanedCount = 0;
-      
+
       for (const file of files) {
         const filePath = path.join(this.cacheDir, file);
-        
+
         try {
           const cacheData = await fs.readJson(filePath);
-          
+
           // Remove if older than 24 hours
           if (now - cacheData.timestamp > 86400000) {
             await fs.remove(filePath);
@@ -210,7 +211,7 @@ class CacheManager {
           cleanedCount++;
         }
       }
-      
+
       return cleanedCount;
     } catch (error) {
       console.warn('Cache cleanup error:', error.message);
@@ -223,27 +224,30 @@ class CacheManager {
    */
   async findSimilar(diff, threshold = 0.8) {
     try {
-      const diffLines = diff.split('\n').filter(line => 
-        line.startsWith('+') || line.startsWith('-')
-      );
-      
-      if (!await fs.pathExists(this.cacheDir)) {
+      const diffLines = diff
+        .split('\n')
+        .filter((line) => line.startsWith('+') || line.startsWith('-'));
+
+      if (!(await fs.pathExists(this.cacheDir))) {
         return null;
       }
-      
+
       const files = await fs.readdir(this.cacheDir);
-      
+
       for (const file of files) {
         const filePath = path.join(this.cacheDir, file);
-        
+
         try {
           const cacheData = await fs.readJson(filePath);
-          const cachedDiffLines = cacheData.diff.split('\n').filter(line => 
-            line.startsWith('+') || line.startsWith('-')
+          const cachedDiffLines = cacheData.diff
+            .split('\n')
+            .filter((line) => line.startsWith('+') || line.startsWith('-'));
+
+          const similarity = this.calculateSimilarity(
+            diffLines,
+            cachedDiffLines
           );
-          
-          const similarity = this.calculateSimilarity(diffLines, cachedDiffLines);
-          
+
           if (similarity >= threshold) {
             return cacheData.messages;
           }
@@ -252,7 +256,7 @@ class CacheManager {
           continue;
         }
       }
-      
+
       return null;
     } catch (error) {
       console.warn('Similar cache search error:', error.message);
@@ -266,12 +270,12 @@ class CacheManager {
   calculateSimilarity(diff1, diff2) {
     if (diff1.length === 0 && diff2.length === 0) return 1;
     if (diff1.length === 0 || diff2.length === 0) return 0;
-    
+
     const set1 = new Set(diff1);
     const set2 = new Set(diff2);
-    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const intersection = new Set([...set1].filter((x) => set2.has(x)));
     const union = new Set([...set1, ...set2]);
-    
+
     return intersection.size / union.size;
   }
 }

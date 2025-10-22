@@ -19,9 +19,11 @@ class GeminiProvider extends BaseProvider {
     if (this.client) return;
 
     const config = await this.getConfig();
-    
+
     if (!config.apiKey) {
-      throw new Error('Google Gemini API key not configured. Run "aicommit setup" to configure.');
+      throw new Error(
+        'Google Gemini API key not configured. Run "aicommit setup" to configure.'
+      );
     }
 
     this.client = new GoogleGenerativeAI(config.apiKey);
@@ -38,31 +40,32 @@ class GeminiProvider extends BaseProvider {
 
     return await this.withRetry(async () => {
       try {
-        const model = this.client.getGenerativeModel({ 
-          model: config.model || 'gemini-pro' 
+        const model = this.client.getGenerativeModel({
+          model: config.model || 'gemini-pro',
         });
 
         const result = await model.generateContent({
-          contents: [{
-            role: 'user',
-            parts: [{ text: prompt }]
-          }],
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: prompt }],
+            },
+          ],
           generationConfig: {
             maxOutputTokens: config.maxTokens || 150,
             temperature: config.temperature || 0.7,
-          }
+          },
         });
 
         const response = await result.response;
         const content = response.text();
-        
+
         if (!content) {
           throw new Error('No response content from Gemini');
         }
 
         const messages = this.parseResponse(content);
-        return messages.filter(msg => this.validateCommitMessage(msg));
-
+        return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
         this.handleError(error, 'Gemini');
       }
@@ -86,24 +89,26 @@ class GeminiProvider extends BaseProvider {
   async test(config) {
     try {
       const client = new GoogleGenerativeAI(config.apiKey);
-      const model = client.getGenerativeModel({ 
-        model: config.model || 'gemini-pro' 
+      const model = client.getGenerativeModel({
+        model: config.model || 'gemini-pro',
       });
 
       const result = await model.generateContent({
-        contents: [{
-          role: 'user',
-          parts: [{ text: 'Say "test successful" if you can read this.' }]
-        }],
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: 'Say "test successful" if you can read this.' }],
+          },
+        ],
         generationConfig: {
           maxOutputTokens: 10,
-          temperature: 0
-        }
+          temperature: 0,
+        },
       });
 
       const response = await result.response;
       const content = response.text();
-      
+
       if (!content) {
         throw new Error('No response from Gemini');
       }
@@ -112,14 +117,13 @@ class GeminiProvider extends BaseProvider {
         success: true,
         message: 'Gemini connection successful',
         model: config.model || 'gemini-pro',
-        response: content.trim()
+        response: content.trim(),
       };
-
     } catch (error) {
       return {
         success: false,
         message: `Gemini connection failed: ${error.message}`,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -129,16 +133,16 @@ class GeminiProvider extends BaseProvider {
    */
   async getAvailableModels() {
     return [
-      { 
-        id: 'gemini-pro', 
-        name: 'Gemini Pro', 
-        description: 'Most capable model for text generation' 
+      {
+        id: 'gemini-pro',
+        name: 'Gemini Pro',
+        description: 'Most capable model for text generation',
       },
-      { 
-        id: 'gemini-pro-vision', 
-        name: 'Gemini Pro Vision', 
-        description: 'Multimodal model with vision capabilities' 
-      }
+      {
+        id: 'gemini-pro-vision',
+        name: 'Gemini Pro Vision',
+        description: 'Multimodal model with vision capabilities',
+      },
     ];
   }
 }
