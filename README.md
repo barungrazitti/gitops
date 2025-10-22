@@ -84,13 +84,15 @@ aic
 ### ✨ Core Features
 
 - **Multi-AI Provider Support**: OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Groq, Ollama
-- **Context-Aware Generation**: Analyzes staged changes via `git diff`
+- **Context-Aware Generation**: Analyzes staged changes via `git diff` with **semantic code analysis**
 - **Repository Learning**: Learns from commit history to match team style
 - **Conventional Commits**: Full support for conventional commit format
 - **Interactive Selection**: Multiple message suggestions with user selection
 - **Git Hook Integration**: Seamless integration with `prepare-commit-msg` hook
 - **Smart Caching**: Cache similar diffs to reduce API calls
 - **Multi-language Support**: Localization for commit messages
+- **🧠 NEW: Semantic Analysis**: Extracts functions, classes, components for ultra-specific commit messages
+- **🤖 NEW: AI Merge Resolution**: Intelligent conflict resolution with AI assistance
 
 ### 🔧 Advanced Features
 
@@ -98,6 +100,10 @@ aic
 - **File-specific Analysis**: Analyze changes per file for better context
 - **Statistics & Analytics**: Track usage and AI provider performance
 - **Proxy Support**: HTTP/HTTPS proxy configuration for enterprise environments
+- **🧠 Enhanced Semantic Context**: JavaScript/TypeScript/PHP/Python function and class detection
+- **🤖 AI-Assisted Merge Conflicts**: Automatic resolution with fallback to AI assistance
+- **⚡ Smart Diff Processing**: Prioritized line selection for better AI understanding
+- **📊 Multi-language Support**: React components, WordPress hooks, API endpoints detection
 
 ## 📦 Installation
 
@@ -370,6 +376,10 @@ Inspired by:
 - **Caching System**: Smart caching to reduce API calls and improve performance
 - **Statistics**: Usage tracking and AI provider performance metrics
 - **Testing**: Extensive test coverage for all core components
+- **🧠 Semantic Analysis Engine**: Deep code understanding for precise commit messages
+- **🤖 Enhanced Conflict Resolution**: File-type-aware conflict resolution strategies
+- **⚡ Performance Optimizations**: Intelligent diff processing with 250-line limit
+- **🔧 Multi-framework Support**: WordPress, React, TypeScript, Python patterns
 
 #### 📚 Documentation
 

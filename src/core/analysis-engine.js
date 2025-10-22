@@ -50,6 +50,7 @@ class AnalysisEngine {
     try {
       const stagedFiles = await this.gitManager.getStagedFiles();
       const fileStats = await this.gitManager.getFileStats();
+      const semanticContext = await this.analyzeSemanticContext(stagedFiles);
 
       const context = {
         totalFiles: stagedFiles.length,
@@ -61,6 +62,7 @@ class AnalysisEngine {
         },
         scope: this.inferScope(stagedFiles),
         wordpress: this.detectWordPressContext(stagedFiles),
+        semantic: semanticContext, // Add semantic context
       };
 
       return context;
@@ -71,6 +73,7 @@ class AnalysisEngine {
         fileTypes: {},
         changes: { insertions: 0, deletions: 0, modified: 0 },
         scope: "unknown",
+        semantic: {},
       };
     }
   }
@@ -215,8 +218,132 @@ class AnalysisEngine {
   }
 
   /**
-   * Detect WordPress-specific context from files
+   * Analyze semantic context from changed files
    */
+  async analyzeSemanticContext(stagedFiles) {
+    try {
+      const repoRoot = await this.gitManager.getRepositoryRoot();
+      const semanticContext = {
+        functions: [],
+        classes: [],
+        imports: [],
+        exports: [],
+        endpoints: [],
+        components: [],
+        tests: [],
+        configs: []
+      };
+
+      for (const file of stagedFiles.slice(0, 10)) { // Limit to prevent performance issues
+        const filePath = path.join(repoRoot, file);
+        if (!await fs.pathExists(filePath)) continue;
+
+        const content = await fs.readFile(filePath, 'utf8');
+        const ext = path.extname(file).toLowerCase();
+
+        // Analyze based on file type
+        if (['.js', '.ts', '.jsx', '.tsx'].includes(ext)) {
+          await this.analyzeJavaScriptFile(content, semanticContext);
+        } else if (['.php'].includes(ext)) {
+          await this.analyzePHPFile(content, semanticContext);
+        } else if (['.py'].includes(ext)) {
+          await this.analyzePythonFile(content, semanticContext);
+        }
+      }
+
+      return semanticContext;
+    } catch (error) {
+      console.warn("Semantic analysis failed:", error.message);
+      return {};
+    }
+  }
+
+  /**
+   * Analyze JavaScript/TypeScript files for semantic context
+   */
+  async analyzeJavaScriptFile(content, context) {
+    // Function detection
+    const functionMatches = content.match(/(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>|(\w+)\s*:\s*\([^)]*\)\s*=>)/g);
+    if (functionMatches) {
+      context.functions.push(...functionMatches.map(m => m.replace(/.*function\s+|const\s+|:.*/, '').replace(/\s*=.*/, '').trim()));
+    }
+
+    // Class detection
+    const classMatches = content.match(/class\s+(\w+)/g);
+    if (classMatches) {
+      context.classes.push(...classMatches.map(m => m.replace('class ', '').trim()));
+    }
+
+    // Import/Export detection
+    const importMatches = content.match(/import.*from\s+['"]([^'"]+)['"]/g);
+    if (importMatches) {
+      context.imports.push(...importMatches.map(m => m.match(/from\s+['"]([^'"]+)['"]/)[1]));
+    }
+
+    const exportMatches = content.match(/export\s+(?:default\s+)?(?:function|class|const|let|var)\s+(\w+)/g);
+    if (exportMatches) {
+      context.exports.push(...exportMatches.map(m => m.replace(/export\s+(?:default\s+)?(?:function|class|const|let|var)\s+/, '').trim()));
+    }
+
+    // API endpoint detection
+    const endpointMatches = content.match(/(?:app\.(get|post|put|delete|patch)|router\.(get|post|put|delete|patch))\s*\(\s*['"]([^'"]+)['"]/g);
+    if (endpointMatches) {
+      context.endpoints.push(...endpointMatches.map(m => `${m.match(/\.(get|post|put|delete|patch)/)[1].toUpperCase()} ${m.match(/['"]([^'"]+)['"]/)[1]}`));
+    }
+
+    // React component detection
+    const componentMatches = content.match(/(?:function\s+(\w+)\s*\([^)]*\)\s*{|const\s+(\w+)\s*=\s*(?:React\.)?(?:forwardRef\s*\()?\([^)]*\)\s*=>\s*{)/g);
+    if (componentMatches) {
+      context.components.push(...componentMatches.map(m => m.replace(/.*function\s+|const\s+|.*React\.forwardRef.*\(/, '').replace(/\s*\(.*/, '').trim()));
+    }
+  }
+
+  /**
+   * Analyze PHP files for semantic context
+   */
+  async analyzePHPFile(content, context) {
+    // Function detection
+    const functionMatches = content.match(/function\s+(\w+)/g);
+    if (functionMatches) {
+      context.functions.push(...functionMatches.map(m => m.replace('function ', '').trim()));
+    }
+
+    // Class detection
+    const classMatches = content.match(/class\s+(\w+)/g);
+    if (classMatches) {
+      context.classes.push(...classMatches.map(m => m.replace('class ', '').trim()));
+    }
+
+    // WordPress hook detection
+    const hookMatches = content.match(/(?:add_action|add_filter)\s*\(\s*['"]([^'"]+)['"]/g);
+    if (hookMatches) {
+      context.wordpress_hooks = context.wordpress_hooks || [];
+      context.wordpress_hooks.push(...hookMatches.map(m => m.match(/['"]([^'"]+)['"]/)[1]));
+    }
+  }
+
+  /**
+   * Analyze Python files for semantic context
+   */
+  async analyzePythonFile(content, context) {
+    // Function detection
+    const functionMatches = content.match(/def\s+(\w+)/g);
+    if (functionMatches) {
+      context.functions.push(...functionMatches.map(m => m.replace('def ', '').trim()));
+    }
+
+    // Class detection
+    const classMatches = content.match(/class\s+(\w+)/g);
+    if (classMatches) {
+      context.classes.push(...classMatches.map(m => m.replace('class ', '').trim()));
+    }
+
+    // Import detection
+    const importMatches = content.match(/from\s+(\w+)(?:\.\w+)*\s+import|import\s+(\w+)/g);
+    if (importMatches) {
+      context.imports.push(...importMatches.map(m => m.match(/(?:from\s+|import\s+)(\w+)/)[1]));
+    }
+  }
   detectWordPressContext(files) {
     const context = {
       isWordPress: false,

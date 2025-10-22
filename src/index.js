@@ -282,13 +282,21 @@ class AICommitGenerator {
    * Generate commit messages with fallback logic
    */
   async generateWithFallback(diff, options) {
-    const { preferredProvider, ...generationOptions } = options;
+    const { preferredProvider, context, ...generationOptions } = options;
     const providers = ["groq", "ollama"];
 
-    // If user specified a provider, try it first
-    let providerOrder = preferredProvider ? [preferredProvider] : [];
+    // Enrich options with enhanced context
+    const enrichedOptions = {
+      ...generationOptions,
+      context: {
+        ...context,
+        enhanced: true,
+        semanticAnalysis: context?.files?.semantic || {},
+        hasSemanticContext: !!(context?.files?.semantic && Object.keys(context.files.semantic).length > 0)
+      }
+    };
 
-    // Add remaining providers for fallback
+    let providerOrder = preferredProvider ? [preferredProvider] : [];
     providers.forEach((provider) => {
       if (provider !== preferredProvider) {
         providerOrder.push(provider);
@@ -300,14 +308,16 @@ class AICommitGenerator {
     for (const providerName of providerOrder) {
       try {
         const provider = AIProviderFactory.create(providerName);
-        const messages = await provider.generateCommitMessages(
-          diff,
-          generationOptions,
-        );
+        const messages = await provider.generateCommitMessages(diff, enrichedOptions);
 
         if (messages && messages.length > 0) {
-          // Record successful provider usage
           await this.statsManager.recordCommit(providerName);
+          
+          // Log context usage for debugging
+          if (enrichedOptions.context.hasSemanticContext) {
+            console.log(chalk.blue(`🧠 Used semantic context with ${providerName}`));
+          }
+          
           return messages;
         }
       } catch (error) {
@@ -316,14 +326,12 @@ class AICommitGenerator {
           chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`),
         );
 
-        // If it's the preferred provider that failed, try fallback
         if (providerName === preferredProvider) {
           console.log(chalk.blue(`🔄 Falling back to local Ollama model...`));
         }
       }
     }
 
-    // If all providers failed, throw the last error
     throw (
       lastError ||
       new Error("All AI providers failed to generate commit messages")
