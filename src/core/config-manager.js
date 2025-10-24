@@ -62,6 +62,32 @@ class ConfigManager {
         simple: "{description}",
         detailed: "{type}({scope}): {description}\n\n{body}",
       },
+      // New validation and formatting defaults
+      testValidation: {
+        enabled: false,
+        autoFix: true,
+        testCommand: "npm run test:quick",
+        lintCommand: "npm run lint",
+        formatCommand: "npm run format",
+        aiProvider: "ollama",
+        confirmFixes: true,
+        timeout: 30000,
+        pushAfterValidation: false,
+      },
+      autoFix: true,
+      codeFormatting: {
+        enabled: false,
+        useAdvancedFormatting: true,
+        phpTools: true,
+        htmlTools: true,
+        cssTools: true,
+        jsTools: true,
+        prettierConfig: null,
+        formatTimeout: 30000,
+        autoSetupConfigs: true,
+      },
+      phpTools: true,
+      prettierConfig: null,
     };
   }
 
@@ -88,6 +114,32 @@ class ConfigManager {
       commitTypes: Joi.array().items(Joi.string()),
       scopes: Joi.array().items(Joi.string()),
       templates: Joi.object(),
+      // New validation and formatting options
+      testValidation: Joi.object({
+        enabled: Joi.boolean(),
+        autoFix: Joi.boolean(),
+        testCommand: Joi.string(),
+        lintCommand: Joi.string(),
+        formatCommand: Joi.string(),
+        aiProvider: Joi.string(),
+        confirmFixes: Joi.boolean(),
+        timeout: Joi.number().integer(),
+        pushAfterValidation: Joi.boolean(),
+      }),
+      autoFix: Joi.boolean(),
+      codeFormatting: Joi.object({
+        enabled: Joi.boolean(),
+        useAdvancedFormatting: Joi.boolean(),
+        phpTools: Joi.boolean(),
+        htmlTools: Joi.boolean(),
+        cssTools: Joi.boolean(),
+        jsTools: Joi.boolean(),
+        prettierConfig: Joi.string().allow(null),
+        formatTimeout: Joi.number().integer(),
+        autoSetupConfigs: Joi.boolean(),
+      }),
+      phpTools: Joi.boolean(),
+      prettierConfig: Joi.string().allow(null),
     });
   }
 
@@ -97,10 +149,22 @@ class ConfigManager {
   async load() {
     try {
       const config = this.config.store;
-      const { error, value } = this.schema.validate(config);
+      const defaults = this.getDefaults();
+
+      // Merge existing config with defaults to handle new properties
+      const mergedConfig = { ...defaults, ...config };
+
+      const { error, value } = this.schema.validate(mergedConfig);
 
       if (error) {
         throw new Error(`Invalid configuration: ${error.message}`);
+      }
+
+      // Update the stored config with new defaults if needed
+      if (JSON.stringify(config) !== JSON.stringify(value)) {
+        Object.entries(value).forEach(([key, val]) => {
+          this.config.set(key, val);
+        });
       }
 
       return value;
