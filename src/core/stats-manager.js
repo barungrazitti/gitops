@@ -16,8 +16,8 @@ class StatsManager {
         cacheMisses: 0,
         errorCount: 0,
         firstUsed: null,
-        lastUsed: null
-      }
+        lastUsed: null,
+      },
     });
   }
 
@@ -31,7 +31,7 @@ class StatsManager {
 
       this.stats.set('totalCommits', current.totalCommits + 1);
       this.stats.set('lastUsed', now);
-      
+
       if (!current.firstUsed) {
         this.stats.set('firstUsed', now);
       }
@@ -46,15 +46,14 @@ class StatsManager {
       responseTimeHistory.push({
         provider,
         time: responseTime,
-        timestamp: now
+        timestamp: now,
       });
-      
+
       if (responseTimeHistory.length > 100) {
         responseTimeHistory.shift();
       }
-      
-      this.stats.set('responseTimeHistory', responseTimeHistory);
 
+      this.stats.set('responseTimeHistory', responseTimeHistory);
     } catch (error) {
       console.warn('Failed to record commit stats:', error.message);
     }
@@ -91,19 +90,19 @@ class StatsManager {
     try {
       const current = this.stats.get('errorCount') || 0;
       this.stats.set('errorCount', current + 1);
-      
+
       // Store recent errors (keep last 50)
       const errors = this.stats.get('recentErrors') || [];
       errors.push({
         message: error.message,
         provider,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       if (errors.length > 50) {
         errors.shift();
       }
-      
+
       this.stats.set('recentErrors', errors);
     } catch (err) {
       console.warn('Failed to record error stats:', err.message);
@@ -116,23 +115,30 @@ class StatsManager {
   async getStats() {
     try {
       const data = this.stats.store;
-      
+
       // Calculate derived statistics
-      const totalCacheRequests = (data.cacheHits || 0) + (data.cacheMisses || 0);
-      const cacheHitRate = totalCacheRequests > 0 
-        ? ((data.cacheHits || 0) / totalCacheRequests * 100).toFixed(1)
-        : 0;
+      const totalCacheRequests =
+        (data.cacheHits || 0) + (data.cacheMisses || 0);
+      const cacheHitRate =
+        totalCacheRequests > 0
+          ? (((data.cacheHits || 0) / totalCacheRequests) * 100).toFixed(1)
+          : 0;
 
       const responseTimeHistory = data.responseTimeHistory || [];
-      const averageResponseTime = responseTimeHistory.length > 0
-        ? Math.round(responseTimeHistory.reduce((sum, entry) => sum + entry.time, 0) / responseTimeHistory.length)
-        : 0;
+      const averageResponseTime =
+        responseTimeHistory.length > 0
+          ? Math.round(
+            responseTimeHistory.reduce((sum, entry) => sum + entry.time, 0) /
+                responseTimeHistory.length
+          )
+          : 0;
 
       const providerUsage = data.providerUsage || {};
-      const mostUsedProvider = Object.entries(providerUsage)
-        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'none';
+      const mostUsedProvider =
+        Object.entries(providerUsage).sort((a, b) => b[1] - a[1])[0]?.[0] ||
+        'none';
 
-      const daysSinceFirstUse = data.firstUsed 
+      const daysSinceFirstUse = data.firstUsed
         ? Math.floor((Date.now() - data.firstUsed) / (1000 * 60 * 60 * 24))
         : 0;
 
@@ -147,13 +153,20 @@ class StatsManager {
         cacheStats: {
           hits: data.cacheHits || 0,
           misses: data.cacheMisses || 0,
-          hitRate: parseFloat(cacheHitRate)
+          hitRate: parseFloat(cacheHitRate),
         },
         usage: {
-          firstUsed: data.firstUsed ? new Date(data.firstUsed).toISOString() : null,
-          lastUsed: data.lastUsed ? new Date(data.lastUsed).toISOString() : null,
-          commitsPerDay: daysSinceFirstUse > 0 ? ((data.totalCommits || 0) / daysSinceFirstUse).toFixed(1) : 0
-        }
+          firstUsed: data.firstUsed
+            ? new Date(data.firstUsed).toISOString()
+            : null,
+          lastUsed: data.lastUsed
+            ? new Date(data.lastUsed).toISOString()
+            : null,
+          commitsPerDay:
+            daysSinceFirstUse > 0
+              ? ((data.totalCommits || 0) / daysSinceFirstUse).toFixed(1)
+              : 0,
+        },
       };
     } catch (error) {
       console.warn('Failed to get stats:', error.message);
@@ -166,7 +179,7 @@ class StatsManager {
         daysSinceFirstUse: 0,
         providerBreakdown: {},
         cacheStats: { hits: 0, misses: 0, hitRate: 0 },
-        usage: { firstUsed: null, lastUsed: null, commitsPerDay: 0 }
+        usage: { firstUsed: null, lastUsed: null, commitsPerDay: 0 },
       };
     }
   }
@@ -183,7 +196,7 @@ class StatsManager {
         ...basicStats,
         responseTimeHistory: data.responseTimeHistory || [],
         recentErrors: data.recentErrors || [],
-        trends: this.calculateTrends(data)
+        trends: this.calculateTrends(data),
       };
     } catch (error) {
       console.warn('Failed to get detailed stats:', error.message);
@@ -196,43 +209,52 @@ class StatsManager {
    */
   calculateTrends(data) {
     const responseTimeHistory = data.responseTimeHistory || [];
-    
+
     if (responseTimeHistory.length < 2) {
       return {
         responseTimeTrend: 'stable',
-        usagePattern: 'insufficient_data'
+        usagePattern: 'insufficient_data',
       };
     }
 
     // Calculate response time trend (last 10 vs previous 10)
     const recent = responseTimeHistory.slice(-10);
     const previous = responseTimeHistory.slice(-20, -10);
-    
+
     if (previous.length === 0) {
       return {
         responseTimeTrend: 'stable',
-        usagePattern: 'new_user'
+        usagePattern: 'new_user',
       };
     }
 
-    const recentAvg = recent.reduce((sum, entry) => sum + entry.time, 0) / recent.length;
-    const previousAvg = previous.reduce((sum, entry) => sum + entry.time, 0) / previous.length;
-    
-    const responseTimeTrend = recentAvg > previousAvg * 1.1 ? 'slower' 
-      : recentAvg < previousAvg * 0.9 ? 'faster' 
-      : 'stable';
+    const recentAvg =
+      recent.reduce((sum, entry) => sum + entry.time, 0) / recent.length;
+    const previousAvg =
+      previous.reduce((sum, entry) => sum + entry.time, 0) / previous.length;
+
+    const responseTimeTrend =
+      recentAvg > previousAvg * 1.1
+        ? 'slower'
+        : recentAvg < previousAvg * 0.9
+          ? 'faster'
+          : 'stable';
 
     // Analyze usage pattern
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
-    const recentCommits = responseTimeHistory.filter(entry => 
-      now - entry.timestamp < 7 * dayMs
+    const recentCommits = responseTimeHistory.filter(
+      (entry) => now - entry.timestamp < 7 * dayMs
     ).length;
 
-    const usagePattern = recentCommits > 10 ? 'heavy' 
-      : recentCommits > 3 ? 'regular' 
-      : recentCommits > 0 ? 'light' 
-      : 'inactive';
+    const usagePattern =
+      recentCommits > 10
+        ? 'heavy'
+        : recentCommits > 3
+          ? 'regular'
+          : recentCommits > 0
+            ? 'light'
+            : 'inactive';
 
     return {
       responseTimeTrend,
@@ -240,8 +262,8 @@ class StatsManager {
       recentCommits,
       averageResponseTime: {
         recent: Math.round(recentAvg),
-        previous: Math.round(previousAvg)
-      }
+        previous: Math.round(previousAvg),
+      },
     };
   }
 
@@ -259,7 +281,7 @@ class StatsManager {
         cacheMisses: 0,
         errorCount: 0,
         firstUsed: null,
-        lastUsed: null
+        lastUsed: null,
       };
     } catch (error) {
       console.warn('Failed to reset stats:', error.message);
@@ -275,7 +297,7 @@ class StatsManager {
       return {
         ...stats,
         exportedAt: new Date().toISOString(),
-        version: '1.0.0'
+        version: '1.0.0',
       };
     } catch (error) {
       console.warn('Failed to export stats:', error.message);

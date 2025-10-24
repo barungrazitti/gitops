@@ -2,15 +2,15 @@
  * Configuration Manager - Handles application configuration
  */
 
-const Conf = require("conf");
-const path = require("path");
-const fs = require("fs-extra");
-const Joi = require("joi");
+const Conf = require('conf');
+
+const fs = require('fs-extra');
+const Joi = require('joi');
 
 class ConfigManager {
   constructor() {
     this.config = new Conf({
-      projectName: "ai-commit-generator",
+      projectName: 'ai-commit-generator',
       defaults: this.getDefaults(),
     });
 
@@ -22,11 +22,11 @@ class ConfigManager {
    */
   getDefaults() {
     return {
-      defaultProvider: "groq",
+      defaultProvider: 'groq',
       apiKey: null,
       model: null,
       conventionalCommits: true,
-      language: "en",
+      language: 'en',
       messageCount: 3,
       maxTokens: 150,
       temperature: 0.7,
@@ -37,30 +37,54 @@ class ConfigManager {
       retries: 3,
       customPrompts: {},
       excludeFiles: [
-        "*.log",
-        "*.tmp",
-        "node_modules/**",
-        ".git/**",
-        "dist/**",
-        "build/**",
+        '*.log',
+        '*.tmp',
+        'node_modules/**',
+        '.git/**',
+        'dist/**',
+        'build/**',
       ],
+      // Test validation settings
+      testValidation: {
+        enabled: false,
+        autoFix: true,
+        testCommand: 'npm run test:quick',
+        lintCommand: 'npm run lint',
+        formatCommand: 'npm run format',
+        aiProvider: 'ollama',
+        confirmFixes: true,
+        timeout: 30000,
+        pushAfterValidation: false,
+      },
+      // Advanced code formatting settings
+      codeFormatting: {
+        enabled: false,
+        useAdvancedFormatting: true,
+        phpTools: true,
+        htmlTools: true,
+        cssTools: true,
+        jsTools: true,
+        prettierConfig: null,
+        formatTimeout: 30000,
+        autoSetupConfigs: true,
+      },
       commitTypes: [
-        "feat",
-        "fix",
-        "docs",
-        "style",
-        "refactor",
-        "perf",
-        "test",
-        "chore",
-        "ci",
-        "build",
+        'feat',
+        'fix',
+        'docs',
+        'style',
+        'refactor',
+        'perf',
+        'test',
+        'chore',
+        'ci',
+        'build',
       ],
       scopes: [],
       templates: {
-        conventional: "{type}({scope}): {description}",
-        simple: "{description}",
-        detailed: "{type}({scope}): {description}\n\n{body}",
+        conventional: '{type}({scope}): {description}',
+        simple: '{description}',
+        detailed: '{type}({scope}): {description}\n\n{body}',
       },
       // New validation and formatting defaults
       testValidation: {
@@ -96,11 +120,11 @@ class ConfigManager {
    */
   getValidationSchema() {
     return Joi.object({
-      defaultProvider: Joi.string().valid("groq", "ollama").required(),
+      defaultProvider: Joi.string().valid('groq', 'ollama').required(),
       apiKey: Joi.string().allow(null),
       model: Joi.string().allow(null),
       conventionalCommits: Joi.boolean(),
-      language: Joi.string().valid("en", "es", "fr", "de", "zh", "ja"),
+      language: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja'),
       messageCount: Joi.number().integer().min(1).max(10),
       maxTokens: Joi.number().integer().min(50).max(1000),
       temperature: Joi.number().min(0).max(2),
@@ -112,6 +136,36 @@ class ConfigManager {
       customPrompts: Joi.object(),
       excludeFiles: Joi.array().items(Joi.string()),
       commitTypes: Joi.array().items(Joi.string()),
+      testValidation: Joi.object({
+        enabled: Joi.boolean(),
+        autoFix: Joi.boolean(),
+        testCommand: Joi.string(),
+        lintCommand: Joi.string(),
+        formatCommand: Joi.string(),
+        aiProvider: Joi.string().valid(
+          'openai',
+          'anthropic',
+          'gemini',
+          'mistral',
+          'cohere',
+          'groq',
+          'ollama'
+        ),
+        confirmFixes: Joi.boolean(),
+        timeout: Joi.number().integer().min(5000),
+        pushAfterValidation: Joi.boolean(),
+      }),
+      codeFormatting: Joi.object({
+        enabled: Joi.boolean(),
+        useAdvancedFormatting: Joi.boolean(),
+        phpTools: Joi.boolean(),
+        htmlTools: Joi.boolean(),
+        cssTools: Joi.boolean(),
+        jsTools: Joi.boolean(),
+        prettierConfig: Joi.string().allow(null),
+        formatTimeout: Joi.number().integer().min(5000),
+        autoSetupConfigs: Joi.boolean(),
+      }),
       scopes: Joi.array().items(Joi.string()),
       templates: Joi.object(),
       // New validation and formatting options
@@ -293,58 +347,58 @@ class ConfigManager {
 
       // Provider-specific model handling - don't use global model for different providers
       switch (provider) {
-        case "openai":
+        case 'openai':
           providerConfig.model =
-            config.model && config.model.startsWith("gpt")
+            config.model && config.model.startsWith('gpt')
               ? config.model
-              : "gpt-3.5-turbo";
+              : 'gpt-3.5-turbo';
           break;
-        case "anthropic":
+        case 'anthropic':
           providerConfig.model =
-            config.model && config.model.startsWith("claude")
+            config.model && config.model.startsWith('claude')
               ? config.model
-              : "claude-3-sonnet-20240229";
+              : 'claude-3-sonnet-20240229';
           break;
-        case "gemini":
+        case 'gemini':
           providerConfig.model =
-            config.model && config.model.includes("gemini")
+            config.model && config.model.includes('gemini')
               ? config.model
-              : "gemini-pro";
+              : 'gemini-pro';
           break;
-        case "mistral":
+        case 'mistral':
           providerConfig.model =
-            config.model && config.model.includes("mistral")
+            config.model && config.model.includes('mistral')
               ? config.model
-              : "mistral-medium";
+              : 'mistral-medium';
           break;
-        case "cohere":
+        case 'cohere':
           providerConfig.model =
-            config.model && config.model.includes("command")
+            config.model && config.model.includes('command')
               ? config.model
-              : "command";
+              : 'command';
           break;
-        case "groq":
+        case 'groq':
           providerConfig.model =
             config.model &&
-            (config.model.includes("mixtral") ||
-              config.model.includes("llama") ||
-              config.model.includes("gemma"))
+            (config.model.includes('mixtral') ||
+              config.model.includes('llama') ||
+              config.model.includes('gemma'))
               ? config.model
-              : "mixtral-8x7b-32768";
+              : 'mixtral-8x7b-32768';
           break;
-        case "ollama":
+        case 'ollama':
           // For Ollama, always use the default unless it's explicitly an Ollama model
           const ollamaModels = [
-            "deepseek-v3.1:671b-cloud",
-            "qwen3-coder:480b-cloud",
-            "qwen2.5-coder:latest",
-            "mistral:7b-instruct",
-            "deepseek-r1:8b",
+            'deepseek-v3.1:671b-cloud',
+            'qwen3-coder:480b-cloud',
+            'qwen2.5-coder:latest',
+            'mistral:7b-instruct',
+            'deepseek-r1:8b',
           ];
           providerConfig.model = ollamaModels.includes(config.model)
             ? config.model
-            : "deepseek-v3.1:671b-cloud";
-          providerConfig.baseURL = "http://localhost:11434";
+            : 'deepseek-v3.1:671b-cloud';
+          providerConfig.baseURL = 'http://localhost:11434';
           break;
       }
 
@@ -360,13 +414,13 @@ class ConfigManager {
   async validateApiKey(provider) {
     const config = await this.load();
 
-    if (provider === "ollama") {
+    if (provider === 'ollama') {
       return true; // Ollama doesn't require API key
     }
 
     if (!config.apiKey) {
       throw new Error(
-        `API key not configured for ${provider}. Run 'aicommit setup' to configure.`,
+        `API key not configured for ${provider}. Run 'aicommit setup' to configure.`
       );
     }
 

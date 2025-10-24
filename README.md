@@ -1,6 +1,31 @@
-# AI Commit Message Generator
+# 🤖 AI Commit Message Generator
+
+**Transform your git workflow with AI-powered commit messages that actually make sense!**
 
 A powerful, context-aware AI commit message generator built in Node.js that combines the best features from successful tools like aicommits, aicommit2, and gcop. This tool analyzes git diffs, learns from repository history, and generates meaningful commit messages using multiple AI providers.
+
+> **One command to rule them all:** `aic` - Just type and let AI handle your entire git workflow! 🚀
+
+## 📋 About
+
+AI Commit Message Generator is your intelligent git companion that writes perfect commit messages every time. Powered by cutting-edge AI models from OpenAI, Anthropic, Google, and more, it understands your code changes and crafts commit messages that follow best practices.
+
+### 🎯 Why Choose This Tool?
+
+- **🧠 Smart Context**: Analyzes your actual code changes, not just file names
+- **🎨 Multiple AI Models**: Choose from GPT-4, Claude, Gemini, Groq, and more
+- **📝 Conventional Commits**: Automatically follows conventional commit standards
+- **⚡ Lightning Fast**: One command does everything - stage, commit, push
+- **🔧 Highly Configurable**: Customize prompts, providers, and workflows
+- **🌍 Enterprise Ready**: Proxy support, team collaboration, and statistics
+
+### 🚀 Perfect For
+
+- **Solo Developers** who want consistent, professional commit messages
+- **Teams** that need standardized commit formats across projects
+- **Open Source Maintainers** handling contributions from multiple developers
+- **Enterprise Teams** requiring audit trails and conventional commits
+- **Anyone** who wants to spend less time writing commit messages and more time coding
 
 ## 🎉 Version 1.0.0 Release
 
@@ -59,13 +84,15 @@ aic
 ### ✨ Core Features
 
 - **Multi-AI Provider Support**: OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Groq, Ollama
-- **Context-Aware Generation**: Analyzes staged changes via `git diff`
+- **Context-Aware Generation**: Analyzes staged changes via `git diff` with **semantic code analysis**
 - **Repository Learning**: Learns from commit history to match team style
 - **Conventional Commits**: Full support for conventional commit format
 - **Interactive Selection**: Multiple message suggestions with user selection
 - **Git Hook Integration**: Seamless integration with `prepare-commit-msg` hook
 - **Smart Caching**: Cache similar diffs to reduce API calls
 - **Multi-language Support**: Localization for commit messages
+- **🧠 NEW: Semantic Analysis**: Extracts functions, classes, components for ultra-specific commit messages
+- **🤖 NEW: AI Merge Resolution**: Intelligent conflict resolution with AI assistance
 
 ### 🔧 Advanced Features
 
@@ -73,6 +100,10 @@ aic
 - **File-specific Analysis**: Analyze changes per file for better context
 - **Statistics & Analytics**: Track usage and AI provider performance
 - **Proxy Support**: HTTP/HTTPS proxy configuration for enterprise environments
+- **🧠 Enhanced Semantic Context**: JavaScript/TypeScript/PHP/Python function and class detection
+- **🤖 AI-Assisted Merge Conflicts**: Automatic resolution with fallback to AI assistance
+- **⚡ Smart Diff Processing**: Prioritized line selection for better AI understanding
+- **📊 Multi-language Support**: React components, WordPress hooks, API endpoints detection
 
 ## 📦 Installation
 
@@ -321,12 +352,6 @@ Inspired by:
 - [aicommit2](https://github.com/tak-bro/aicommit2) by tak-bro
 - [gcop](https://github.com/yegor256/gcop) by yegor256
 
-## 📞 Support
-
-- 📧 Email: support@ai-commit-generator.com
-- 🐛 Issues: [GitHub Issues](https://github.com/your-username/ai-commit-generator/issues)
-- 💬 Discussions: [GitHub Discussions](https://github.com/your-username/ai-commit-generator/discussions)
-
 ## 📋 Changelog
 
 ### v1.0.0 (2025-10-14) - Initial Stable Release
@@ -351,6 +376,10 @@ Inspired by:
 - **Caching System**: Smart caching to reduce API calls and improve performance
 - **Statistics**: Usage tracking and AI provider performance metrics
 - **Testing**: Extensive test coverage for all core components
+- **🧠 Semantic Analysis Engine**: Deep code understanding for precise commit messages
+- **🤖 Enhanced Conflict Resolution**: File-type-aware conflict resolution strategies
+- **⚡ Performance Optimizations**: Intelligent diff processing with 250-line limit
+- **🔧 Multi-framework Support**: WordPress, React, TypeScript, Python patterns
 
 #### 📚 Documentation
 

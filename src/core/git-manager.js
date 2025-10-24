@@ -18,7 +18,9 @@ class GitManager {
     try {
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
-        throw new Error('Not a git repository. Please run this command from within a git repository.');
+        throw new Error(
+          'Not a git repository. Please run this command from within a git repository.'
+        );
       }
       return true;
     } catch (error) {
@@ -56,12 +58,12 @@ class GitManager {
   async getCommitHistory(limit = 50) {
     try {
       const log = await this.git.log({ maxCount: limit });
-      return log.all.map(commit => ({
+      return log.all.map((commit) => ({
         hash: commit.hash,
         message: commit.message,
         author: commit.author_name,
         date: commit.date,
-        files: commit.refs || []
+        files: commit.refs || [],
       }));
     } catch (error) {
       throw new Error(`Failed to get commit history: ${error.message}`);
@@ -138,7 +140,7 @@ class GitManager {
         files: diff.files,
         insertions: diff.insertions,
         deletions: diff.deletions,
-        changed: diff.changed
+        changed: diff.changed,
       };
     } catch (error) {
       throw new Error(`Failed to get file stats: ${error.message}`);
@@ -153,14 +155,14 @@ class GitManager {
       const remotes = await this.git.getRemotes(true);
       const branch = await this.getCurrentBranch();
       const root = await this.getRepositoryRoot();
-      
+
       return {
         branch,
         root,
-        remotes: remotes.map(remote => ({
+        remotes: remotes.map((remote) => ({
           name: remote.name,
-          url: remote.refs.fetch
-        }))
+          url: remote.refs.fetch,
+        })),
       };
     } catch (error) {
       throw new Error(`Failed to get repository info: ${error.message}`);
@@ -173,16 +175,16 @@ class GitManager {
   async getCommitPatterns(limit = 100) {
     try {
       const commits = await this.getCommitHistory(limit);
-      
+
       // Analyze commit message patterns
       const patterns = {
         types: new Map(),
         scopes: new Map(),
         lengths: [],
-        formats: new Map()
+        formats: new Map(),
       };
 
-      commits.forEach(commit => {
+      commits.forEach((commit) => {
         const message = commit.message;
         patterns.lengths.push(message.length);
 
@@ -193,11 +195,20 @@ class GitManager {
           patterns.types.set(type, (patterns.types.get(type) || 0) + 1);
           if (scope) {
             const cleanScope = scope.slice(1, -1); // Remove parentheses
-            patterns.scopes.set(cleanScope, (patterns.scopes.get(cleanScope) || 0) + 1);
+            patterns.scopes.set(
+              cleanScope,
+              (patterns.scopes.get(cleanScope) || 0) + 1
+            );
           }
-          patterns.formats.set('conventional', (patterns.formats.get('conventional') || 0) + 1);
+          patterns.formats.set(
+            'conventional',
+            (patterns.formats.get('conventional') || 0) + 1
+          );
         } else {
-          patterns.formats.set('freeform', (patterns.formats.get('freeform') || 0) + 1);
+          patterns.formats.set(
+            'freeform',
+            (patterns.formats.get('freeform') || 0) + 1
+          );
         }
       });
 
@@ -208,12 +219,169 @@ class GitManager {
         mostUsedScopes: Array.from(patterns.scopes.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5),
-        averageLength: patterns.lengths.reduce((a, b) => a + b, 0) / patterns.lengths.length,
-        preferredFormat: Array.from(patterns.formats.entries())
-          .sort((a, b) => b[1] - a[1])[0]?.[0] || 'freeform'
+        averageLength:
+          patterns.lengths.reduce((a, b) => a + b, 0) / patterns.lengths.length,
+        preferredFormat:
+          Array.from(patterns.formats.entries()).sort(
+            (a, b) => b[1] - a[1]
+          )[0]?.[0] || 'freeform',
       };
     } catch (error) {
       throw new Error(`Failed to analyze commit patterns: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create a temporary branch for validation workflow
+   */
+  async createValidationBranch(baseBranch = null) {
+    try {
+      const currentBranch = await this.getCurrentBranch();
+      const timestamp = new Date()
+        .toISOString()
+        .replace(/[:.]/g, '-')
+        .slice(0, 19);
+      const validationBranch = `validation-${timestamp}`;
+
+      // Create and checkout validation branch
+      await this.git.checkoutLocalBranch(validationBranch);
+
+      return {
+        branch: validationBranch,
+        previousBranch: currentBranch,
+      };
+    } catch (error) {
+      throw new Error(`Failed to create validation branch: ${error.message}`);
+    }
+  }
+
+  /**
+   * Switch back to original branch and cleanup validation branch
+   */
+  async cleanupValidationBranch(validationBranch, previousBranch) {
+    try {
+      // Switch back to original branch
+      await this.git.checkout(previousBranch);
+
+      // Delete validation branch
+      await this.git.deleteLocalBranch(validationBranch);
+    } catch (error) {
+      throw new Error(`Failed to cleanup validation branch: ${error.message}`);
+    }
+  }
+
+  /**
+   * Create dual commits - original and corrected versions
+   */
+  async createDualCommits(originalMessage, fixes = null) {
+    try {
+      const commits = [];
+
+      // First commit: Original changes
+      const originalCommit = await this.commit(originalMessage);
+      commits.push({
+        type: 'original',
+        message: originalMessage,
+        hash: originalCommit.commit,
+      });
+
+      // Second commit: Fixed version (if fixes were applied)
+      if (fixes && fixes.applied && fixes.applied.length > 0) {
+        // Stage the fixed changes
+        await this.git.add('.');
+
+        const fixedMessage = `${originalMessage}\n\n[auto-corrected] Applied ${fixes.summary.totalFixes} fixes:\n${fixes.applied.map((f) => `- ${f.description || f.type}`).join('\n')}`;
+
+        const fixedCommit = await this.commit(fixedMessage);
+        commits.push({
+          type: 'corrected',
+          message: fixedMessage,
+          hash: fixedCommit.commit,
+          fixes: fixes.summary,
+        });
+      }
+
+      return commits;
+    } catch (error) {
+      throw new Error(`Failed to create dual commits: ${error.message}`);
+    }
+  }
+
+  /**
+   * Push commits to remote repository
+   */
+  async pushCommits(branch = null, force = false) {
+    try {
+      const targetBranch = branch || (await this.getCurrentBranch());
+      const forceFlag = force ? '--force' : '';
+
+      const result = await this.git.push('origin', targetBranch, forceFlag);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to push commits: ${error.message}`);
+    }
+  }
+
+  /**
+   * Stash current changes
+   */
+  async stashChanges(message = 'Auto-stash before validation') {
+    try {
+      const result = await this.git.stash(['push', '-m', message]);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to stash changes: ${error.message}`);
+    }
+  }
+
+  /**
+   * Pop stashed changes
+   */
+  async popStash() {
+    try {
+      const result = await this.git.stash(['pop']);
+      return result;
+    } catch (error) {
+      throw new Error(`Failed to pop stash: ${error.message}`);
+    }
+  }
+
+  /**
+   * Check if there are any stashed changes
+   */
+  async hasStash() {
+    try {
+      const stashList = await this.git.stashList();
+      return stashList.all.length > 0;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
+   * Get unstaged files list
+   */
+  async getUnstagedFiles() {
+    try {
+      const status = await this.git.status();
+      return status.modified.concat(
+        status.not_added,
+        status.deleted,
+        status.created
+      );
+    } catch (error) {
+      throw new Error(`Failed to get unstaged files: ${error.message}`);
+    }
+  }
+
+  /**
+   * Reset staged changes
+   */
+  async resetStaged() {
+    try {
+      await this.git.reset(['--mixed']);
+    } catch (error) {
+      throw new Error(`Failed to reset staged changes: ${error.message}`);
     }
   }
 }
