@@ -40,9 +40,6 @@ class GroqProvider extends BaseProvider {
       await this.initializeClient();
       const config = await this.getConfig();
 
-      // Add timeout to prevent hanging
-      const timeoutMs = options.timeout || config.timeout || 60000; // 60 second default
-
       // Groq has strict TPM limits, so we need to be more aggressive with chunking
       const maxTokens = 4000; // Leave room for system message and response
       const prompt = this.buildPrompt(diff, options);
@@ -254,7 +251,7 @@ class GroqProvider extends BaseProvider {
         new Promise((_, reject) =>
           setTimeout(
             () => reject(new Error('AI generation timeout')),
-            timeoutMs
+            options.timeout || config.timeout || 60000
           )
         ),
       ]);
