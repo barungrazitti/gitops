@@ -40,6 +40,9 @@ class GroqProvider extends BaseProvider {
       await this.initializeClient();
       const config = await this.getConfig();
 
+      // Add timeout to prevent hanging
+      const timeoutMs = options.timeout || config.timeout || 60000; // 60 second default
+
       // Groq has strict TPM limits, so we need to be more aggressive with chunking
       const maxTokens = 4000; // Leave room for system message and response
       const prompt = this.buildPrompt(diff, options);
@@ -84,7 +87,11 @@ class GroqProvider extends BaseProvider {
           ) {
             // If we hit rate limits, try with smaller chunks
             console.warn('Groq rate limit hit, trying with smaller chunks...');
-            return await this.generateFromChunks(diff, options, 2000);
+            return await this.generateFromChunks(
+              diff,
+              options,
+              Math.max(2000, 100)
+            );
           }
           throw this.handleError(error, 'Groq');
         }
@@ -157,10 +164,15 @@ class GroqProvider extends BaseProvider {
           console.warn(
             `Chunk ${i + 1} still too large, retrying with smaller size...`
           );
-          const smallerChunks = this.chunkDiff(
-            chunk,
-            Math.floor(maxTokens / 2)
-          );
+
+          // Prevent infinite chunking by setting minimum chunk size
+          const newMaxTokens = Math.max(Math.floor(maxTokens / 2), 100);
+          if (newMaxTokens === maxTokens) {
+            console.warn('Minimum chunk size reached, skipping chunk');
+            continue;
+          }
+
+          const smallerChunks = this.chunkDiff(chunk, newMaxTokens);
           for (const smallerChunk of smallerChunks) {
             try {
               const smallerMessages = await this.generateDirectCommitMessages(
@@ -193,36 +205,59 @@ class GroqProvider extends BaseProvider {
 
       const prompt = this.buildPrompt(diff, options);
 
-      return await this.withRetry(async () => {
-        try {
-          const response = await this.client.chat.completions.create({
-            model: options.model || config.model || 'llama-3.1-8b-instant',
-            messages: [
-              {
-                role: 'system',
-                content:
-                  'You are an expert software developer who writes clear, concise commit messages.',
-              },
-              {
-                role: 'user',
-                content: prompt,
-              },
-            ],
-            max_tokens: config.maxTokens || 150,
-            temperature: config.temperature || 0.7,
-          });
+      return await Promise.race([
+        this.withRetry(async () => {
+          try {
+            const response = await this.client.chat.completions.create({
+              model: options.model || config.model || 'llama-3.1-8b-instant',
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    'You are an expert software developer who writes clear, concise commit messages.',
+                },
+                {
+                  role: 'user',
+                  content: prompt,
+                },
+              ],
+              max_tokens: config.maxTokens || 150,
+              temperature: config.temperature || 0.7,
+            });
 
-          const content = response.choices[0]?.message?.content;
-          if (!content) {
-            throw new Error('No response content from Groq');
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+              throw new Error('No response content from Groq');
+            }
+
+            const messages = this.parseResponse(content);
+            return messages.filter((msg) => this.validateCommitMessage(msg));
+          } catch (error) {
+            // Handle rate limiting specifically
+            if (
+              error.status === 413 ||
+              error.error?.code === 'rate_limit_exceeded'
+            ) {
+              // If we hit rate limits, try with smaller chunks
+              console.warn(
+                'Groq rate limit hit, trying with smaller chunks...'
+              );
+              return await this.generateFromChunks(
+                diff,
+                options,
+                Math.max(2000, 100)
+              );
+            }
+            throw this.handleError(error, 'Groq');
           }
-
-          const messages = this.parseResponse(content);
-          return messages.filter((msg) => this.validateCommitMessage(msg));
-        } catch (error) {
-          throw this.handleError(error, 'Groq');
-        }
-      }, config.retries || 3);
+        }, config.retries || 3),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error('AI generation timeout')),
+            timeoutMs
+          )
+        ),
+      ]);
     } catch (error) {
       throw this.handleError(error, 'Groq');
     }
@@ -241,6 +276,11 @@ class GroqProvider extends BaseProvider {
    * Chunk diff into smaller pieces
    */
   chunkDiff(diff, maxTokens) {
+    // Prevent infinite chunking with minimum size
+    if (maxTokens < 50) {
+      return [diff.substring(0, 500)]; // Return a small safe chunk
+    }
+
     const lines = diff.split('\n');
     const chunks = [];
     let currentChunk = [];
