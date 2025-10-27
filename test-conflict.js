@@ -1,6 +1,9 @@
-// Original version
+// Main branch version with validation
 function calculateTotal(items) {
-  return items.reduce((sum, item) => sum + item.price, 0);
+  if (!Array.isArray(items)) {
+    throw new Error('Items must be an array');
+  }
+  return items.reduce((sum, item) => sum + (item.price || 0), 0);
 }
 
 class ShoppingCart {
