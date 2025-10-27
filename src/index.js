@@ -450,12 +450,35 @@ class AICommitGenerator {
       score += 1;
     }
 
-    // Penalize messages that are too generic
-    const genericPatterns = [/update/i, /fix/i, /change/i, /modify/i, /add/i];
-    const isGeneric = genericPatterns.some(
-      (pattern) => pattern.test(message) && message.split(' ').length <= 3
-    );
-    if (isGeneric) {
+    // REWARD specific technical terms
+    const specificPatterns = [
+      /\b[A-Z][a-zA-Z]*\b/, // Class names
+      /\b\w+\(\)/, // Function calls
+      /\b(add|create|implement|remove|delete|update)\s+\w+/i, // Specific actions
+      /\b(class|function|const|let|var)\s+\w+/i, // Code constructs
+    ];
+
+    specificPatterns.forEach((pattern) => {
+      if (pattern.test(message)) {
+        score += 3;
+      }
+    });
+
+    // HEAVILY PENALIZE generic messages
+    const genericPatterns = [
+      /\b(add|update|fix|change|modify|remove)\s+(functionality|features?|code|files?)\b/i,
+      /\b(new|additional|extra)\s+(stuff|things|items)\b/i,
+      /\b(general|misc|various|multiple)\s+(changes|updates|fixes)\b/i,
+    ];
+
+    genericPatterns.forEach((pattern) => {
+      if (pattern.test(message)) {
+        score -= 5;
+      }
+    });
+
+    // Penalize very short, non-specific messages
+    if (message.split(' ').length <= 3 && !/[A-Z]\w+/.test(message)) {
       score -= 3;
     }
 

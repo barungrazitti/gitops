@@ -459,10 +459,18 @@ class MessageFormatter {
     const title = lines[0];
     const body = lines.slice(1).join('\n').trim();
 
-    // Limit title to 72 characters (GitHub's limit)
+    // Limit title to 72 characters but be smarter about truncation
     let formattedTitle = title;
     if (title.length > 72) {
-      formattedTitle = title.substring(0, 69) + '...';
+      // Try to truncate at word boundaries
+      const truncated = title.substring(0, 72);
+      const lastSpace = truncated.lastIndexOf(' ');
+      if (lastSpace > 40) {
+        // Only truncate at space if we have enough content
+        formattedTitle = truncated.substring(0, lastSpace);
+      } else {
+        formattedTitle = truncated;
+      }
     }
 
     // If there's a body, add it back

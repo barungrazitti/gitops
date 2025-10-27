@@ -252,11 +252,13 @@ class BaseProvider {
     let prompt = `You are an expert software developer specializing in writing precise, meaningful commit messages. Analyze the following git diff and generate ${options.count || 3} highly relevant commit messages.
 
 CRITICAL REQUIREMENTS:
-- Be extremely specific about WHAT changed and WHY it matters
-- Use active voice and imperative mood (e.g., "Add feature" not "Added feature")
-- Keep titles under 72 characters, focus on the most important change
-- Prioritize semantic meaning over generic descriptions
-- Consider the business impact or technical significance`;
+ - Be EXTREMELY SPECIFIC about what changed (use actual function/class names)
+ - Focus on the PRIMARY PURPOSE of the changes
+ - Use active voice and imperative mood (e.g., "Add ShoppingCart class" not "Added functionality")
+ - Keep titles under 72 characters but be descriptive
+ - AVOID generic terms like "functionality", "features", "updates"
+ - Use specific technical terms from the code
+ - Each message should be UNIQUE and highlight different aspects`;
 
     // Add chunking context if applicable
     if (totalChunks && totalChunks > 1) {
@@ -383,11 +385,16 @@ DIFF ANALYSIS:`;
     }
 
     prompt += `
-
+    
 GIT DIFF:
 \`\`\`diff
 ${this.preprocessDiff(diff)}
 \`\`\`
+
+EXAMPLES OF GOOD MESSAGES:
+- "feat(auth): add JWT token validation middleware"
+- "fix(database): resolve null pointer in User.findById"
+- "refactor(utils): extract password hashing into separate function"
 
 Generate ${options.count || 3} commit messages that accurately reflect the specific changes and their purpose. Each message should be on a separate line with no numbering or bullets:`;
 

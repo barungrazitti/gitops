@@ -149,6 +149,10 @@ class AnalysisEngine {
       widgets: /widgets?|sidebar|footer|header/i,
       customizer: /customizer|customize|theme-options/i,
       woocommerce: /woocommerce|wc-|shop|product|cart|checkout/i,
+      // More specific patterns for better scope detection
+      shopping: /shopping|cart|checkout|product|item/i,
+      ecommerce: /ecommerce|e-commerce|store|shop/i,
+      examples: /example|demo|sample|test/i,
     };
 
     const scopeCounts = {};
