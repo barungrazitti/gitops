@@ -86,7 +86,7 @@ class GroqProvider extends BaseProvider {
             console.warn('Groq rate limit hit, trying with smaller chunks...');
             return await this.generateFromChunks(diff, options, 2000);
           }
-          this.handleError(error, 'Groq');
+          throw this.handleError(error, 'Groq');
         }
       }, config.retries || 3);
     } catch (error) {
@@ -220,11 +220,11 @@ class GroqProvider extends BaseProvider {
           const messages = this.parseResponse(content);
           return messages.filter((msg) => this.validateCommitMessage(msg));
         } catch (error) {
-          this.handleError(error, 'Groq');
+          throw this.handleError(error, 'Groq');
         }
       }, config.retries || 3);
     } catch (error) {
-      this.handleError(error, 'Groq');
+      throw this.handleError(error, 'Groq');
     }
   }
 
