@@ -179,7 +179,7 @@ class AutoGit {
   /**
    * Generate AI commit message
    */
-  async generateCommitMessage(options) {
+  async generateCommitMessage(options = {}) {
     this.spinner = ora('Generating AI commit message...').start();
 
     try {
@@ -231,7 +231,7 @@ class AutoGit {
   /**
    * Generate AI messages using the AI provider
    */
-  async generateAIMessages(diff, options) {
+  async generateAIMessages(diff, options = {}) {
     const config = await this.aiCommit.configManager.load();
     const AIProviderFactory = require('./providers/ai-provider-factory');
 
@@ -1098,8 +1098,8 @@ class AutoGit {
 Below are the conflict sections that need to be resolved:
 
 ${conflictSections
-    .map(
-      (section, index) => `
+  .map(
+    (section, index) => `
 Conflict ${index + 1}:
 <<<<<<< HEAD (our changes)
 ${section.ours.join('\n')}
@@ -1111,8 +1111,8 @@ Context around this conflict:
 Before: ${section.context.before}
 After: ${section.context.after}
 `
-    )
-    .join('\n')}
+  )
+  .join('\n')}
 
 Please provide a resolution that:
 1. Preserves important functionality from both sides
@@ -1178,15 +1178,15 @@ Respond with only the resolved conflict content, no explanation:`;
     ]);
 
     switch (action) {
-    case 'edit':
-      await this.openConflictedFiles(conflicts);
-      await this.waitForConflictResolution();
-      break;
-    case 'skip':
-      console.log(chalk.yellow('Assuming conflicts are resolved...'));
-      break;
-    case 'abort':
-      throw new Error('Workflow aborted by user');
+      case 'edit':
+        await this.openConflictedFiles(conflicts);
+        await this.waitForConflictResolution();
+        break;
+      case 'skip':
+        console.log(chalk.yellow('Assuming conflicts are resolved...'));
+        break;
+      case 'abort':
+        throw new Error('Workflow aborted by user');
     }
   }
 
