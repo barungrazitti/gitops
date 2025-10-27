@@ -55,7 +55,7 @@ class OllamaProvider extends BaseProvider {
   /**
    * Validate Ollama configuration
    */
-  async validate(config) {
+  async validate(_config) {
     // Check if Ollama is running
     try {
       await axios.get(`${this.baseURL}/api/tags`, { timeout: 5000 });
@@ -228,7 +228,7 @@ class OllamaProvider extends BaseProvider {
    */
   async pullModel(modelName) {
     try {
-      const response = await axios.post(
+      await axios.post(
         `${this.baseURL}/api/pull`,
         {
           name: modelName,

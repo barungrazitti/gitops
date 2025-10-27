@@ -315,6 +315,42 @@ Configure files to exclude from analysis:
 aicommit config --set excludeFiles="*.log,dist/**,node_modules/**"
 ```
 
+## 🚀 Production Deployment
+
+This application is production-ready with comprehensive build and deployment scripts.
+
+### Build for Production
+
+```bash
+# Build and validate the application
+npm run build:prod
+
+# This will:
+# - Clean previous build artifacts
+# - Install dependencies
+# - Run linting and tests
+# - Generate coverage report
+# - Validate package.json
+# - Create build information
+```
+
+### Deploy to Production
+
+```bash
+# Prepare for deployment
+npm run deploy
+
+# Deploy and publish to npm
+npm run deploy:publish
+```
+
+### Production Scripts
+
+- `npm run build` - Run linting and tests
+- `npm run build:prod` - Full production build with validation
+- `npm run deploy` - Prepare and validate for deployment
+- `npm run deploy:publish` - Deploy and publish to npm
+
 ## 🤝 Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
@@ -334,6 +370,9 @@ npm run dev
 
 # Run tests
 npm test
+
+# Build for production
+npm run build:prod
 ```
 
 ## 📄 License

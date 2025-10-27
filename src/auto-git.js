@@ -720,7 +720,7 @@ class AutoGit {
   /**
    * Resolve JavaScript/TypeScript conflicts
    */
-  resolveJavaScriptConflict(content, filePath) {
+  resolveJavaScriptConflict(content, _filePath) {
     // For JavaScript files, try to preserve function signatures and imports
     const lines = content.split('\n');
     const resolvedLines = [];
@@ -807,7 +807,7 @@ class AutoGit {
   /**
    * Resolve CSS/SCSS conflicts
    */
-  resolveStyleConflict(content, filePath) {
+  resolveStyleConflict(content, _filePath) {
     // For CSS, merge by combining rules
     const lines = content.split('\n');
     const resolvedLines = [];
@@ -1126,7 +1126,7 @@ Respond with only the resolved conflict content, no explanation:`;
   /**
    * Parse AI conflict response
    */
-  parseAIConflictResponse(response, conflictSections) {
+  parseAIConflictResponse(response, _conflictSections) {
     if (!response || response.trim().length === 0) {
       return null;
     }
@@ -1225,8 +1225,9 @@ Respond with only the resolved conflict content, no explanation:`;
   async waitForConflictResolution() {
     console.log(chalk.yellow('\nWaiting for conflict resolution...'));
 
-    while (true) {
-      const { ready } = await inquirer.prompt([
+    let ready = true;
+    while (ready) {
+      const result = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'ready',
@@ -1235,7 +1236,7 @@ Respond with only the resolved conflict content, no explanation:`;
         },
       ]);
 
-      if (ready) {
+      if (result.ready) {
         // Verify conflicts are resolved
         const status = await this.git.status();
         if (status.conflicted.length === 0) {

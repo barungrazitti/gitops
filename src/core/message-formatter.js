@@ -445,7 +445,7 @@ class MessageFormatter {
   /**
    * Apply language-specific formatting
    */
-  applyLanguageFormatting(message, language) {
+  applyLanguageFormatting(message, _language) {
     // For now, just return the message as-is
     // In the future, this could handle language-specific conventions
     return message;

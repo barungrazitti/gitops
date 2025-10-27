@@ -4,8 +4,7 @@
   "description": "A powerful, context-aware AI commit message generator",
   "main": "src/index.js",
   "bin": {
-    "aicommit": "./bin/aicommit.js",
-    "aic": "./bin/aic.js"
+    "aicommit": "./bin/aicommit.js"
   },
   "scripts": {
     "start": "node src/index.js",
@@ -13,16 +12,15 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:simple": "node test.js",
-    "test:quick": "node test-quick.js",
     "test:verbose": "VERBOSE_TESTS=1 jest --verbose",
-    "install:global": "node install.js",
-    "update:global": "node install.js --update",
-    "reinstall:global": "node install.js --reinstall",
-    "uninstall:global": "node install.js --uninstall",
-    "fix:install": "node install.js --fix",
     "lint": "eslint src/",
-    "format": "prettier --write src/"
+    "format": "prettier --write src/",
+    "build": "npm run lint && npm run test",
+    "prepare": "npm run build",
+    "predeploy": "npm run build && npm run test:coverage",
+    "build:prod": "./scripts/build.sh",
+    "deploy": "./scripts/deploy.sh",
+    "deploy:publish": "./scripts/deploy.sh --publish"
   },
   "keywords": [
     "git",

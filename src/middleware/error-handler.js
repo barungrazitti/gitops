@@ -9,7 +9,7 @@ export class AppError extends Error {
   }
 }
 
-export const handleError = (error, req, res, next) => {
+export const handleError = (error, req, res, _next) => {
   if (error instanceof AppError) {
     return res.status(error.statusCode).json({
       status: 'error',

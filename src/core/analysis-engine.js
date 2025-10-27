@@ -140,11 +140,11 @@ class AnalysisEngine {
       perf: /performance|optimize|cache|lazy|memo/i,
       // WordPress-specific patterns
       wordpress: /wp-content|wp-includes|wp-admin|wordpress|wp-|\.php$/i,
-      plugins: /plugins?\/[^\/]+|wp-content\/plugins/i,
-      themes: /themes?\/[^\/]+|wp-content\/themes/i,
-      core: /wp-includes|wp-admin|wordpress\/wp-|\/wp-[^\/]+\.php$/i,
+      plugins: /plugins?\/[^/]+|wp-content\/plugins/i,
+      themes: /themes?\/[^/]+|wp-content\/themes/i,
+      core: /wp-includes|wp-admin|wordpress\/wp-|\/wp-[^/]+\.php$/i,
       posts: /posts?|article|blog|content/i,
-      pages: /pages?|template|page-[^\/]*\.php/i,
+      pages: /pages?|template|page-[^/]*\.php/i,
       media: /media|uploads|images?|assets?\/uploads/i,
       widgets: /widgets?|sidebar|footer|header/i,
       customizer: /customizer|customize|theme-options/i,
@@ -433,7 +433,7 @@ class AnalysisEngine {
       // Detect WordPress components
       if (/wp-content\/plugins/i.test(lowerFile)) {
         context.type = 'plugin';
-        const pluginMatch = file.match(/wp-content\/plugins\/([^\/]+)/i);
+        const pluginMatch = file.match(/wp-content\/plugins\/([^/]+)/i);
         if (pluginMatch && !context.plugins.includes(pluginMatch[1])) {
           context.plugins.push(pluginMatch[1]);
         }
@@ -441,7 +441,7 @@ class AnalysisEngine {
 
       if (/wp-content\/themes/i.test(lowerFile)) {
         context.type = 'theme';
-        const themeMatch = file.match(/wp-content\/themes\/([^\/]+)/i);
+        const themeMatch = file.match(/wp-content\/themes\/([^/]+)/i);
         if (themeMatch && !context.themes.includes(themeMatch[1])) {
           context.themes.push(themeMatch[1]);
         }
@@ -684,14 +684,11 @@ class AnalysisEngine {
    * Check if project has test files
    */
   async hasTestFiles(repoRoot) {
-    const testPatterns = [
-      'test/**',
-      'tests/**',
-      'spec/**',
-      '__tests__/**',
-      '*.test.*',
-      '*.spec.*',
-    ];
+    // Test patterns for future use
+    // const _testPatterns = [
+    //   '*.test.*',
+    //   '*.spec.*',
+    // ];
 
     // Simple check for common test directories
     const testDirs = ['test', 'tests', 'spec', '__tests__'];

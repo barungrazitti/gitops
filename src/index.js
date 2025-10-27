@@ -600,7 +600,7 @@ class AICommitGenerator {
   /**
    * Run advanced formatting workflow
    */
-  async runAdvancedFormatting(options) {
+  async runAdvancedFormatting(_options) {
     try {
       const files = await this.testValidator.getFilesToValidate(
         this.gitManager

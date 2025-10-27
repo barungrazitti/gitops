@@ -115,7 +115,7 @@ class TestValidator {
   /**
    * Run tests on specified files
    */
-  async runTests(files = []) {
+  async runTests(_files = []) {
     const results = {
       success: true,
       errors: [],

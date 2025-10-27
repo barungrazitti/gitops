@@ -3,8 +3,6 @@
  */
 
 const simpleGit = require('simple-git');
-const fs = require('fs-extra');
-const path = require('path');
 
 class GitManager {
   constructor() {
@@ -191,7 +189,7 @@ class GitManager {
         // Check for conventional commit format
         const conventionalMatch = message.match(/^(\w+)(\(.+\))?: (.+)/);
         if (conventionalMatch) {
-          const [, type, scope, description] = conventionalMatch;
+          const [, type, scope] = conventionalMatch;
           patterns.types.set(type, (patterns.types.get(type) || 0) + 1);
           if (scope) {
             const cleanScope = scope.slice(1, -1); // Remove parentheses
@@ -234,9 +232,9 @@ class GitManager {
   /**
    * Create a temporary branch for validation workflow
    */
-  async createValidationBranch(baseBranch = null) {
+  async createValidationBranch(_baseBranch = null) {
     try {
-      const currentBranch = await this.getCurrentBranch();
+      await this.getCurrentBranch();
       const timestamp = new Date()
         .toISOString()
         .replace(/[:.]/g, '-')
@@ -248,7 +246,7 @@ class GitManager {
 
       return {
         branch: validationBranch,
-        previousBranch: currentBranch,
+        previousBranch: await this.getCurrentBranch(),
       };
     } catch (error) {
       throw new Error(`Failed to create validation branch: ${error.message}`);
