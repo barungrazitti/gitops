@@ -60,7 +60,7 @@ class MistralProvider extends BaseProvider {
         const messages = this.parseResponse(content);
         return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
-        this.handleError(error, 'Mistral');
+        throw this.handleError(error, 'Mistral');
       }
     }, config.retries || 3);
   }

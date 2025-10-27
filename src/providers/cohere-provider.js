@@ -58,7 +58,7 @@ class CohereProvider extends BaseProvider {
         const messages = this.parseResponse(content);
         return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
-        this.handleError(error, 'Cohere');
+        throw this.handleError(error, 'Cohere');
       }
     }, config.retries || 3);
   }

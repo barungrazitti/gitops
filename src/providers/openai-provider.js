@@ -81,7 +81,7 @@ class OpenAIProvider extends BaseProvider {
       const messages = this.parseResponse(content);
       return messages.filter((msg) => this.validateCommitMessage(msg));
     } catch (error) {
-      this.handleError(error, 'OpenAI');
+      throw this.handleError(error, 'OpenAI');
     }
   }
 

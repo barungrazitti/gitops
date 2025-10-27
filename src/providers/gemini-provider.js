@@ -67,7 +67,7 @@ class GeminiProvider extends BaseProvider {
         const messages = this.parseResponse(content);
         return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
-        this.handleError(error, 'Gemini');
+        throw this.handleError(error, 'Gemini');
       }
     }, config.retries || 3);
   }

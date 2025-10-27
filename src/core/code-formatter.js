@@ -227,109 +227,109 @@ class CodeFormatter {
     };
 
     switch (language) {
-    // Prettier-supported languages
-    case 'javascript':
-    case 'typescript':
-    case 'json':
-    case 'markdown':
-    case 'yaml':
-    case 'css':
-    case 'scss':
-    case 'sass':
-    case 'less':
-    case 'html':
-    case 'vue':
-    case 'svelte':
-    case 'xml':
-      return await this.formatWithPrettier(files, language);
+      // Prettier-supported languages
+      case 'javascript':
+      case 'typescript':
+      case 'json':
+      case 'markdown':
+      case 'yaml':
+      case 'css':
+      case 'scss':
+      case 'sass':
+      case 'less':
+      case 'html':
+      case 'vue':
+      case 'svelte':
+      case 'xml':
+        return await this.formatWithPrettier(files, language);
 
       // PHP formatters
-    case 'php':
-      return await this.formatPHP(files);
+      case 'php':
+        return await this.formatPHP(files);
 
       // Python formatters
-    case 'python':
-      return await this.formatPython(files);
+      case 'python':
+        return await this.formatPython(files);
 
       // Java formatters
-    case 'java':
-      return await this.formatJava(files);
+      case 'java':
+        return await this.formatJava(files);
 
       // C/C++ formatters
-    case 'c':
-    case 'cpp':
-      return await this.formatC_CPP(files);
+      case 'c':
+      case 'cpp':
+        return await this.formatC_CPP(files);
 
       // C# formatter
-    case 'csharp':
-      return await this.formatCSharp(files);
+      case 'csharp':
+        return await this.formatCSharp(files);
 
       // Go formatter
-    case 'go':
-      return await this.formatGo(files);
+      case 'go':
+        return await this.formatGo(files);
 
       // Rust formatter
-    case 'rust':
-      return await this.formatRust(files);
+      case 'rust':
+        return await this.formatRust(files);
 
       // Ruby formatter
-    case 'ruby':
-      return await this.formatRuby(files);
+      case 'ruby':
+        return await this.formatRuby(files);
 
       // Swift formatter
-    case 'swift':
-      return await this.formatSwift(files);
+      case 'swift':
+        return await this.formatSwift(files);
 
       // Kotlin formatter
-    case 'kotlin':
-      return await this.formatKotlin(files);
+      case 'kotlin':
+        return await this.formatKotlin(files);
 
       // Scala formatter
-    case 'scala':
-      return await this.formatScala(files);
+      case 'scala':
+        return await this.formatScala(files);
 
       // Dart formatter
-    case 'dart':
-      return await this.formatDart(files);
+      case 'dart':
+        return await this.formatDart(files);
 
       // Shell formatters
-    case 'shell':
-    case 'powershell':
-      return await this.formatShell(files);
+      case 'shell':
+      case 'powershell':
+        return await this.formatShell(files);
 
       // SQL formatter
-    case 'sql':
-      return await this.formatSQL(files);
+      case 'sql':
+        return await this.formatSQL(files);
 
       // Docker files
-    case 'docker':
-      return await this.formatDocker(files);
+      case 'docker':
+        return await this.formatDocker(files);
 
       // TOML files
-    case 'toml':
-      return await this.formatTOML(files);
+      case 'toml':
+        return await this.formatTOML(files);
 
       // INI/Config files
-    case 'ini':
-      return await this.formatINI(files);
+      case 'ini':
+        return await this.formatINI(files);
 
       // Text files (no formatting needed)
-    case 'text':
-      files.forEach((file) =>
-        results.skipped.push({
-          file,
-          language,
-          reason: 'Text file - no formatting needed',
-        })
-      );
-      return results;
+      case 'text':
+        files.forEach((file) =>
+          results.skipped.push({
+            file,
+            language,
+            reason: 'Text file - no formatting needed',
+          })
+        );
+        return results;
 
-    default:
-      console.log(chalk.yellow(`⚠️  No formatter available for ${language}`));
-      files.forEach((file) =>
-        results.skipped.push({ file, language, reason: 'No formatter' })
-      );
-      return results;
+      default:
+        console.log(chalk.yellow(`⚠️  No formatter available for ${language}`));
+        files.forEach((file) =>
+          results.skipped.push({ file, language, reason: 'No formatter' })
+        );
+        return results;
     }
   }
 
@@ -1282,15 +1282,15 @@ class CodeFormatter {
       let command;
 
       switch (formatter.name) {
-      case 'PHP-CS-Fixer':
-        command = `${process.env.HOME}/.composer/vendor/bin/php-cs-fixer fix --using-cache=no ${files.join(' ')}`;
-        break;
-      case 'Pint':
-        command = `pint ${files.join(' ')}`;
-        break;
-      case 'PHP_CodeSniffer':
-        command = `phpcbf ${files.join(' ')}`;
-        break;
+        case 'PHP-CS-Fixer':
+          command = `${process.env.HOME}/.composer/vendor/bin/php-cs-fixer fix --using-cache=no ${files.join(' ')}`;
+          break;
+        case 'Pint':
+          command = `pint ${files.join(' ')}`;
+          break;
+        case 'PHP_CodeSniffer':
+          command = `phpcbf ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {
@@ -1684,15 +1684,15 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'Black':
-        command = `black ${files.join(' ')}`;
-        break;
-      case 'autopep8':
-        command = `autopep8 --in-place ${files.join(' ')}`;
-        break;
-      case 'yapf':
-        command = `yapf --in-place ${files.join(' ')}`;
-        break;
+        case 'Black':
+          command = `black ${files.join(' ')}`;
+          break;
+        case 'autopep8':
+          command = `autopep8 --in-place ${files.join(' ')}`;
+          break;
+        case 'yapf':
+          command = `yapf --in-place ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {
@@ -1763,15 +1763,15 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'Google Java Format':
-        command = `google-java-format --replace ${files.join(' ')}`;
-        break;
-      case 'Spotless':
-        command = 'gradlew spotlessApply';
-        break;
-      case 'Palantir Java Format':
-        command = `palantir-java-format --replace ${files.join(' ')}`;
-        break;
+        case 'Google Java Format':
+          command = `google-java-format --replace ${files.join(' ')}`;
+          break;
+        case 'Spotless':
+          command = 'gradlew spotlessApply';
+          break;
+        case 'Palantir Java Format':
+          command = `palantir-java-format --replace ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {
@@ -1842,15 +1842,15 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'clang-format':
-        command = `clang-format -i ${files.join(' ')}`;
-        break;
-      case 'astyle':
-        command = `astyle ${files.join(' ')}`;
-        break;
-      case 'uncrustify':
-        command = `uncrustify -l C --no-backup ${files.join(' ')}`;
-        break;
+        case 'clang-format':
+          command = `clang-format -i ${files.join(' ')}`;
+          break;
+        case 'astyle':
+          command = `astyle ${files.join(' ')}`;
+          break;
+        case 'uncrustify':
+          command = `uncrustify -l C --no-backup ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {
@@ -1912,12 +1912,12 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'dotnet-format':
-        command = 'dotnet-format';
-        break;
-      case 'csharpier':
-        command = 'dotnet-csharpier .';
-        break;
+        case 'dotnet-format':
+          command = 'dotnet-format';
+          break;
+        case 'csharpier':
+          command = 'dotnet-csharpier .';
+          break;
       }
 
       execSync(command, {
@@ -2065,12 +2065,12 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'rufo':
-        command = `rufo ${files.join(' ')}`;
-        break;
-      case 'rubocop':
-        command = `rubocop -a ${files.join(' ')}`;
-        break;
+        case 'rufo':
+          command = `rufo ${files.join(' ')}`;
+          break;
+        case 'rubocop':
+          command = `rubocop -a ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {
@@ -2310,12 +2310,12 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'shfmt':
-        command = `shfmt -w ${files.join(' ')}`;
-        break;
-      case 'beautysh':
-        command = `beautysh ${files.join(' ')}`;
-        break;
+        case 'shfmt':
+          command = `shfmt -w ${files.join(' ')}`;
+          break;
+        case 'beautysh':
+          command = `beautysh ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {
@@ -2377,12 +2377,12 @@ return (new PhpCsFixer\\Config())
     try {
       let command;
       switch (formatter.name) {
-      case 'sql-formatter':
-        command = `sql-formatter ${files.join(' ')}`;
-        break;
-      case 'pg_format':
-        command = `pg_format -i 2 ${files.join(' ')}`;
-        break;
+        case 'sql-formatter':
+          command = `sql-formatter ${files.join(' ')}`;
+          break;
+        case 'pg_format':
+          command = `pg_format -i 2 ${files.join(' ')}`;
+          break;
       }
 
       execSync(command, {

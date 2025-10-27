@@ -295,60 +295,60 @@ class ConfigManager {
 
       // Provider-specific model handling - don't use global model for different providers
       switch (provider) {
-      case 'openai':
-        providerConfig.model =
+        case 'openai':
+          providerConfig.model =
             config.model && config.model.startsWith('gpt')
               ? config.model
               : 'gpt-3.5-turbo';
-        break;
-      case 'anthropic':
-        providerConfig.model =
+          break;
+        case 'anthropic':
+          providerConfig.model =
             config.model && config.model.startsWith('claude')
               ? config.model
               : 'claude-3-sonnet-20240229';
-        break;
-      case 'gemini':
-        providerConfig.model =
+          break;
+        case 'gemini':
+          providerConfig.model =
             config.model && config.model.includes('gemini')
               ? config.model
               : 'gemini-pro';
-        break;
-      case 'mistral':
-        providerConfig.model =
+          break;
+        case 'mistral':
+          providerConfig.model =
             config.model && config.model.includes('mistral')
               ? config.model
               : 'mistral-medium';
-        break;
-      case 'cohere':
-        providerConfig.model =
+          break;
+        case 'cohere':
+          providerConfig.model =
             config.model && config.model.includes('command')
               ? config.model
               : 'command';
-        break;
-      case 'groq':
-        providerConfig.model =
+          break;
+        case 'groq':
+          providerConfig.model =
             config.model &&
             (config.model.includes('mixtral') ||
               config.model.includes('llama') ||
               config.model.includes('gemma'))
               ? config.model
               : 'mixtral-8x7b-32768';
-        break;
-      case 'ollama': {
-        // For Ollama, always use the default unless it's explicitly an Ollama model
-        const ollamaModels = [
-          'deepseek-v3.1:671b-cloud',
-          'qwen3-coder:480b-cloud',
-          'qwen2.5-coder:latest',
-          'mistral:7b-instruct',
-          'deepseek-r1:8b',
-        ];
-        providerConfig.model = ollamaModels.includes(config.model)
-          ? config.model
-          : 'deepseek-v3.1:671b-cloud';
-        providerConfig.baseURL = 'http://localhost:11434';
-        break;
-      }
+          break;
+        case 'ollama': {
+          // For Ollama, always use the default unless it's explicitly an Ollama model
+          const ollamaModels = [
+            'deepseek-v3.1:671b-cloud',
+            'qwen3-coder:480b-cloud',
+            'qwen2.5-coder:latest',
+            'mistral:7b-instruct',
+            'deepseek-r1:8b',
+          ];
+          providerConfig.model = ollamaModels.includes(config.model)
+            ? config.model
+            : 'deepseek-v3.1:671b-cloud';
+          providerConfig.baseURL = 'http://localhost:11434';
+          break;
+        }
       }
 
       return providerConfig;

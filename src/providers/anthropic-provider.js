@@ -73,7 +73,7 @@ class AnthropicProvider extends BaseProvider {
         const messages = this.parseResponse(content);
         return messages.filter((msg) => this.validateCommitMessage(msg));
       } catch (error) {
-        this.handleError(error, 'Anthropic');
+        throw this.handleError(error, 'Anthropic');
       }
     }, config.retries || 3);
   }

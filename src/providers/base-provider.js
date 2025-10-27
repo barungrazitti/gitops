@@ -28,6 +28,15 @@ class BaseProvider {
    * Preprocess diff to make it more AI-friendly while preserving context
    */
   preprocessDiff(diff) {
+    // Check if diff is too large to process efficiently
+    if (diff.length > 500000) {
+      // 500KB limit
+      return (
+        diff.substring(0, 10000) +
+        '\n... (diff too large, truncated for processing)'
+      );
+    }
+
     // Remove binary file indicators
     let processed = diff.replace(
       /^Binary files? .* differ$/gm,
@@ -609,27 +618,27 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         error.response.data?.error?.message || error.response.statusText;
 
       switch (status) {
-      case 401:
-        throw new Error(
-          `Authentication failed for ${providerName}. Please check your API key.`
-        );
-      case 403:
-        throw new Error(
-          `Access forbidden for ${providerName}. Please check your permissions.`
-        );
-      case 429:
-        throw new Error(
-          `Rate limit exceeded for ${providerName}. Please try again later.`
-        );
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        throw new Error(
-          `${providerName} service is temporarily unavailable. Please try again later.`
-        );
-      default:
-        throw new Error(`${providerName} API error (${status}): ${message}`);
+        case 401:
+          throw new Error(
+            `Authentication failed for ${providerName}. Please check your API key.`
+          );
+        case 403:
+          throw new Error(
+            `Access forbidden for ${providerName}. Please check your permissions.`
+          );
+        case 429:
+          throw new Error(
+            `Rate limit exceeded for ${providerName}. Please try again later.`
+          );
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          throw new Error(
+            `${providerName} service is temporarily unavailable. Please try again later.`
+          );
+        default:
+          throw new Error(`${providerName} API error (${status}): ${message}`);
       }
     } else if (error.code === 'ECONNREFUSED') {
       throw new Error(
@@ -666,7 +675,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
             .replace(/^\* \s*/, '') // Strip asterisks
       )
       .filter((line) => line.length > 0)
-      .slice(0, 10); // Limit to 10 messages max
+      .slice(0, 3); // Limit to 3 messages max
 
     if (messages.length === 0) {
       throw new Error('No valid commit messages found in AI response');

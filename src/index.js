@@ -487,7 +487,7 @@ class AICommitGenerator {
 
   async generateWithFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
-    const providers = ['groq', 'ollama'];
+    const providers = ['ollama', 'groq'];
 
     // Enrich options with enhanced context
     const enrichedOptions = {

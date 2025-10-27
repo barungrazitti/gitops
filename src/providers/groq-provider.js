@@ -94,7 +94,7 @@ class GroqProvider extends BaseProvider {
         }
       }, config.retries || 3);
     } catch (error) {
-      this.handleError(error, 'Groq');
+      throw this.handleError(error, 'Groq');
     }
   }
 

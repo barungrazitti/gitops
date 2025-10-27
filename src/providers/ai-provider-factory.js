@@ -10,15 +10,21 @@ class AIProviderFactory {
    * Create an AI provider instance
    */
   static create(providerName) {
-    switch (providerName.toLowerCase()) {
-    case 'groq':
-      return new GroqProvider();
-    case 'ollama':
-      return new OllamaProvider();
-    default:
+    if (!providerName) {
       throw new Error(
-        `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
+        `Provider name is required. Got: ${providerName}. Available providers: groq, ollama`
       );
+    }
+
+    switch (providerName.toLowerCase()) {
+      case 'groq':
+        return new GroqProvider();
+      case 'ollama':
+        return new OllamaProvider();
+      default:
+        throw new Error(
+          `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
+        );
     }
   }
 
@@ -140,7 +146,7 @@ class AIProviderFactory {
     const allModels = await this.getAllAvailableModels(configs);
 
     // Priority order for providers (best to worst for commit messages)
-    const providerPriority = ['groq', 'ollama'];
+    const providerPriority = ['ollama', 'groq'];
 
     for (const providerName of providerPriority) {
       const providerData = allModels[providerName];
@@ -187,9 +193,19 @@ class AIProviderFactory {
       model: bestOption.model.id,
       recommendation: {
         reason: `Selected ${bestOption.model.name} from ${bestOption.providerInfo.displayName}`,
-        alternatives: Object.keys(configs).filter(
-          (p) => p !== bestOption.provider
-        ),
+        alternatives: Object.keys(configs)
+          .filter((p) =>
+            [
+              'groq',
+              'ollama',
+              'openai',
+              'anthropic',
+              'gemini',
+              'mistral',
+              'cohere',
+            ].includes(p)
+          )
+          .filter((p) => p !== bestOption.provider),
       },
     };
   }

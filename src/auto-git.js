@@ -235,14 +235,16 @@ class AutoGit {
     const config = await this.aiCommit.configManager.load();
     const AIProviderFactory = require('./providers/ai-provider-factory');
 
-    const provider = AIProviderFactory.create(
-      options.provider || config.defaultProvider
-    );
+    // Use auto-configuration to get the best available provider
+    const autoConfig = await AIProviderFactory.autoConfigureProvider(config);
+    const provider = AIProviderFactory.create(autoConfig.provider);
 
     // Analyze repository context
     const context = await this.aiCommit.analysisEngine.analyzeRepository();
 
     const messages = await provider.generateCommitMessages(diff, {
+      ...options,
+      model: autoConfig.model,
       context,
       count: 3,
       language: config.language || 'en',
@@ -1098,8 +1100,8 @@ class AutoGit {
 Below are the conflict sections that need to be resolved:
 
 ${conflictSections
-    .map(
-      (section, index) => `
+  .map(
+    (section, index) => `
 Conflict ${index + 1}:
 <<<<<<< HEAD (our changes)
 ${section.ours.join('\n')}
@@ -1111,8 +1113,8 @@ Context around this conflict:
 Before: ${section.context.before}
 After: ${section.context.after}
 `
-    )
-    .join('\n')}
+  )
+  .join('\n')}
 
 Please provide a resolution that:
 1. Preserves important functionality from both sides
@@ -1178,15 +1180,15 @@ Respond with only the resolved conflict content, no explanation:`;
     ]);
 
     switch (action) {
-    case 'edit':
-      await this.openConflictedFiles(conflicts);
-      await this.waitForConflictResolution();
-      break;
-    case 'skip':
-      console.log(chalk.yellow('Assuming conflicts are resolved...'));
-      break;
-    case 'abort':
-      throw new Error('Workflow aborted by user');
+      case 'edit':
+        await this.openConflictedFiles(conflicts);
+        await this.waitForConflictResolution();
+        break;
+      case 'skip':
+        console.log(chalk.yellow('Assuming conflicts are resolved...'));
+        break;
+      case 'abort':
+        throw new Error('Workflow aborted by user');
     }
   }
 
