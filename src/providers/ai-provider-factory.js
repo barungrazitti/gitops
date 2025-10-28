@@ -17,14 +17,14 @@ class AIProviderFactory {
     }
 
     switch (providerName.toLowerCase()) {
-      case 'groq':
-        return new GroqProvider();
-      case 'ollama':
-        return new OllamaProvider();
-      default:
-        throw new Error(
-          `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
-        );
+    case 'groq':
+      return new GroqProvider();
+    case 'ollama':
+      return new OllamaProvider();
+    default:
+      throw new Error(
+        `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
+      );
     }
   }
 

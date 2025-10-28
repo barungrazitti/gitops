@@ -34,6 +34,12 @@ program
   .option('--no-auto-fix', 'Disable automatic error fixing')
   .option('--format-code', 'Run advanced multi-language code formatting')
   .option('--no-format', 'Disable code formatting')
+  .option('--lint', 'Run syntax linting before committing (default: enabled)')
+  .option('--no-lint', 'Disable syntax linting')
+  .option(
+    '--no-lint-fix',
+    'Disable auto-fixing of linting errors (default: enabled)'
+  )
   .action(async (message, options) => {
     try {
       const autoGit = new AutoGit();
@@ -44,21 +50,60 @@ program
         );
         console.log('1. Check git repository');
         console.log('2. Stage all changes');
-        if (options.testValidate) {
-          console.log('3. Run tests and validation');
-          console.log('4. Auto-fix any issues found');
-          console.log('5. Generate AI commit message (or use provided)');
-          console.log('6. Commit changes');
-          if (!options.skipPull) console.log('7. Pull latest changes');
-          console.log('8. Auto-resolve conflicts if possible');
-          if (options.push !== false) console.log('9. Push changes');
+        const steps = [];
+        steps.push('1. Check git repository');
+        steps.push('2. Stage all changes');
+
+        if (options.lint !== false) {
+          steps.push('3. Run syntax linting');
+          if (options.lintFix !== false)
+            steps.push('4. Auto-fix linting errors');
+          steps.push(
+            options.lintFix !== false
+              ? '5. Generate AI commit message (or use provided)'
+              : '4. Generate AI commit message (or use provided)'
+          );
+          steps.push(
+            options.lintFix !== false
+              ? '6. Commit changes'
+              : '5. Commit changes'
+          );
+          if (!options.skipPull)
+            steps.push(
+              options.lintFix !== false
+                ? '7. Pull latest changes'
+                : '6. Pull latest changes'
+            );
+          steps.push(
+            options.lintFix !== false
+              ? '8. Auto-resolve conflicts if possible'
+              : '7. Auto-resolve conflicts if possible'
+          );
+          if (options.push !== false)
+            steps.push(
+              options.lintFix !== false ? '9. Push changes' : '8. Push changes'
+            );
         } else {
-          console.log('3. Generate AI commit message (or use provided)');
-          console.log('4. Commit changes');
-          if (!options.skipPull) console.log('5. Pull latest changes');
-          console.log('6. Auto-resolve conflicts if possible');
-          if (options.push !== false) console.log('7. Push changes');
+          steps.push('3. Generate AI commit message (or use provided)');
+          steps.push('4. Commit changes');
+          if (!options.skipPull) steps.push('5. Pull latest changes');
+          steps.push('6. Auto-resolve conflicts if possible');
+          if (options.push !== false) steps.push('7. Push changes');
         }
+
+        if (options.testValidate) {
+          const testStepIndex = steps.findIndex((s) =>
+            s.includes('Generate AI commit message')
+          );
+          steps.splice(
+            testStepIndex,
+            0,
+            'Run tests and validation',
+            'Auto-fix any issues found'
+          );
+        }
+
+        steps.forEach((step) => console.log(step));
         return;
       }
 
@@ -360,6 +405,59 @@ program
     }
   });
 
+// Lint command
+program
+  .command('lint')
+  .description('Run syntax linting on staged files')
+  .option(
+    '--no-fix',
+    'Disable auto-fixing of linting errors (default: enabled)'
+  )
+  .option('--files <files...>', 'Lint specific files instead of staged files')
+  .option(
+    '--type <type>',
+    'Specify project type (wordpress, nodejs, frontend, jquery, python, java, go, rust, css, etc.)'
+  )
+  .action(async (options) => {
+    try {
+      const autoGit = new AutoGit();
+
+      let files;
+      if (options.files && options.files.length > 0) {
+        files = options.files;
+      } else {
+        // Get staged files
+        const status = await autoGit.git.status();
+        files = [
+          ...status.created,
+          ...status.modified,
+          ...status.renamed.map((f) => f.to),
+        ];
+      }
+
+      if (files.length === 0) {
+        console.log(chalk.yellow('No files to lint'));
+        return;
+      }
+
+      console.log(chalk.cyan(`🔍 Linting ${files.length} file(s)...`));
+
+      const results = await autoGit.lintManager.lintFiles(files, {
+        autoFix: options.fix !== false,
+        projectType: options.type,
+      });
+
+      autoGit.lintManager.printResults(results);
+
+      if (!results.success) {
+        process.exit(1);
+      }
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 // Quick commands
 program
   .command('quick')
@@ -399,6 +497,13 @@ program.on('--help', () => {
   console.log(
     '  aic --format-code      # Run advanced multi-language formatting'
   );
+  console.log(
+    '  aic --lint             # Run syntax linting before committing (default)'
+  );
+  console.log('  aic --no-lint          # Disable syntax linting');
+  console.log(
+    '  aic --no-lint-fix      # Disable auto-fixing of linting errors'
+  );
   console.log('  aic format --check     # Check available formatters');
   console.log('  aic format --setup     # Setup formatter configurations');
   console.log('  aic setup              # Configure AI provider');
@@ -408,26 +513,47 @@ program.on('--help', () => {
   console.log(
     '  aic quick feat         # Quick commit with "feat: quick update"'
   );
+  console.log(
+    '  aic lint               # Lint staged files (auto-fix enabled by default)'
+  );
+  console.log('  aic lint --no-fix      # Lint without auto-fixing');
+  console.log('  aic lint --files *.js  # Lint specific files');
+  console.log('  aic lint --type jquery # Lint as jQuery project');
+  console.log('  aic lint --type css   # Lint as CSS project');
   console.log('');
   console.log(chalk.cyan('Standard Workflow:'));
   console.log('  1. 🔍 Check repository and changes');
   console.log('  2. 📦 Stage all changes');
-  console.log('  3. 🤖 Generate AI commit message');
-  console.log('  4. 💾 Commit changes');
-  console.log('  5. ⬇️  Pull latest changes');
-  console.log('  6. 🔧 Auto-resolve conflicts');
-  console.log('  7. ⬆️  Push changes');
+  console.log('  3. 🔍 Run syntax linting (CSS, JS, jQuery, PHP, etc.)');
+  console.log('  4. 🔧 Auto-fix linting errors');
+  console.log('  5. 🤖 Generate AI commit message');
+  console.log('  6. 💾 Commit changes');
+  console.log('  7. ⬇️  Pull latest changes');
+  console.log('  8. 🔧 Auto-resolve conflicts');
+  console.log('  9. ⬆️  Push changes');
   console.log('');
   console.log(chalk.cyan('With --test-validate:'));
   console.log('  1. 🔍 Check repository and changes');
   console.log('  2. 📦 Stage all changes');
-  console.log('  3. 🧪 Run tests and validation');
-  console.log('  4. 🔧 Auto-fix any issues found');
-  console.log('  5. 🤖 Generate AI commit message');
-  console.log('  6. 💾 Commit changes (original + fixed version)');
-  console.log('  7. ⬇️  Pull latest changes');
-  console.log('  8. 🔧 Auto-resolve conflicts');
-  console.log('  9. ⬆️  Push changes');
+  console.log('  3. 🔍 Run syntax linting');
+  console.log('  4. 🔧 Auto-fix linting errors');
+  console.log('  5. 🧪 Run tests and validation');
+  console.log('  6. 🔧 Auto-fix any issues found');
+  console.log('  7. 🤖 Generate AI commit message');
+  console.log('  8. 💾 Commit changes (original + fixed version)');
+  console.log('  9. ⬇️  Pull latest changes');
+  console.log('  10. 🔧 Auto-resolve conflicts');
+  console.log('  11. ⬆️  Push changes');
+  console.log('');
+  console.log(chalk.cyan('With --no-lint-fix:'));
+  console.log('  1. 🔍 Check repository and changes');
+  console.log('  2. 📦 Stage all changes');
+  console.log('  3. 🔍 Run syntax linting (no auto-fix)');
+  console.log('  4. 🤖 Generate AI commit message');
+  console.log('  5. 💾 Commit changes');
+  console.log('  6. ⬇️  Pull latest changes');
+  console.log('  7. 🔧 Auto-resolve conflicts');
+  console.log('  8. ⬆️  Push changes');
   console.log('');
 });
 

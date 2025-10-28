@@ -280,9 +280,9 @@ ${context.files.test?.content || 'Not available'}
 
 Related source files:
 ${Object.entries(context.files)
-  .filter(([key]) => key !== 'test')
-  .map(([key, value]) => `${key}:\n${value.content}`)
-  .join('\n\n')}
+    .filter(([key]) => key !== 'test')
+    .map(([key, value]) => `${key}:\n${value.content}`)
+    .join('\n\n')}
 
 Please provide a fix for this test failure. Respond with a JSON object containing:
 {
@@ -370,15 +370,15 @@ Only provide the JSON response, no additional text.
 
       for (const change of sortedChanges) {
         switch (change.type) {
-          case 'replace':
-            lines[change.line - 1] = change.content;
-            break;
-          case 'insert':
-            lines.splice(change.line - 1, 0, change.content);
-            break;
-          case 'delete':
-            lines.splice(change.line - 1, 1);
-            break;
+        case 'replace':
+          lines[change.line - 1] = change.content;
+          break;
+        case 'insert':
+          lines.splice(change.line - 1, 0, change.content);
+          break;
+        case 'delete':
+          lines.splice(change.line - 1, 1);
+          break;
         }
       }
 

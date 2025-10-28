@@ -8,11 +8,13 @@ const ora = require('ora');
 const inquirer = require('inquirer');
 const simpleGit = require('simple-git');
 const AICommitGenerator = require('./index.js');
+const LintManager = require('./core/lint-manager');
 
 class AutoGit {
   constructor() {
     this.git = simpleGit();
     this.aiCommit = new AICommitGenerator();
+    this.lintManager = new LintManager();
     this.spinner = null;
     // Configure git to prefer merge over rebase for safety
     this.git.raw(['config', 'pull.rebase', 'false']);
@@ -38,7 +40,35 @@ class AutoGit {
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
 
-      // Step 4: Run test validation if requested
+      // Step 4: Run linting if enabled (default: enabled with auto-fix)
+      if (options.lint !== false) {
+        // Default to auto-fix unless explicitly disabled
+        const autoFix = options.lintFix !== false;
+        const lintResults = await this.runLinting({ ...options, autoFix });
+
+        if (!lintResults.success) {
+          console.log(
+            chalk.yellow(
+              'Linting failed with unfixable errors. Use --no-lint to skip.'
+            )
+          );
+
+          const { continueAnyway } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'continueAnyway',
+              message: 'Continue with commit despite linting failures?',
+              default: false,
+            },
+          ]);
+
+          if (!continueAnyway) {
+            return;
+          }
+        }
+      }
+
+      // Step 5: Run test validation if requested
       if (options.testValidate) {
         const fixes = await this.runTestValidation(options);
         if (fixes === false && options.autoFix !== false) {
@@ -51,7 +81,7 @@ class AutoGit {
         }
       }
 
-      // Step 5: Generate or use provided commit message
+      // Step 6: Generate or use provided commit message
       let commitMessage;
       if (options.manualMessage) {
         commitMessage = options.manualMessage;
@@ -64,10 +94,10 @@ class AutoGit {
         }
       }
 
-      // Step 6: Commit changes
+      // Step 7: Commit changes
       await this.commitChanges(commitMessage, options);
 
-      // Step 6: Pull latest changes and handle conflicts (unless skipped)
+      // Step 7: Pull latest changes and handle conflicts (unless skipped)
       if (!options.skipPull) {
         try {
           await this.pullAndHandleConflicts();
@@ -90,7 +120,7 @@ class AutoGit {
         }
       }
 
-      // Step 7: Push changes (unless disabled)
+      // Step 8: Push changes (unless disabled)
       if (options.push !== false) {
         await this.pushChanges();
       }
@@ -1100,8 +1130,8 @@ class AutoGit {
 Below are the conflict sections that need to be resolved:
 
 ${conflictSections
-  .map(
-    (section, index) => `
+    .map(
+      (section, index) => `
 Conflict ${index + 1}:
 <<<<<<< HEAD (our changes)
 ${section.ours.join('\n')}
@@ -1113,8 +1143,8 @@ Context around this conflict:
 Before: ${section.context.before}
 After: ${section.context.after}
 `
-  )
-  .join('\n')}
+    )
+    .join('\n')}
 
 Please provide a resolution that:
 1. Preserves important functionality from both sides
@@ -1180,15 +1210,15 @@ Respond with only the resolved conflict content, no explanation:`;
     ]);
 
     switch (action) {
-      case 'edit':
-        await this.openConflictedFiles(conflicts);
-        await this.waitForConflictResolution();
-        break;
-      case 'skip':
-        console.log(chalk.yellow('Assuming conflicts are resolved...'));
-        break;
-      case 'abort':
-        throw new Error('Workflow aborted by user');
+    case 'edit':
+      await this.openConflictedFiles(conflicts);
+      await this.waitForConflictResolution();
+      break;
+    case 'skip':
+      console.log(chalk.yellow('Assuming conflicts are resolved...'));
+      break;
+    case 'abort':
+      throw new Error('Workflow aborted by user');
     }
   }
 
@@ -1304,6 +1334,50 @@ Respond with only the resolved conflict content, no explanation:`;
     }
 
     return `   ${summary.join(', ')}`;
+  }
+
+  /**
+   * Run linting workflow
+   */
+  async runLinting(options = {}) {
+    try {
+      const { autoFix = false, projectType = null } = options;
+
+      // Get staged files
+      const status = await this.git.status();
+      const stagedFiles = [
+        ...status.created,
+        ...status.modified,
+        ...status.renamed.map((f) => f.to),
+      ];
+
+      if (stagedFiles.length === 0) {
+        console.log(chalk.yellow('⚠️  No staged files to lint'));
+        return {
+          success: true,
+          results: [],
+          summary: { total: 0, passed: 0, failed: 0, fixed: 0 },
+        };
+      }
+
+      // Get repository root for project detection
+      const repoRoot = await this.git.revparse(['--show-toplevel']);
+
+      // Run linting
+      const results = await this.lintManager.lintFiles(stagedFiles, {
+        autoFix,
+        projectType,
+        repoRoot: repoRoot.trim(),
+      });
+
+      // Print results
+      this.lintManager.printResults(results);
+
+      return results;
+    } catch (error) {
+      console.error(chalk.red(`❌ Linting failed: ${error.message}`));
+      return { success: false, error: error.message };
+    }
   }
 
   /**
