@@ -40,16 +40,22 @@ class AutoGit {
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
 
-      // Step 4: Run linting if enabled (default: enabled with auto-fix)
+      // Step 4: Run linting if enabled (default: enabled with auto-fix and AI fallback)
       if (options.lint !== false) {
-        // Default to auto-fix unless explicitly disabled
+        // Default to auto-fix and AI fallback unless explicitly disabled
         const autoFix = options.lintFix !== false;
-        const lintResults = await this.runLinting({ ...options, autoFix });
+        const useAI = options.aiLint !== false;
+        const lintResults = await this.runLinting({
+          ...options,
+          autoFix,
+          useAI,
+          aiFallback: useAI,
+        });
 
         if (!lintResults.success) {
           console.log(
             chalk.yellow(
-              'Linting failed with unfixable errors. Use --no-lint to skip.'
+              'Linting failed with unfixable errors. Use --no-lint to skip or --ai-lint to enable AI fixes.'
             )
           );
 
@@ -1130,8 +1136,8 @@ class AutoGit {
 Below are the conflict sections that need to be resolved:
 
 ${conflictSections
-    .map(
-      (section, index) => `
+  .map(
+    (section, index) => `
 Conflict ${index + 1}:
 <<<<<<< HEAD (our changes)
 ${section.ours.join('\n')}
@@ -1143,8 +1149,8 @@ Context around this conflict:
 Before: ${section.context.before}
 After: ${section.context.after}
 `
-    )
-    .join('\n')}
+  )
+  .join('\n')}
 
 Please provide a resolution that:
 1. Preserves important functionality from both sides
@@ -1210,15 +1216,15 @@ Respond with only the resolved conflict content, no explanation:`;
     ]);
 
     switch (action) {
-    case 'edit':
-      await this.openConflictedFiles(conflicts);
-      await this.waitForConflictResolution();
-      break;
-    case 'skip':
-      console.log(chalk.yellow('Assuming conflicts are resolved...'));
-      break;
-    case 'abort':
-      throw new Error('Workflow aborted by user');
+      case 'edit':
+        await this.openConflictedFiles(conflicts);
+        await this.waitForConflictResolution();
+        break;
+      case 'skip':
+        console.log(chalk.yellow('Assuming conflicts are resolved...'));
+        break;
+      case 'abort':
+        throw new Error('Workflow aborted by user');
     }
   }
 
@@ -1341,7 +1347,12 @@ Respond with only the resolved conflict content, no explanation:`;
    */
   async runLinting(options = {}) {
     try {
-      const { autoFix = false, projectType = null } = options;
+      const {
+        autoFix = true,
+        projectType = null,
+        useAI = true,
+        aiFallback = true,
+      } = options;
 
       // Get staged files
       const status = await this.git.status();
@@ -1363,17 +1374,58 @@ Respond with only the resolved conflict content, no explanation:`;
       // Get repository root for project detection
       const repoRoot = await this.git.revparse(['--show-toplevel']);
 
-      // Run linting
-      const results = await this.lintManager.lintFiles(stagedFiles, {
+      // First try standard linting with auto-fix
+      const standardResults = await this.lintManager.lintFiles(stagedFiles, {
         autoFix,
         projectType,
         repoRoot: repoRoot.trim(),
       });
 
-      // Print results
-      this.lintManager.printResults(results);
+      // If standard linting succeeded or AI fallback is disabled, return results
+      if (standardResults.success || !aiFallback) {
+        this.lintManager.printResults(standardResults);
+        return standardResults;
+      }
 
-      return results;
+      // Try AI fallback for unfixable errors
+      if (useAI) {
+        // Initialize AI provider if not already done
+        if (!this.lintManager.aiProvider) {
+          try {
+            const AIProviderFactory = require('./providers/ai-provider-factory');
+            const config = await this.aiCommit.configManager.load();
+            const providerName = config.defaultProvider || 'groq';
+            this.lintManager.aiProvider =
+              AIProviderFactory.create(providerName);
+          } catch (error) {
+            console.log(
+              chalk.yellow(
+                '   ⚠️  Could not initialize AI provider for linting fixes'
+              )
+            );
+            this.lintManager.printResults(standardResults);
+            return standardResults;
+          }
+        }
+        console.log(
+          chalk.blue('\n🤖 Standard linting failed, attempting AI fixes...')
+        );
+
+        const aiResults = await this.lintManager.lintFilesWithAI(stagedFiles, {
+          autoFix: false, // Don't double-fix
+          useAI: true,
+          projectType,
+          repoRoot: repoRoot.trim(),
+        });
+
+        // Print enhanced results
+        this.lintManager.printResults(aiResults);
+        return aiResults;
+      }
+
+      // Print standard results if AI is not available
+      this.lintManager.printResults(standardResults);
+      return standardResults;
     } catch (error) {
       console.error(chalk.red(`❌ Linting failed: ${error.message}`));
       return { success: false, error: error.message };

@@ -53,6 +53,45 @@ class OllamaProvider extends BaseProvider {
   }
 
   /**
+   * Generate AI response for general prompts
+   */
+  async generateResponse(prompt, options = {}) {
+    const config = await this.getConfig();
+    const model = options.model || config.model || 'deepseek-v3.1:671b-cloud';
+
+    const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
+
+    return await this.withRetry(async () => {
+      try {
+        const response = await axios.post(
+          `${this.baseURL}/api/generate`,
+          {
+            model: model,
+            prompt: fullPrompt,
+            stream: false,
+            options: {
+              temperature: options.temperature || 0.3,
+              num_predict: options.maxTokens || 2000,
+            },
+          },
+          {
+            timeout: config.timeout || 60000, // Longer timeout for code fixing
+          }
+        );
+
+        const content = response.data.response;
+        if (!content) {
+          throw new Error('No response content from Ollama');
+        }
+
+        return [content.trim()];
+      } catch (error) {
+        throw this.handleError(error, 'Ollama');
+      }
+    }, config.retries || 3);
+  }
+
+  /**
    * Validate Ollama configuration
    */
   async validate(_config) {

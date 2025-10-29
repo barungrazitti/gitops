@@ -8,7 +8,8 @@ const path = require('path');
 const { spawn } = require('child_process');
 
 class LintManager {
-  constructor() {
+  constructor(aiProvider = null) {
+    this.aiProvider = aiProvider;
     this.lintConfigs = {
       // WordPress/PHP projects
       wordpress: {
@@ -384,22 +385,98 @@ class LintManager {
   /**
    * Get appropriate linters for detected project type
    */
-  async getLintersForProject(projectType) {
+  async getLintersForProject(projectType, repoRoot = process.cwd()) {
     const config = this.lintConfigs[projectType];
     if (!config) {
       return [];
     }
 
+    // Check if configuration files exist and create them if needed
+    await this.ensureLintingSetup(projectType, repoRoot);
+
     // Check which linters are actually available
-    const availableLinters = [];
+    let availableLinters = [];
 
     for (const linter of config.linters) {
       if (await this.isCommandAvailable(linter.command)) {
-        availableLinters.push(linter);
+        // Additional check for configuration files
+        if (await this.hasRequiredConfig(linter, projectType, repoRoot)) {
+          availableLinters.push(linter);
+        } else {
+          console.log(
+            chalk.yellow(
+              `   ⚠️  ${linter.name} configuration missing, skipping...`
+            )
+          );
+        }
       }
     }
 
+    // If still no linters are available after setup, show hints
+    if (availableLinters.length === 0) {
+      this.showInstallHints(projectType);
+    }
+
     return availableLinters;
+  }
+
+  /**
+   * Check if linter has required configuration files
+   */
+  async hasRequiredConfig(linter, projectType, repoRoot) {
+    switch (linter.name) {
+      case 'stylelint': {
+        const stylelintConfigs = [
+          '.stylelintrc.json',
+          '.stylelintrc.js',
+          '.stylelintrc.yml',
+          '.stylelintrc.yaml',
+        ];
+        for (const config of stylelintConfigs) {
+          if (await fs.pathExists(path.join(repoRoot, config))) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      case 'eslint': {
+        const eslintConfigs = [
+          '.eslintrc.js',
+          '.eslintrc.json',
+          '.eslintrc.yml',
+          '.eslintrc.yaml',
+          '.eslintrc',
+        ];
+        for (const config of eslintConfigs) {
+          if (await fs.pathExists(path.join(repoRoot, config))) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      case 'prettier': {
+        const prettierConfigs = [
+          '.prettierrc',
+          '.prettierrc.json',
+          '.prettierrc.yml',
+          '.prettierrc.yaml',
+          '.prettierrc.js',
+          'prettier.config.js',
+        ];
+        for (const config of prettierConfigs) {
+          if (await fs.pathExists(path.join(repoRoot, config))) {
+            return true;
+          }
+        }
+        // Prettier can work without config file, so return true
+        return true;
+      }
+
+      default:
+        return true; // Assume other linters work without config
+    }
   }
 
   /**
@@ -428,6 +505,344 @@ class LintManager {
         .on('error', () => {
           resolve(false);
         });
+    });
+  }
+
+  /**
+   * Auto-create configuration files and install dependencies if needed
+   */
+  async ensureLintingSetup(projectType, repoRoot) {
+    const setupActions = [];
+
+    switch (projectType) {
+      case 'css':
+        await this.ensureStylelintSetup(repoRoot, setupActions);
+        break;
+      case 'nodejs':
+      case 'frontend':
+        await this.ensureESLintSetup(repoRoot, setupActions);
+        break;
+      case 'python':
+        await this.ensurePythonSetup(repoRoot, setupActions);
+        break;
+    }
+
+    return setupActions;
+  }
+
+  /**
+   * Ensure stylelint configuration exists
+   */
+  async ensureStylelintSetup(repoRoot, setupActions) {
+    const stylelintConfigPath = path.join(repoRoot, '.stylelintrc.json');
+    const packageJsonPath = path.join(repoRoot, 'package.json');
+
+    // Check if stylelint config exists
+    if (!(await fs.pathExists(stylelintConfigPath))) {
+      console.log(chalk.yellow('📝 Creating stylelint configuration...'));
+
+      const defaultConfig = {
+        extends: 'stylelint-config-standard',
+        rules: {
+          // Disable most formatting rules - focus on syntax errors only
+          indentation: null,
+          'no-empty-source': null,
+          'string-quotes': null,
+          'no-duplicate-selectors': null,
+          'color-hex-case': null,
+          'color-hex-length': null,
+          'selector-combinator-space-after': null,
+          'selector-attribute-quotes': null,
+          'selector-attribute-operator-space-before': null,
+          'selector-attribute-operator-space-after': null,
+          'selector-attribute-brackets-space-inside': null,
+          'declaration-block-trailing-semicolon': null,
+          'declaration-no-important': null,
+          'declaration-colon-space-before': null,
+          'declaration-colon-space-after': null,
+          'number-leading-zero': null,
+          'number-no-trailing-zeros': null,
+          'function-url-quotes': null,
+          'font-weight-notation': null,
+          'comment-whitespace-inside': null,
+          'rule-empty-line-before': null,
+          'shorthand-property-no-redundant-values': null,
+
+          // Allow unknown properties and at-rules (for frameworks and vendor prefixes)
+          'property-no-unknown': null,
+          'at-rule-no-unknown': null,
+          'selector-type-no-unknown': null,
+          'unit-no-unknown': null,
+
+          // Allow empty blocks and comments
+          'block-no-empty': null,
+          'comment-no-empty': null,
+
+          // Allow various CSS features
+          'declaration-block-no-redundant-longhand-properties': null,
+          'value-no-vendor-prefix': null,
+          'property-no-vendor-prefix': null,
+          'selector-no-vendor-prefix': null,
+
+          // Allow duplicate properties (last one wins)
+          'declaration-block-no-duplicate-properties': null,
+
+          // Allow various units and values
+          'length-zero-no-unit': null,
+          'color-named': null,
+          'color-function-notation': null,
+
+          // Allow various selectors
+          'selector-pseudo-class-no-unknown': null,
+          'selector-pseudo-element-no-unknown': null,
+
+          // Allow various at-rules
+          'at-rule-allowed-list': null,
+          'at-rule-disallowed-list': null,
+
+          // Allow various declarations
+          'declaration-property-value-no-unknown': null,
+          'declaration-property-unit-allowed-list': null,
+
+          // Allow various CSS patterns
+          'function-linear-gradient-no-nonstandard-direction': null,
+          'function-no-unknown': null,
+
+          // Allow various CSS hacks and workarounds
+          'property-blacklist': null,
+          'unit-blacklist': null,
+          'value-keyword-case': null,
+        },
+      };
+
+      await fs.writeFile(
+        stylelintConfigPath,
+        JSON.stringify(defaultConfig, null, 2)
+      );
+      console.log(chalk.green('   ✅ Created .stylelintrc.json'));
+      setupActions.push('Created stylelint configuration');
+    }
+
+    // Create package.json if it doesn't exist
+    if (!(await fs.pathExists(packageJsonPath))) {
+      console.log(chalk.yellow('📝 Creating package.json...'));
+
+      const defaultPackageJson = {
+        name: path.basename(repoRoot),
+        version: '1.0.0',
+        description: '',
+        devDependencies: {},
+      };
+
+      await fs.writeFile(
+        packageJsonPath,
+        JSON.stringify(defaultPackageJson, null, 2)
+      );
+      console.log(chalk.green('   ✅ Created package.json'));
+      setupActions.push('Created package.json');
+    }
+
+    // Check if stylelint is installed
+    try {
+      const packageJson = await fs.readJson(packageJsonPath);
+      const deps = {
+        ...packageJson.dependencies,
+        ...packageJson.devDependencies,
+      };
+
+      if (!deps.stylelint) {
+        console.log(chalk.yellow('📦 Installing stylelint dependencies...'));
+
+        const installResult = await this.runCommand(
+          'npm',
+          ['install', '--save-dev', 'stylelint', 'stylelint-config-standard'],
+          repoRoot
+        );
+        if (installResult.success) {
+          console.log(
+            chalk.green(
+              '   ✅ Installed stylelint and stylelint-config-standard'
+            )
+          );
+          setupActions.push('Installed stylelint dependencies');
+        } else {
+          console.log(
+            chalk.red('   ❌ Failed to install stylelint dependencies')
+          );
+          console.log(chalk.dim(`     ${installResult.error}`));
+        }
+      }
+    } catch (error) {
+      console.log(
+        chalk.yellow('   ⚠️  Could not check package.json dependencies')
+      );
+    }
+  }
+
+  /**
+   * Ensure ESLint configuration exists
+   */
+  async ensureESLintSetup(repoRoot, setupActions) {
+    const eslintConfigPath = path.join(repoRoot, '.eslintrc.js');
+    const packageJsonPath = path.join(repoRoot, 'package.json');
+
+    // Check if ESLint config exists
+    if (!(await fs.pathExists(eslintConfigPath))) {
+      console.log(chalk.yellow('📝 Creating ESLint configuration...'));
+
+      const defaultConfig = `module.exports = {
+  env: {
+    browser: true,
+    es2021: true,
+    node: true,
+  },
+  extends: [
+    'eslint:recommended',
+  ],
+  parserOptions: {
+    ecmaVersion: 12,
+    sourceType: 'module',
+  },
+  rules: {
+    'indent': ['error', 2],
+    'linebreak-style': ['error', 'unix'],
+    'quotes': ['error', 'single'],
+    'semi': ['error', 'always'],
+  },
+};`;
+
+      await fs.writeFile(eslintConfigPath, defaultConfig);
+      console.log(chalk.green('   ✅ Created .eslintrc.js'));
+      setupActions.push('Created ESLint configuration');
+    }
+
+    // Create package.json if it doesn't exist
+    if (!(await fs.pathExists(packageJsonPath))) {
+      console.log(chalk.yellow('📝 Creating package.json...'));
+
+      const defaultPackageJson = {
+        name: path.basename(repoRoot),
+        version: '1.0.0',
+        description: '',
+        devDependencies: {},
+      };
+
+      await fs.writeFile(
+        packageJsonPath,
+        JSON.stringify(defaultPackageJson, null, 2)
+      );
+      console.log(chalk.green('   ✅ Created package.json'));
+      setupActions.push('Created package.json');
+    }
+
+    // Check if ESLint is installed
+    try {
+      const packageJson = await fs.readJson(packageJsonPath);
+      const deps = {
+        ...packageJson.dependencies,
+        ...packageJson.devDependencies,
+      };
+
+      if (!deps.eslint) {
+        console.log(chalk.yellow('📦 Installing ESLint...'));
+
+        const installResult = await this.runCommand(
+          'npm',
+          ['install', '--save-dev', 'eslint'],
+          repoRoot
+        );
+        if (installResult.success) {
+          console.log(chalk.green('   ✅ Installed ESLint'));
+          setupActions.push('Installed ESLint');
+        } else {
+          console.log(chalk.red('   ❌ Failed to install ESLint'));
+          console.log(chalk.dim(`     ${installResult.error}`));
+        }
+      }
+    } catch (error) {
+      console.log(
+        chalk.yellow('   ⚠️  Could not check package.json dependencies')
+      );
+    }
+  }
+
+  /**
+   * Ensure Python linting setup
+   */
+  async ensurePythonSetup(repoRoot, setupActions) {
+    const requirementsPath = path.join(repoRoot, 'requirements.txt');
+
+    // Check if requirements.txt exists and has linting tools
+    if (await fs.pathExists(requirementsPath)) {
+      try {
+        const content = await fs.readFile(requirementsPath, 'utf8');
+        const hasFlake8 = content.includes('flake8');
+        const hasBlack = content.includes('black');
+
+        if (!hasFlake8 || !hasBlack) {
+          console.log(
+            chalk.yellow(
+              '📝 Adding Python linting tools to requirements.txt...'
+            )
+          );
+
+          let newContent = content;
+          if (!hasFlake8) newContent += '\nflake8>=3.8.0';
+          if (!hasBlack) newContent += '\nblack>=21.0.0';
+
+          await fs.writeFile(requirementsPath, newContent.trim());
+          console.log(
+            chalk.green('   ✅ Added flake8 and black to requirements.txt')
+          );
+          setupActions.push('Added Python linting tools to requirements.txt');
+        }
+      } catch (error) {
+        console.log(chalk.yellow('   ⚠️  Could not update requirements.txt'));
+      }
+    }
+  }
+
+  /**
+   * Run a command and return result
+   */
+  async runCommand(command, args, cwd) {
+    return new Promise((resolve) => {
+      const child = spawn(command, args, {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: cwd || process.cwd(),
+        shell: true,
+      });
+
+      let stdout = '';
+      let stderr = '';
+
+      if (child.stdout) {
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+      }
+
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+      }
+
+      child.on('close', (code) => {
+        resolve({
+          success: code === 0,
+          exitCode: code,
+          output: stdout,
+          error: stderr,
+        });
+      });
+
+      child.on('error', (error) => {
+        resolve({
+          success: false,
+          error: error.message,
+        });
+      });
     });
   }
 
@@ -617,7 +1032,7 @@ class LintManager {
         )
       );
 
-      const linters = await this.getLintersForProject(type);
+      const linters = await this.getLintersForProject(type, repoRoot);
 
       if (linters.length === 0) {
         console.log(
@@ -688,8 +1103,14 @@ class LintManager {
    */
   async lintFile(filePath, linters, autoFix = false) {
     const results = [];
+    const fileExt = path.extname(filePath).toLowerCase();
 
     for (const linter of linters) {
+      // Skip HTMLHint for non-HTML files
+      if (linter.name === 'htmlhint' && !['.html', '.htm'].includes(fileExt)) {
+        continue;
+      }
+
       const result = await this.runLinter(filePath, linter, autoFix);
       results.push(result);
 
@@ -723,16 +1144,29 @@ class LintManager {
       let stdout = '';
       let stderr = '';
 
-      child.stdout?.on('data', (data) => {
-        stdout += data.toString();
-      });
+      if (child.stdout) {
+        child.stdout.on('data', (data) => {
+          stdout += data.toString();
+        });
+      }
 
-      child.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
+      if (child.stderr) {
+        child.stderr.on('data', (data) => {
+          stderr += data.toString();
+        });
+      }
 
       child.on('close', (code) => {
-        const success = code === 0;
+        // For ESLint, treat warnings as success (exit code 1 with only warnings)
+        let success = code === 0;
+        if (linter.name === 'eslint' && code === 1) {
+          const output = stdout || stderr;
+          // Check if output contains only warnings (no errors)
+          if (output && !output.includes('error')) {
+            success = true;
+          }
+        }
+
         const fixed = autoFix && linter.fixable && success;
 
         resolve({
@@ -778,6 +1212,354 @@ class LintManager {
   }
 
   /**
+   * Fix linting errors using AI when traditional linters can't fix them
+   */
+  async fixWithAI(filePath, linterOutput, projectType) {
+    if (!this.aiProvider) {
+      console.log(
+        chalk.yellow('   ⚠️  No AI provider available for intelligent fixing')
+      );
+      return false;
+    }
+
+    try {
+      const fileContent = await fs.readFile(filePath, 'utf8');
+      const fileExt = path.extname(filePath).toLowerCase();
+
+      // Create a focused prompt for the AI
+      const prompt = this.createAIFixPrompt(
+        fileContent,
+        linterOutput,
+        fileExt,
+        projectType
+      );
+
+      console.log(
+        chalk.dim(`   🤖 Using AI to fix ${path.basename(filePath)}...`)
+      );
+
+      // Get AI fix with retry logic and rate limiting
+      const aiResponses = await this.aiProvider.generateResponse(prompt, {
+        maxTokens: 2000,
+        temperature: 0.3,
+      });
+      const aiResponse = aiResponses[0];
+
+      if (!aiResponse || aiResponse.trim().length === 0) {
+        console.log(chalk.yellow('   ⚠️  AI could not generate a fix'));
+        return false;
+      }
+
+      // Extract the fixed code from AI response
+      const fixedContent = this.extractFixedCode(aiResponse, fileContent);
+
+      if (fixedContent && fixedContent !== fileContent) {
+        // Create backup before applying fix
+        const backupPath = `${filePath}.backup.${Date.now()}`;
+        await fs.copy(filePath, backupPath);
+
+        // Apply the fix
+        await fs.writeFile(filePath, fixedContent);
+
+        console.log(
+          chalk.green(
+            `   ✅ AI fix applied (backup: ${path.basename(backupPath)})`
+          )
+        );
+        return true;
+      } else {
+        console.log(chalk.yellow('   ⚠️  AI could not improve the code'));
+        return false;
+      }
+    } catch (error) {
+      console.log(chalk.red(`   ❌ AI fix failed: ${error.message}`));
+      return false;
+    }
+  }
+
+  /**
+   * Create a focused prompt for AI-based linting fixes
+   */
+  createAIFixPrompt(fileContent, linterOutput, fileExt, projectType) {
+    const languageMap = {
+      '.js': 'JavaScript',
+      '.jsx': 'React JSX',
+      '.ts': 'TypeScript',
+      '.tsx': 'React TypeScript',
+      '.php': 'PHP',
+      '.css': 'CSS',
+      '.scss': 'SCSS',
+      '.html': 'HTML',
+      '.json': 'JSON',
+      '.py': 'Python',
+      '.java': 'Java',
+      '.go': 'Go',
+      '.rs': 'Rust',
+    };
+
+    const language = languageMap[fileExt] || fileExt.slice(1);
+    const projectContext =
+      projectType === 'jquery' ? 'jQuery-based' : projectType;
+
+    return `Fix the following ${language} code issues in a ${projectContext} project.
+
+Linter Output:
+${linterOutput}
+
+Original Code:
+\`\`\`${language}
+${fileContent}
+\`\`\`
+
+Requirements:
+1. Fix ALL linting errors mentioned in the linter output
+2. Preserve the original functionality and logic - DO NOT change the code into comments or descriptions
+3. Follow ${language} best practices and coding standards
+4. Make minimal changes necessary to fix the issues
+5. Return ONLY the fixed code without explanations or markdown formatting
+6. Do not add comments unless required to fix an issue
+7. For unused variables/imports, either remove them or export them if they're part of an API
+8. Keep the code structure similar to the original
+9. IMPORTANT: The output must be valid ${language} code, not a commit message or description
+
+Fixed Code:`;
+  }
+
+  /**
+   * Extract the fixed code from AI response
+   */
+  extractFixedCode(aiResponse, originalContent, filePath = null) {
+    let fixedContent = aiResponse.trim();
+
+    // Remove markdown code blocks if present
+    if (fixedContent.includes('```')) {
+      const lines = fixedContent.split('\n');
+      let codeStart = -1;
+      let codeEnd = -1;
+
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes('```') && codeStart === -1) {
+          codeStart = i;
+        } else if (lines[i].includes('```') && codeStart !== -1) {
+          codeEnd = i;
+          break;
+        }
+      }
+
+      if (codeStart !== -1 && codeEnd !== -1) {
+        fixedContent = lines.slice(codeStart + 1, codeEnd).join('\n');
+      } else if (codeStart !== -1) {
+        // Try to find the end of the code block
+        const remainingLines = lines.slice(codeStart + 1);
+        fixedContent = remainingLines.join('\n');
+      }
+    }
+
+    // Remove any explanatory text before code
+    const codeLines = fixedContent.split('\n');
+    const codeLineIndex = codeLines.findIndex(
+      (line) =>
+        line.trim().length > 0 &&
+        !line.toLowerCase().includes('here') &&
+        !line.toLowerCase().includes('fixed') &&
+        !line.toLowerCase().includes('solution')
+    );
+
+    if (codeLineIndex > 0) {
+      fixedContent = codeLines.slice(codeLineIndex).join('\n');
+    }
+
+    // Validate the fix
+    if (!fixedContent || fixedContent.length === 0) {
+      return null;
+    }
+
+    // Check if AI response is clearly not code (commit messages, descriptions, etc.)
+    const nonCodePatterns = [
+      /^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?:/,
+      /^(added|removed|updated|fixed|improved)/i,
+      /^(this|the|a|an) \w+ (is|was|has)/i,
+      /^[A-Z][a-z]+(?: [a-z]+)*:/,
+    ];
+
+    for (const pattern of nonCodePatterns) {
+      if (pattern.test(fixedContent.trim())) {
+        console.log(
+          chalk.yellow(
+            '   ⚠️  AI response appears to be a commit message, not code'
+          )
+        );
+        return null;
+      }
+    }
+
+    // Check if the fix is reasonable (not completely different)
+    // Only apply similarity check for very different content (less than 5% similar)
+    const similarity = this.calculateSimilarity(originalContent, fixedContent);
+    if (similarity < 0.05) {
+      console.log(
+        chalk.yellow(
+          `   ⚠️  AI fix seems too different (similarity: ${similarity.toFixed(2)}), skipping`
+        )
+      );
+      return null;
+    }
+
+    // For formatting fixes, allow more significant changes
+    const fileExt = path.extname(filePath).toLowerCase();
+    if (['.js', '.jsx', '.ts', '.tsx'].includes(fileExt) && similarity < 0.1) {
+      console.log(
+        chalk.yellow(
+          `   ⚠️  AI fix seems too different for formatting (similarity: ${similarity.toFixed(2)}), skipping`
+        )
+      );
+      return null;
+    }
+
+    return fixedContent;
+  }
+
+  /**
+   * Calculate similarity between two strings (simple implementation)
+   */
+  calculateSimilarity(str1, str2) {
+    if (!str1 || !str2) return 0;
+
+    const longer = str1.length > str2.length ? str1 : str2;
+    const shorter = str1.length > str2.length ? str2 : str1;
+
+    if (longer.length === 0) return 1.0;
+
+    const editDistance = this.levenshteinDistance(longer, shorter);
+    return (longer.length - editDistance) / longer.length;
+  }
+
+  /**
+   * Calculate Levenshtein distance between two strings
+   */
+  levenshteinDistance(str1, str2) {
+    const matrix = [];
+
+    for (let i = 0; i <= str2.length; i++) {
+      matrix[i] = [i];
+    }
+
+    for (let j = 0; j <= str1.length; j++) {
+      matrix[0][j] = j;
+    }
+
+    for (let i = 1; i <= str2.length; i++) {
+      for (let j = 1; j <= str1.length; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+
+    return matrix[str2.length][str1.length];
+  }
+
+  /**
+   * Enhanced linting with AI fallback for unfixable errors
+   */
+  async lintFilesWithAI(files, options = {}) {
+    const {
+      autoFix = true,
+      useAI = true,
+      projectType = null,
+      repoRoot = process.cwd(),
+    } = options;
+
+    // First, run standard linting
+    const standardResults = await this.lintFiles(files, {
+      autoFix: autoFix && !useAI, // Don't auto-fix if we're using AI
+      projectType,
+      repoRoot,
+    });
+
+    // If no errors or AI is disabled, return standard results
+    if (standardResults.success || !useAI) {
+      return standardResults;
+    }
+
+    console.log(chalk.blue('\n🤖 Attempting AI fixes for unfixable errors...'));
+
+    const aiFixedResults = [];
+    let aiFixedCount = 0;
+
+    // Process failed results with AI
+    for (const result of standardResults.results) {
+      if (!result.success && !result.fixed) {
+        const fileExt = path.extname(result.file).toLowerCase();
+
+        // Only attempt AI fixes for supported file types
+        if (
+          [
+            '.js',
+            '.jsx',
+            '.ts',
+            '.tsx',
+            '.php',
+            '.css',
+            '.html',
+            '.json',
+          ].includes(fileExt)
+        ) {
+          const fixed = await this.fixWithAI(
+            result.file,
+            result.output,
+            result.projectType || projectType || 'unknown'
+          );
+
+          if (fixed) {
+            aiFixedCount++;
+
+            // Re-run linter to verify the fix
+            const linters = await this.getLintersForProject(
+              result.projectType || projectType || 'unknown'
+            );
+
+            if (linters.length > 0) {
+              const recheckResults = await this.lintFile(
+                result.file,
+                linters,
+                false
+              );
+              aiFixedResults.push(...recheckResults);
+            }
+          }
+        }
+      }
+    }
+
+    // Update results with AI fixes
+    if (aiFixedCount > 0) {
+      console.log(chalk.green(`   ✅ AI fixed ${aiFixedCount} file(s)`));
+
+      // Recalculate summary
+      const newResults = await this.lintFiles(files, {
+        autoFix: false,
+        projectType,
+        repoRoot,
+      });
+
+      return {
+        ...newResults,
+        aiFixed: aiFixedCount,
+        originalResults: standardResults,
+      };
+    }
+
+    return standardResults;
+  }
+
+  /**
    * Print linting results summary
    */
   printResults(results) {
@@ -795,6 +1577,10 @@ class LintManager {
 
     if (summary.fixed > 0) {
       console.log(chalk.green(`   Fixed: ${summary.fixed}`));
+    }
+
+    if (results.aiFixed > 0) {
+      console.log(chalk.cyan(`   AI Fixed: ${results.aiFixed}`));
     }
 
     if (!success) {
