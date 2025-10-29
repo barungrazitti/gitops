@@ -777,7 +777,10 @@ class AICommitGenerator {
       const filteredFiles = filesToLint.filter((file) => {
         const ext = path.extname(file).toLowerCase();
         // Exclude backup files (files ending with .backup.* or containing backup patterns)
-        const isBackup = file.includes('.backup.') || file.includes('backup') || file.endsWith('~');
+        const isBackup =
+          file.includes('.backup.') ||
+          file.includes('backup') ||
+          file.endsWith('~');
         return !isBackup && relevantExtensions.includes(ext);
       });
 
