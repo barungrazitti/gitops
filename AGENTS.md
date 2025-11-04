@@ -73,6 +73,21 @@ No linting/formatting tools - removed per user request.
 - **Chunking**: Automatic large diff handling for both providers
 - **Context Enrichment**: Advanced semantic analysis integration
 
+### Improved Git Merge Handling with AI
+
+- **AI-Powered Resolution**: Uses Ollama/Groq to intelligently resolve merge conflicts
+- **Chunking Support**: Handles large conflicts by splitting into manageable chunks
+- **Multiple Resolution Strategies**: 
+  - 🤖 AI-powered resolution (intelligent merge)
+  - 💾 Keep current changes (theirs)
+  - 📥 Use incoming changes (mine)
+  - 🔧 Manual resolution guidance
+  - ❌ Cancel operation
+- **Smart Fallback**: If AI fails, offers traditional resolution options
+- **Per-File Processing**: Resolves conflicts file by file with detailed feedback
+- **Context-Aware**: Analyzes original, current, and incoming changes for intelligent merging
+- **Large File Support**: Automatically chunks large conflicts for AI processing
+
 ### Core Modules
 
 - `analysis-engine.js`: Advanced repository context analysis
@@ -81,6 +96,7 @@ No linting/formatting tools - removed per user request.
 - `message-formatter.js`: Conventional commit formatting
 - `config-manager.js`: Persistent configuration management
 - `stats-manager.js`: Usage tracking and analytics
+- `auto-git.js`: AI-powered conflict resolution and workflow automation
 
 ## Removed Functionality
 
@@ -95,8 +111,9 @@ Per user request, the following has been completely removed:
 
 ## Current Architecture
 
-The codebase now focuses purely on:
-1. **Ollama + Groq** AI provider support
-2. **Intelligent merging** of results from both providers
+The codebase now focuses on:
+1. **Ollama-first AI generation** with Groq fallback
+2. **Simplified provider selection** - no complex merging logic
 3. **Highly relevant** commit message generation
 4. **Semantic analysis** for better context understanding
+5. **AI-powered git conflict resolution** with intelligent merging and chunking support

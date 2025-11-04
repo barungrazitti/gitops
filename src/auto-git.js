@@ -7,6 +7,8 @@ const chalk = require('chalk');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const simpleGit = require('simple-git');
+const fs = require('fs-extra');
+const path = require('path');
 const AICommitGenerator = require('./index.js');
 
 class AutoGit {
@@ -164,8 +166,8 @@ class AutoGit {
       // Get repository context for better AI generation
       const context = await this.aiCommit.analysisEngine.analyzeRepository();
 
-      // Use the AI commit generator with intelligent merging
-      const messages = await this.aiCommit.generateWithIntelligentMerging(
+      // Use the AI commit generator with Ollama-first fallback
+      const messages = await this.aiCommit.generateWithFallback(
         await this.git.diff(['--staged']),
         {
           count: 1, // Only need one message for auto-commit
@@ -203,7 +205,7 @@ class AutoGit {
   }
 
   /**
-   * Pull latest changes and auto-resolve conflicts
+   * Pull latest changes and handle conflicts with AI-powered resolution
    */
   async pullAndHandleConflicts() {
     this.spinner = ora('Pulling latest changes...').start();
@@ -212,43 +214,81 @@ class AutoGit {
       const pullResult = await this.git.pull();
 
       if (pullResult.files && pullResult.files.length > 0) {
-        this.spinner.text = 'Handling conflicts...';
-
-        // Check for conflicts
-        const hasConflicts = pullResult.files.some(
-          (file) => file.changes && file.changes.some((change) => change.conflict)
-        );
+        // Check for conflicts using git status (more reliable)
+        const status = await this.git.status();
+        const hasConflicts = status.conflicted.length > 0;
 
         if (hasConflicts) {
-          console.log(chalk.yellow('\n⚠️  Merge conflicts detected'));
+          this.spinner.text = 'Analyzing merge conflicts...';
+          console.log(chalk.yellow(`\n⚠️  Merge conflicts detected in ${status.conflicted.length} file(s):`));
+          status.conflicted.forEach(file => {
+            console.log(chalk.dim(`   • ${file}`));
+          });
 
-          const { autoResolve } = await inquirer.prompt([
+          const { resolutionStrategy } = await inquirer.prompt([
             {
-              type: 'confirm',
-              name: 'autoResolve',
-              message: 'Attempt to auto-resolve conflicts?',
-              default: true,
+              type: 'list',
+              name: 'resolutionStrategy',
+              message: 'Choose conflict resolution strategy:',
+              choices: [
+                {
+                  name: '🤖 AI-powered resolution (intelligent merge)',
+                  value: 'ai',
+                },
+                {
+                  name: '💾 Keep current changes (theirs)',
+                  value: 'ours',
+                },
+                {
+                  name: '📥 Use incoming changes (mine)',
+                  value: 'theirs',
+                },
+                {
+                  name: '🔧 Manual resolution',
+                  value: 'manual',
+                },
+                {
+                  name: '❌ Cancel operation',
+                  value: 'cancel',
+                },
+              ],
+              default: 'ai',
             },
           ]);
 
-          if (autoResolve) {
-            try {
-              // Simple auto-resolve: prefer current changes
-              await this.git.raw(['checkout', '--ours', '.']);
-              await this.git.add('.');
-              await this.git.commit('Auto-resolved merge conflicts');
+          if (resolutionStrategy === 'cancel') {
+            throw new Error('Pull cancelled due to conflicts');
+          }
 
-              this.spinner.succeed('Conflicts auto-resolved');
-            } catch (resolveError) {
-              this.spinner.warn(
-                'Could not auto-resolve conflicts. Manual resolution required.'
-              );
-              throw resolveError;
+          if (resolutionStrategy === 'manual') {
+            console.log(chalk.yellow('\n📝 Manual conflict resolution required:'));
+            console.log(chalk.dim('   1. Resolve conflicts in your editor'));
+            console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
+            console.log(chalk.dim('   3. Continue with: git commit'));
+            throw new Error('Manual conflict resolution required. Please resolve conflicts and run again.');
+          }
+
+          try {
+            if (resolutionStrategy === 'ai') {
+              await this.resolveConflictsWithAI(status.conflicted);
+            } else {
+              // Traditional resolution
+              const checkoutFlag = resolutionStrategy === 'ours' ? '--ours' : '--theirs';
+              
+              for (const file of status.conflicted) {
+                await this.git.raw(['checkout', checkoutFlag, '--', file]);
+              }
+              
+              await this.git.add('.');
+              await this.git.commit(`Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`);
+              
+              this.spinner.succeed(`Conflicts resolved using ${resolutionStrategy} strategy`);
+              console.log(chalk.green(`✅ Resolved conflicts in ${status.conflicted.length} file(s)`));
             }
-          } else {
-            throw new Error(
-              'Manual conflict resolution required. Please resolve conflicts and run again.'
-            );
+          } catch (resolveError) {
+            this.spinner.fail('Failed to resolve conflicts');
+            console.log(chalk.red('Error details:', resolveError.message));
+            throw new Error(`Resolution failed: ${resolveError.message}`);
           }
         } else {
           this.spinner.succeed('Pulled latest changes');
@@ -258,9 +298,111 @@ class AutoGit {
       }
     } catch (error) {
       this.spinner.fail('Failed to pull changes');
+      
+      // If it's not a conflict error we handled, offer to skip
+      if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
+        console.log(chalk.yellow(`\nPull failed: ${error.message}`));
+
+        const { skipPull } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'skipPull',
+            message: 'Skip pull and continue with push?',
+            default: false,
+          },
+        ]);
+
+        if (skipPull) {
+          console.log(chalk.yellow('⚠️  Skipping pull, pushing local changes only'));
+          return; // Continue without pulling
+        }
+      }
+      
       throw error;
     } finally {
       this.spinner = null;
+    }
+  }
+
+  /**
+   * Resolve conflicts using AI with intelligent merging
+   */
+  async resolveConflictsWithAI(conflictedFiles) {
+    console.log(chalk.blue('\n🤖 Using AI to intelligently resolve conflicts...'));
+    
+    for (const file of conflictedFiles) {
+      console.log(chalk.cyan(`\n📄 Processing ${file}...`));
+      
+      try {
+        await this.resolveFileConflictsWithAI(file);
+        console.log(chalk.green(`✅ Resolved conflicts in ${file}`));
+      } catch (error) {
+        console.log(chalk.red(`❌ Failed to resolve ${file}: ${error.message}`));
+        
+        const { fallback } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'fallback',
+            message: `Fallback strategy for ${file}:`,
+            choices: [
+              { name: 'Keep current changes (theirs)', value: 'ours' },
+              { name: 'Use incoming changes (mine)', value: 'theirs' },
+              { name: 'Cancel entire operation', value: 'cancel' },
+            ],
+          },
+        ]);
+        
+        if (fallback === 'cancel') {
+          throw new Error('Operation cancelled due to resolution failure');
+        }
+        
+        await this.git.raw(['checkout', `--${fallback}`, '--', file]);
+        console.log(chalk.yellow(`⚠️  Used fallback strategy for ${file}`));
+      }
+    }
+    
+    // Stage all resolved files
+    await this.git.add('.');
+    await this.git.commit('AI-resolved merge conflicts with intelligent merging');
+    
+    this.spinner.succeed(`AI resolved conflicts in ${conflictedFiles.length} file(s)`);
+    console.log(chalk.green('✨ AI-powered conflict resolution completed!'));
+  }
+
+  /**
+   * Resolve conflicts in a single file using AI
+   */
+  async resolveFileConflictsWithAI(filePath) {
+    try {
+      // Get the conflicted file content
+      const fileContent = await this.git.show([`HEAD:${filePath}`]);
+      const currentContent = await this.git.show([`--theirs`, `:${filePath}`]);
+      const incomingContent = await this.git.show([`--ours`, `:${filePath}`]);
+      
+      // Get the current conflicted file to see conflict markers
+      const repoRoot = await this.git.revparse(['--show-toplevel']);
+      const fullPath = require('path').join(repoRoot, filePath);
+      const fs = require('fs-extra');
+      const conflictedContent = await fs.readFile(fullPath, 'utf8');
+      
+      // Create conflict context for AI
+      const conflictContext = {
+        filePath,
+        originalContent: fileContent,
+        currentChanges: currentContent,
+        incomingChanges: incomingContent,
+        conflictedContent,
+        timestamp: Date.now(),
+      };
+      
+      // Use AI to resolve conflicts
+      const resolvedContent = await this.aiCommit.resolveConflictWithAI(conflictContext);
+      
+      // Write the resolved content back to the file
+      await fs.writeFile(fullPath, resolvedContent, 'utf8');
+      
+    } catch (error) {
+      throw new Error(`Failed to resolve conflicts in ${filePath}: ${error.message}`);
     }
   }
 

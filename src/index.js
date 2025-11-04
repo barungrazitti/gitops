@@ -14,6 +14,7 @@ const AnalysisEngine = require('./core/analysis-engine');
 const MessageFormatter = require('./core/message-formatter');
 const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
+const fs = require('fs-extra');
 
 class AICommitGenerator {
   constructor() {
@@ -65,9 +66,9 @@ class AICommitGenerator {
         spinner.text = 'Analyzing repository context...';
         const context = await this.analysisEngine.analyzeRepository();
 
-        // Generate commit messages with intelligent merging
+        // Generate commit messages with Ollama-first fallback
         spinner.text = 'Generating commit messages with AI...';
-        messages = await this.generateWithIntelligentMerging(diff, {
+        messages = await this.generateWithFallback(diff, {
           context,
           count: parseInt(mergedOptions.count) || 3,
           type: mergedOptions.type,
@@ -422,13 +423,11 @@ class AICommitGenerator {
   }
 
   /**
-   * Generate commit messages with intelligent merging from multiple AI providers
+   * Generate commit messages with fallback from Ollama to Groq
    */
-  async generateWithIntelligentMerging(diff, options) {
+  async generateWithFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
-    const providers = ['ollama', 'groq'];
-    
-    console.log(chalk.blue('🤖 Running intelligent AI merging...'));
+    const providers = preferredProvider ? [preferredProvider] : ['ollama', 'groq'];
     
     // Enrich options with enhanced context
     const enrichedOptions = {
@@ -444,12 +443,10 @@ class AICommitGenerator {
       },
     };
 
-    // Try to use both providers in parallel for intelligent merging
-    const allProviderResults = {};
-    let successfulProviders = [];
-
+    // Try providers sequentially: Ollama first, then Groq as fallback
     for (const providerName of providers) {
       try {
+        console.log(chalk.blue(`🤖 Trying ${providerName}...`));
         const provider = AIProviderFactory.create(providerName);
         
         // Check if diff is too large and needs chunking
@@ -490,131 +487,37 @@ class AICommitGenerator {
         }
 
         if (messages && messages.length > 0) {
-          allProviderResults[providerName] = messages;
-          successfulProviders.push(providerName);
-          
+          await this.statsManager.recordCommit(providerName);
           console.log(
             chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
           );
+          
+          // Log context usage for debugging
+          if (enrichedOptions.context.hasSemanticContext) {
+            console.log(
+              chalk.blue(`🧠 Used semantic context for better analysis`)
+            );
+          }
+          
+          return messages;
         }
       } catch (error) {
-        console.warn(
-          chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
-        );
-      }
-    }
-
-    // Intelligent merging logic
-    if (successfulProviders.length === 0) {
-      throw new Error('All AI providers failed to generate commit messages');
-    }
-
-    if (successfulProviders.length === 1) {
-      // Only one provider worked, use its results
-      const providerName = successfulProviders[0];
-      await this.statsManager.recordCommit(providerName);
-      return allProviderResults[providerName];
-    }
-
-    // Multiple providers succeeded - intelligent merging
-    console.log(chalk.cyan('🧠 Merging results from multiple providers...'));
-    
-    const mergedMessages = this.intelligentlyMergeResults(
-      allProviderResults,
-      generationOptions.count || 3,
-      preferredProvider
-    );
-
-    // Record usage for all successful providers
-    for (const providerName of successfulProviders) {
-      await this.statsManager.recordCommit(providerName);
-    }
-
-    // Log context usage for debugging
-    if (enrichedOptions.context.hasSemanticContext) {
-      console.log(
-        chalk.blue(`🧠 Used semantic context with intelligent merging`)
-      );
-    }
-
-    return mergedMessages;
-  }
-
-  /**
-   * Intelligently merge results from multiple AI providers
-   */
-  intelligentlyMergeResults(providerResults, targetCount, preferredProvider = null) {
-    const allMessages = [];
-    const messageSources = new Map();
-
-    // Collect all messages with their source providers
-    for (const [providerName, messages] of Object.entries(providerResults)) {
-      messages.forEach((message, index) => {
-        const normalizedMessage = message.trim().toLowerCase();
-        
-        if (!messageSources.has(normalizedMessage)) {
-          messageSources.set(normalizedMessage, {
-            message: message.trim(),
-            providers: [providerName],
-            originalIndex: index,
-          });
-          allMessages.push(messageSources.get(normalizedMessage));
+        if (providerName === 'ollama') {
+          console.warn(
+            chalk.yellow(`⚠️  ${providerName} failed, trying Groq as fallback: ${error.message}`)
+          );
         } else {
-          // Message already seen from another provider - merge
-          const existing = messageSources.get(normalizedMessage);
-          if (!existing.providers.includes(providerName)) {
-            existing.providers.push(providerName);
-          }
+          console.warn(
+            chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
+          );
         }
-      });
+      }
     }
 
-    // Score messages based on multiple factors
-    const scoredMessages = allMessages.map((item) => {
-      let score = this.scoreCommitMessage(item.message);
-      
-      // Bonus for messages from multiple providers (consensus)
-      if (item.providers.length > 1) {
-        score += 15 * item.providers.length; // 15 points per additional provider
-      }
-      
-      // Bonus for preferred provider
-      if (preferredProvider && item.providers.includes(preferredProvider)) {
-        score += 10;
-      }
-      
-      // Bonus for Ollama (local, typically more context-aware)
-      if (item.providers.includes('ollama')) {
-        score += 5;
-      }
-      
-      // Bonus for Groq (fast, typically good for conventional commits)
-      if (item.providers.includes('groq')) {
-        score += 3;
-      }
-
-      return {
-        ...item,
-        score,
-      };
-    });
-
-    // Sort by score and take best ones
-    scoredMessages.sort((a, b) => b.score - a.score);
-    
-    const bestMessages = scoredMessages.slice(0, targetCount);
-    
-    // Log merge details
-    console.log(chalk.cyan('\n🎯 Intelligent merging results:'));
-    bestMessages.forEach((item, index) => {
-      const providersStr = item.providers.join(' + ');
-      console.log(
-        chalk.dim(`  ${index + 1}. [${providersStr}] ${item.message}`)
-      );
-    });
-
-    return bestMessages.map((item) => item.message);
+    throw new Error('All AI providers failed to generate commit messages');
   }
+
+
 
   /**
    * Show usage statistics
@@ -632,6 +535,337 @@ class AICommitGenerator {
     console.log(`Most used provider: ${stats.mostUsedProvider}`);
     console.log(`Average response time: ${stats.averageResponseTime}ms`);
     console.log(`Cache hit rate: ${stats.cacheHitRate}%`);
+  }
+
+  /**
+   * Resolve merge conflicts using AI with intelligent merging
+   */
+  async resolveConflictWithAI(conflictContext) {
+    const spinner = ora('🤖 AI analyzing conflicts...').start();
+    
+    try {
+      // Try Ollama first, then fallback to Groq
+      const providers = ['ollama', 'groq'];
+      
+      for (const providerName of providers) {
+        try {
+          const provider = AIProviderFactory.create(providerName);
+          spinner.text = `🤖 Using ${providerName} to resolve conflicts...`;
+          
+          // Create conflict resolution prompt
+          const conflictPrompt = this.buildConflictResolutionPrompt(conflictContext);
+          
+          // Check if content is too large and needs chunking
+          const estimatedTokens = Math.ceil(conflictPrompt.length / 4);
+          
+          if (estimatedTokens > 4000) {
+            spinner.text = `📦 Chunking large conflict for ${providerName}...`;
+            const resolvedContent = await this.resolveLargeConflictWithChunking(
+              provider, 
+              conflictContext, 
+              conflictPrompt
+            );
+            spinner.succeed(`AI resolved conflicts using ${providerName}`);
+            return resolvedContent;
+          } else {
+            const resolutionOptions = {
+              type: 'conflict-resolution',
+              context: {
+                ...conflictContext,
+                filePath: conflictContext.filePath,
+                hasSemanticContext: true,
+              },
+            };
+            
+            const resolutions = await provider.generateCommitMessages(conflictPrompt, resolutionOptions);
+            
+            if (resolutions && resolutions.length > 0) {
+              // Extract actual resolved content from AI response
+              const resolvedContent = this.extractResolvedContent(resolutions[0], conflictContext.conflictedContent);
+              spinner.succeed(`AI resolved conflicts using ${providerName}`);
+              await this.statsManager.recordCommit(providerName);
+              return resolvedContent;
+            }
+          }
+        } catch (error) {
+          if (providerName === 'ollama') {
+            spinner.text = `⚠️  ${providerName} failed, trying Groq as fallback: ${error.message}`;
+          } else {
+            spinner.fail(`⚠️  ${providerName} failed: ${error.message}`);
+          }
+        }
+      }
+      
+      throw new Error('All AI providers failed to resolve conflicts');
+    } catch (error) {
+      spinner.fail('AI conflict resolution failed');
+      throw error;
+    }
+  }
+
+  /**
+   * Build comprehensive conflict resolution prompt
+   */
+  buildConflictResolutionPrompt(conflictContext) {
+    const { filePath, originalContent, currentChanges, incomingChanges, conflictedContent } = conflictContext;
+    
+    return `You are an expert Git conflict resolver. Analyze and resolve the merge conflicts in the following file.
+
+FILE: ${filePath}
+
+ORIGINAL VERSION (before any changes):
+\`\`\`
+${originalContent}
+\`\`\`
+
+CURRENT/REMOTE CHANGES (theirs - what's already in the branch):
+\`\`\`
+${currentChanges}
+\`\`\`
+
+INCOMING/LOCAL CHANGES (ours - what we're trying to merge):
+\`\`\`
+${incomingChanges}
+\`\`\`
+
+CONFLICTED CONTENT (with Git conflict markers):
+\`\`\`
+${conflictedContent}
+\`\`\`
+
+INSTRUCTIONS:
+1. Analyze both changes carefully
+2. Preserve the best elements from both versions
+3. Merge changes intelligently to create the final resolved file
+4. Remove all Git conflict markers (<<<<<<<, =======, >>>>>>>)
+5. Ensure the result is syntactically correct and makes logical sense
+6. For code files, ensure all imports/dependencies are properly handled
+7. For config files, preserve important settings from both versions
+8. For documentation/text, merge content to be coherent
+
+RESPONSE FORMAT:
+Provide ONLY the final resolved file content. Do NOT include explanations, conflict markers, or any additional text. Just the pure resolved content that should replace the conflicted file.
+
+RESOLVED CONTENT:`;
+  }
+
+  /**
+   * Extract resolved content from AI response
+   */
+  extractResolvedContent(aiResponse, originalConflictedContent) {
+    // Remove any common AI response prefixes/suffixes
+    let resolvedContent = aiResponse
+      .replace(/^(RESOLVED CONTENT:|Here is the resolved content:|Final resolved content:)\s*/i, '')
+      .replace(/^```[\w]*\n?/, '') // Remove code block markers
+      .replace(/```\s*$/, '') // Remove closing code block markers
+      .trim();
+    
+    // If AI didn't actually resolve conflicts (still has markers), use a simple merge strategy
+    if (resolvedContent.includes('<<<<<<<') || resolvedContent.includes('>>>>>>>')) {
+      console.log(chalk.yellow('⚠️  AI didn\'t fully resolve conflicts, using intelligent fallback'));
+      return this.intelligentFallbackMerge(originalConflictedContent);
+    }
+    
+    return resolvedContent;
+  }
+
+  /**
+   * Intelligent fallback merge when AI fails to fully resolve
+   */
+  intelligentFallbackMerge(conflictedContent) {
+    const lines = conflictedContent.split('\n');
+    const resolvedLines = [];
+    let inConflict = false;
+    let conflictSection = '';
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      if (line.startsWith('<<<<<<<')) {
+        inConflict = true;
+        conflictSection = '';
+        continue;
+      }
+      
+      if (line.startsWith('=======')) {
+        // Switch to second part of conflict, continue collecting
+        continue;
+      }
+      
+      if (line.startsWith('>>>>>>>')) {
+        inConflict = false;
+        // For simple fallback, prefer the second version (ours) but include both if different
+        const conflictLines = conflictSection.split('\n').filter(l => l.trim());
+        if (conflictLines.length > 0) {
+          // Add non-empty lines from conflict resolution
+          resolvedLines.push(...conflictLines);
+        }
+        continue;
+      }
+      
+      if (inConflict) {
+        conflictSection += line + '\n';
+      } else {
+        resolvedLines.push(line);
+      }
+    }
+    
+    return resolvedLines.join('\n');
+  }
+
+  /**
+   * Handle large conflicts by chunking them for AI processing
+   */
+  async resolveLargeConflictWithChunking(provider, conflictContext, fullPrompt) {
+    const { conflictedContent, filePath } = conflictContext;
+    
+    // Split conflict into chunks around conflict markers
+    const chunks = this.chunkConflictContent(conflictedContent);
+    const resolvedChunks = [];
+    
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      
+      if (chunk.hasConflicts) {
+        const chunkPrompt = this.buildChunkConflictPrompt(conflictContext, chunk, i, chunks.length);
+        
+        const chunkOptions = {
+          type: 'conflict-resolution',
+          context: {
+            ...conflictContext,
+            filePath,
+            chunkIndex: i,
+            totalChunks: chunks.length,
+            isLastChunk: i === chunks.length - 1,
+            hasSemanticContext: true,
+          },
+        };
+        
+        const resolutions = await provider.generateCommitMessages(chunkPrompt, chunkOptions);
+        
+        if (resolutions && resolutions.length > 0) {
+          const resolvedChunk = this.extractResolvedContent(resolutions[0], chunk.content);
+          resolvedChunks.push(resolvedChunk);
+        } else {
+          // Fallback to intelligent merge for this chunk
+          resolvedChunks.push(this.intelligentFallbackMerge(chunk.content));
+        }
+      } else {
+        // No conflicts in this chunk, keep as is
+        resolvedChunks.push(chunk.content);
+      }
+    }
+    
+    // Reassemble the resolved content
+    return resolvedChunks.join('\n');
+  }
+
+  /**
+   * Split conflicted content into manageable chunks
+   */
+  chunkConflictContent(conflictedContent) {
+    const lines = conflictedContent.split('\n');
+    const chunks = [];
+    let currentChunk = {
+      content: '',
+      hasConflicts: false,
+      lineNumber: 0,
+    };
+    
+    let currentTokens = 0;
+    const maxTokens = 3000;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineTokens = Math.ceil(line.length / 4);
+      
+      // Check if line starts a new conflict section
+      const startsConflict = line.startsWith('<<<<<<<');
+      const endsConflict = line.startsWith('>>>>>>>');
+      
+      // If we're at a chunk boundary and not in the middle of a conflict
+      if (currentTokens + lineTokens > maxTokens && 
+          !currentChunk.hasConflicts && 
+          !startsConflict) {
+        // Save current chunk and start a new one
+        chunks.push(currentChunk);
+        currentChunk = {
+          content: '',
+          hasConflicts: false,
+          lineNumber: i,
+        };
+        currentTokens = 0;
+      }
+      
+      // Add line to current chunk
+      currentChunk.content += line + '\n';
+      currentTokens += lineTokens;
+      
+      // Track if this chunk has conflicts
+      if (startsConflict || endsConflict || line.startsWith('=======')) {
+        currentChunk.hasConflicts = true;
+      }
+    }
+    
+    // Add the last chunk if it has content
+    if (currentChunk.content.trim()) {
+      chunks.push(currentChunk);
+    }
+    
+    return chunks;
+  }
+
+  /**
+   * Build prompt for conflict chunk resolution
+   */
+  buildChunkConflictPrompt(conflictContext, chunk, chunkIndex, totalChunks) {
+    const { filePath, originalContent, currentChanges, incomingChanges } = conflictContext;
+    
+    // Extract relevant context for this chunk
+    const originalChunk = this.extractRelevantContext(originalContent, chunk);
+    const currentChunk = this.extractRelevantContext(currentChanges, chunk);
+    const incomingChunk = this.extractRelevantContext(incomingChanges, chunk);
+    
+    return `You are resolving a merge conflict chunk (${chunkIndex + 1}/${totalChunks}) for file: ${filePath}
+
+ORIGINAL CONTEXT:
+\`\`\`
+${originalChunk}
+\`\`\`
+
+CURRENT CHANGES:
+\`\`\`
+${currentChunk}
+\`\`\`
+
+INCOMING CHANGES:
+\`\`\`
+${incomingChunk}
+\`\`\`
+
+CONFLICTED CHUNK:
+\`\`\`
+${chunk.content}
+\`\`\`
+
+Resolve this conflict chunk intelligently. Remove all conflict markers and create the best merged version. Focus on the immediate conflict but consider the broader context.
+
+RESOLVED CHUNK:`;
+  }
+
+  /**
+   * Extract relevant context from full content for a chunk
+   */
+  extractRelevantContext(fullContent, chunk) {
+    // Simple implementation: get a few lines around the chunk area
+    const chunkLines = chunk.content.split('\n');
+    const fullLines = fullContent.split('\n');
+    
+    // Find approximate location and extract context
+    const contextStart = Math.max(0, chunk.lineNumber - 10);
+    const contextEnd = Math.min(fullLines.length, chunk.lineNumber + chunkLines.length + 10);
+    
+    return fullLines.slice(contextStart, contextEnd).join('\n');
   }
 }
 
