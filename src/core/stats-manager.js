@@ -128,9 +128,9 @@ class StatsManager {
       const averageResponseTime =
         responseTimeHistory.length > 0
           ? Math.round(
-              responseTimeHistory.reduce((sum, entry) => sum + entry.time, 0) /
+            responseTimeHistory.reduce((sum, entry) => sum + entry.time, 0) /
                 responseTimeHistory.length
-            )
+          )
           : 0;
 
       const providerUsage = data.providerUsage || {};
