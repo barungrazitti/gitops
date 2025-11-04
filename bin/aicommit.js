@@ -74,7 +74,7 @@ program
   .description('Generate AI commit messages for staged changes')
   .option(
     '-p, --provider <provider>',
-    'AI provider to use (openai, anthropic, gemini, etc.)'
+    'AI provider to use (groq, ollama)'
   )
   .option('-m, --model <model>', 'Specific model to use')
   .option('-c, --count <number>', 'Number of commit messages to generate', '3')
@@ -83,11 +83,6 @@ program
   .option('--no-cache', 'Disable caching')
   .option('--dry-run', 'Show what would be committed without making changes')
   .option('--conventional', 'Force conventional commit format')
-  .option('--test-validate', 'Run tests and auto-fix errors before committing')
-  .option('--no-auto-fix', 'Disable automatic error fixing')
-  .option('--push', 'Push commits to remote after validation')
-  .option('--format-code', 'Run advanced multi-language code formatting')
-  .option('--no-format', 'Disable code formatting')
   .action(handleGenerate);
 
 program
@@ -117,84 +112,9 @@ program
   .option('--reset', 'Reset statistics')
   .action(handleStats);
 
-program
-  .command('format')
-  .description('Format code with multi-language support')
-  .option('--setup', 'Setup formatter configuration files')
-  .option('--check', 'Check available formatters')
-  .option('--files <files...>', 'Format specific files')
-  .action(async (options) => {
-    try {
-      const CodeFormatter = require('../src/core/code-formatter');
-      const formatter = new CodeFormatter();
 
-      if (options.setup) {
-        console.log(chalk.cyan('🔧 Setting up formatter configurations...'));
-        const configs = await formatter.setupFormatterConfigs();
-        console.log(chalk.green('✅ Formatter configurations created:'));
-        Object.entries(configs).forEach(([tool, file]) => {
-          console.log(chalk.dim(`   ${tool}: ${file}`));
-        });
-        return;
-      }
 
-      if (options.check) {
-        console.log(chalk.cyan('🔍 Checking available formatters...'));
-        const available = await formatter.checkAvailableFormatters();
-        console.log(chalk.cyan('\n📋 Available Formatters:'));
-        Object.entries(available).forEach(([tool, isAvailable]) => {
-          const status = isAvailable ? chalk.green('✅') : chalk.red('❌');
-          console.log(`   ${status} ${tool}`);
-        });
-        return;
-      }
 
-      if (options.files && options.files.length > 0) {
-        console.log(
-          chalk.cyan(`📝 Formatting ${options.files.length} file(s)...`)
-        );
-        const results = await formatter.formatFiles(options.files);
-        const summary = formatter.generateSummary(results);
-
-        console.log(chalk.cyan(`\n📊 Formatting Results: ${summary.status}`));
-        console.log(
-          `   Total: ${summary.total} | Formatted: ${summary.formatted} | Failed: ${summary.failed}`
-        );
-
-        if (summary.tools.length > 0) {
-          console.log(`   Tools used: ${summary.tools.join(', ')}`);
-        }
-        return;
-      }
-
-      console.log(
-        chalk.yellow(
-          'Please specify --setup, --check, or provide files to format'
-        )
-      );
-    } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
-    }
-  });
-
-program
-  .command('lint')
-  .description('Lint staged files')
-  .option('--staged', 'Lint only staged files (default behavior)')
-  .option('--all', 'Lint all files in project')
-  .option('--fix', 'Apply auto-fixes where possible')
-  .option('--no-lint-fix', 'Skip auto-fixing during linting')
-  .option('--check', 'Run linting without applying fixes')
-  .action(async (options) => {
-    try {
-      const generator = new (require('../src/index.js'))();
-      await generator.lint(options);
-    } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
-    }
-  });
 
 // --- Main Execution ---
 

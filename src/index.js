@@ -14,8 +14,6 @@ const AnalysisEngine = require('./core/analysis-engine');
 const MessageFormatter = require('./core/message-formatter');
 const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
-const TestValidator = require('./core/test-validator');
-const AutoCorrector = require('./core/auto-corrector');
 
 class AICommitGenerator {
   constructor() {
@@ -26,8 +24,6 @@ class AICommitGenerator {
     this.messageFormatter = new MessageFormatter();
     this.statsManager = new StatsManager();
     this.hookManager = new HookManager();
-    this.testValidator = new TestValidator();
-    this.autoCorrector = new AutoCorrector();
   }
 
   /**
@@ -56,32 +52,6 @@ class AICommitGenerator {
         return;
       }
 
-      // Test validation workflow
-      let fixes = null;
-      if (mergedOptions.testValidate) {
-        spinner.text = 'Running test validation...';
-        fixes = await this.runTestValidation(mergedOptions);
-
-        if (!fixes && !mergedOptions.autoFix) {
-          spinner.fail('Validation failed and auto-fix is disabled.');
-          return;
-        }
-      }
-
-      // Advanced formatting workflow
-      if (mergedOptions.formatCode && !mergedOptions.testValidate) {
-        spinner.text = 'Running advanced formatting...';
-        const formatResults = await this.runAdvancedFormatting(mergedOptions);
-
-        if (formatResults && formatResults.summary.formatted > 0) {
-          console.log(
-            chalk.green(
-              `✅ Formatted ${formatResults.summary.formatted} file(s)`
-            )
-          );
-        }
-      }
-
       // Check cache
       let messages = [];
       if (mergedOptions.cache !== false) {
@@ -89,14 +59,15 @@ class AICommitGenerator {
         messages = await this.cacheManager.get(diff);
       }
 
+      // Advanced analysis and generation with intelligent merging
       if (!messages || messages.length === 0) {
         // Analyze repository context
         spinner.text = 'Analyzing repository context...';
         const context = await this.analysisEngine.analyzeRepository();
 
-        // Generate commit messages using AI with fallback logic
-        spinner.text = 'Generating commit messages...';
-        messages = await this.generateWithFallback(diff, {
+        // Generate commit messages with intelligent merging
+        spinner.text = 'Generating commit messages with AI...';
+        messages = await this.generateWithIntelligentMerging(diff, {
           context,
           count: parseInt(mergedOptions.count) || 3,
           type: mergedOptions.type,
@@ -106,7 +77,7 @@ class AICommitGenerator {
           preferredProvider: mergedOptions.provider || config.defaultProvider,
         });
 
-        // Cache the results
+        // Cache results
         if (mergedOptions.cache !== false) {
           await this.cacheManager.set(diff, messages);
         }
@@ -131,36 +102,8 @@ class AICommitGenerator {
       const selectedMessage = await this.selectMessage(formattedMessages);
 
       if (selectedMessage) {
-        // Create dual commits if validation was run
-        if (mergedOptions.testValidate) {
-          spinner.text = 'Creating commits...';
-          const commits = await this.gitManager.createDualCommits(
-            selectedMessage,
-            fixes
-          );
-
-          console.log(chalk.green(`\n✅ Created ${commits.length} commit(s):`));
-          commits.forEach((commit, index) => {
-            const type =
-              commit.type === 'original' ? '📝 Original' : '🔧 Corrected';
-            console.log(
-              chalk.cyan(
-                `  ${index + 1}. ${type}: ${commit.hash.substring(0, 8)}`
-              )
-            );
-          });
-
-          // Push if requested
-          if (mergedOptions.push) {
-            spinner.text = 'Pushing to remote...';
-            await this.gitManager.pushCommits();
-            console.log(chalk.green('✅ Pushed to remote successfully!'));
-          }
-        } else {
-          // Standard single commit
-          await this.gitManager.commit(selectedMessage);
-          console.log(chalk.green('\n✅ Commit created successfully!'));
-        }
+        await this.gitManager.commit(selectedMessage);
+        console.log(chalk.green('\n✅ Commit created successfully!'));
 
         // Update statistics
         await this.statsManager.recordCommit(
@@ -269,12 +212,7 @@ class AICommitGenerator {
         name: 'provider',
         message: 'Select your preferred AI provider:',
         choices: [
-          { name: 'OpenAI (GPT-3.5/GPT-4)', value: 'openai' },
-          { name: 'Anthropic Claude', value: 'anthropic' },
-          { name: 'Google Gemini', value: 'gemini' },
-          { name: 'Mistral AI', value: 'mistral' },
-          { name: 'Cohere', value: 'cohere' },
-          { name: 'Groq', value: 'groq' },
+          { name: 'Groq (Fast Cloud)', value: 'groq' },
           { name: 'Ollama (Local)', value: 'ollama' },
         ],
       },
@@ -337,9 +275,6 @@ class AICommitGenerator {
   }
 
   /**
-   * Generate commit messages with fallback logic
-   */
-  /**
    * Chunk large diffs into smaller pieces for AI processing
    */
   chunkDiff(diff, maxTokens = 4000) {
@@ -363,7 +298,7 @@ class AICommitGenerator {
           currentTokens = 0;
         }
 
-        // Split the large line into smaller pieces
+        // Split large line into smaller pieces
         const chunksNeeded = Math.ceil(lineTokens / maxTokens);
         const chunkSize = Math.ceil(line.length / chunksNeeded);
 
@@ -375,7 +310,7 @@ class AICommitGenerator {
         continue;
       }
 
-      // Check if adding this line would exceed the limit
+      // Check if adding this line would exceed limit
       if (currentTokens + lineTokens > maxTokens && currentChunk.length > 0) {
         chunks.push(currentChunk.join('\n'));
         currentChunk = [line];
@@ -386,7 +321,7 @@ class AICommitGenerator {
       }
     }
 
-    // Add the last chunk if it has content
+    // Add last chunk if it has content
     if (currentChunk.length > 0) {
       chunks.push(currentChunk.join('\n'));
     }
@@ -395,7 +330,7 @@ class AICommitGenerator {
   }
 
   /**
-   * Select the best commit messages from chunked results
+   * Select best commit messages from chunked results
    */
   selectBestMessages(messages, count = 3) {
     if (!messages || messages.length === 0) return [];
@@ -409,7 +344,7 @@ class AICommitGenerator {
       score: this.scoreCommitMessage(msg),
     }));
 
-    // Sort by score and take the best ones
+    // Sort by score and take best ones
     scored.sort((a, b) => b.score - a.score);
 
     return scored.slice(0, count).map((item) => item.message);
@@ -486,10 +421,15 @@ class AICommitGenerator {
     return score;
   }
 
-  async generateWithFallback(diff, options) {
+  /**
+   * Generate commit messages with intelligent merging from multiple AI providers
+   */
+  async generateWithIntelligentMerging(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
     const providers = ['ollama', 'groq'];
-
+    
+    console.log(chalk.blue('🤖 Running intelligent AI merging...'));
+    
     // Enrich options with enhanced context
     const enrichedOptions = {
       ...generationOptions,
@@ -504,19 +444,14 @@ class AICommitGenerator {
       },
     };
 
-    let providerOrder = preferredProvider ? [preferredProvider] : [];
-    providers.forEach((provider) => {
-      if (provider !== preferredProvider) {
-        providerOrder.push(provider);
-      }
-    });
+    // Try to use both providers in parallel for intelligent merging
+    const allProviderResults = {};
+    let successfulProviders = [];
 
-    let lastError = null;
-
-    for (const providerName of providerOrder) {
+    for (const providerName of providers) {
       try {
         const provider = AIProviderFactory.create(providerName);
-
+        
         // Check if diff is too large and needs chunking
         const estimatedTokens = Math.ceil(diff.length / 4);
         let messages;
@@ -524,202 +459,161 @@ class AICommitGenerator {
         if (estimatedTokens > 4000) {
           console.log(
             chalk.blue(
-              `📦 Chunking large diff (${estimatedTokens} tokens) for ${providerName}...`
+              `📦 Chunking large diff for ${providerName}...`
             )
           );
 
-          const chunks = this.chunkDiff(diff, 3000); // Leave room for prompt
+          const chunks = this.chunkDiff(diff, 3000);
           const chunkMessages = [];
 
           for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i];
             const isLastChunk = i === chunks.length - 1;
 
-            console.log(
-              chalk.dim(`   Processing chunk ${i + 1}/${chunks.length}...`)
-            );
-
             const chunkOptions = {
               ...enrichedOptions,
               chunkIndex: i,
               totalChunks: chunks.length,
               isLastChunk,
-              chunkContext: isLastChunk
-                ? 'final'
-                : i === 0
-                  ? 'initial'
-                  : 'middle',
+              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
             };
 
-            const chunkResult = await provider.generateCommitMessages(
-              chunk,
-              chunkOptions
-            );
+            const chunkResult = await provider.generateCommitMessages(chunk, chunkOptions);
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
             }
           }
 
-          // Deduplicate and select best messages from all chunks
-          messages = this.selectBestMessages(
-            chunkMessages,
-            generationOptions.count || 3
-          );
+          messages = this.selectBestMessages(chunkMessages, generationOptions.count || 5);
         } else {
-          messages = await provider.generateCommitMessages(
-            diff,
-            enrichedOptions
-          );
+          messages = await provider.generateCommitMessages(diff, enrichedOptions);
         }
 
         if (messages && messages.length > 0) {
-          await this.statsManager.recordCommit(providerName);
-
-          // Log context usage for debugging
-          if (enrichedOptions.context.hasSemanticContext) {
-            console.log(
-              chalk.blue(`🧠 Used semantic context with ${providerName}`)
-            );
-          }
-
-          return messages;
+          allProviderResults[providerName] = messages;
+          successfulProviders.push(providerName);
+          
+          console.log(
+            chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
+          );
         }
       } catch (error) {
-        lastError = error;
         console.warn(
           chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
         );
       }
     }
 
-    throw (
-      lastError ||
-      new Error('All AI providers failed to generate commit messages')
+    // Intelligent merging logic
+    if (successfulProviders.length === 0) {
+      throw new Error('All AI providers failed to generate commit messages');
+    }
+
+    if (successfulProviders.length === 1) {
+      // Only one provider worked, use its results
+      const providerName = successfulProviders[0];
+      await this.statsManager.recordCommit(providerName);
+      return allProviderResults[providerName];
+    }
+
+    // Multiple providers succeeded - intelligent merging
+    console.log(chalk.cyan('🧠 Merging results from multiple providers...'));
+    
+    const mergedMessages = this.intelligentlyMergeResults(
+      allProviderResults,
+      generationOptions.count || 3,
+      preferredProvider
     );
-  }
 
-  /**
-   * Run advanced formatting workflow
-   */
-  async runAdvancedFormatting(_options) {
-    try {
-      const files = await this.testValidator.getFilesToValidate(
-        this.gitManager
-      );
-      const allFiles = [...files.staged, ...files.unstaged];
-
-      if (allFiles.length === 0) {
-        console.log(chalk.blue('ℹ️  No files to format'));
-        return null;
-      }
-
-      console.log(chalk.blue(`🎨 Formatting ${allFiles.length} file(s)...`));
-
-      const results =
-        await this.autoCorrector.codeFormatter.formatFiles(allFiles);
-
-      // Re-stage formatted files
-      if (results.formatted.length > 0) {
-        await this.gitManager.git.add(results.formatted.map((f) => f.file));
-      }
-
-      return results;
-    } catch (error) {
-      console.error(chalk.red(`Advanced formatting failed: ${error.message}`));
-      return null;
+    // Record usage for all successful providers
+    for (const providerName of successfulProviders) {
+      await this.statsManager.recordCommit(providerName);
     }
-  }
 
-  /**
-   * Run test validation and auto-correction workflow
-   */
-  async runTestValidation(options) {
-    try {
-      // Check if validation is available
-      const isAvailable = await this.testValidator.isValidationAvailable();
-      if (!isAvailable) {
-        console.log(
-          chalk.yellow(
-            '⚠️  Test validation not available (no test scripts found)'
-          )
-        );
-        return null;
-      }
-
-      // Get files to validate
-      const files = await this.testValidator.getFilesToValidate(
-        this.gitManager
-      );
-      const allFiles = [...files.staged, ...files.unstaged];
-
-      if (allFiles.length === 0) {
-        console.log(chalk.blue('ℹ️  No relevant files to validate'));
-        return null;
-      }
-
-      console.log(chalk.blue(`🔍 Validating ${allFiles.length} file(s)...`));
-
-      // Run validation
-      const results = await this.testValidator.validateStagedChanges(allFiles);
-      const summary = this.testValidator.generateSummary(results);
-
-      // Display results
-      console.log(chalk.cyan(`\n📋 Validation Results: ${summary.status}`));
+    // Log context usage for debugging
+    if (enrichedOptions.context.hasSemanticContext) {
       console.log(
-        chalk.gray(
-          `   Linting: ${summary.lintStatus} | Tests: ${summary.testStatus}`
-        )
+        chalk.blue(`🧠 Used semantic context with intelligent merging`)
       );
-
-      if (summary.errorCount > 0) {
-        console.log(
-          chalk.red(
-            `   Errors: ${summary.errorCount} | Warnings: ${summary.warningCount}`
-          )
-        );
-      }
-      if (summary.fixableCount > 0) {
-        console.log(chalk.yellow(`   Fixable issues: ${summary.fixableCount}`));
-      }
-
-      // If validation passed, return early
-      if (results.passed) {
-        console.log(chalk.green('✅ All validations passed!'));
-        return null;
-      }
-
-      // Auto-fix if enabled
-      if (options.autoFix !== false) {
-        console.log(chalk.blue('\n🔧 Attempting to fix issues...'));
-        const fixes = await this.autoCorrector.fixIssues(results, allFiles);
-        const fixSummary = this.autoCorrector.generateSummary(fixes);
-
-        console.log(chalk.cyan('\n🔧 Fix Summary:'));
-        console.log(
-          chalk.gray(
-            `   Applied: ${fixSummary.applied} | Failed: ${fixSummary.failed} | Skipped: ${fixSummary.skipped}`
-          )
-        );
-
-        if (fixSummary.totalFixes > 0) {
-          console.log(chalk.green(`   Total fixes: ${fixSummary.totalFixes}`));
-          return fixes;
-        } else {
-          console.log(chalk.yellow('   No fixes were applied'));
-        }
-      } else {
-        console.log(
-          chalk.yellow(
-            '\n⚠️  Auto-fix is disabled. Commit will proceed with errors.'
-          )
-        );
-      }
-
-      return null;
-    } catch (error) {
-      console.error(chalk.red(`Validation workflow failed: ${error.message}`));
-      return null;
     }
+
+    return mergedMessages;
+  }
+
+  /**
+   * Intelligently merge results from multiple AI providers
+   */
+  intelligentlyMergeResults(providerResults, targetCount, preferredProvider = null) {
+    const allMessages = [];
+    const messageSources = new Map();
+
+    // Collect all messages with their source providers
+    for (const [providerName, messages] of Object.entries(providerResults)) {
+      messages.forEach((message, index) => {
+        const normalizedMessage = message.trim().toLowerCase();
+        
+        if (!messageSources.has(normalizedMessage)) {
+          messageSources.set(normalizedMessage, {
+            message: message.trim(),
+            providers: [providerName],
+            originalIndex: index,
+          });
+          allMessages.push(messageSources.get(normalizedMessage));
+        } else {
+          // Message already seen from another provider - merge
+          const existing = messageSources.get(normalizedMessage);
+          if (!existing.providers.includes(providerName)) {
+            existing.providers.push(providerName);
+          }
+        }
+      });
+    }
+
+    // Score messages based on multiple factors
+    const scoredMessages = allMessages.map((item) => {
+      let score = this.scoreCommitMessage(item.message);
+      
+      // Bonus for messages from multiple providers (consensus)
+      if (item.providers.length > 1) {
+        score += 15 * item.providers.length; // 15 points per additional provider
+      }
+      
+      // Bonus for preferred provider
+      if (preferredProvider && item.providers.includes(preferredProvider)) {
+        score += 10;
+      }
+      
+      // Bonus for Ollama (local, typically more context-aware)
+      if (item.providers.includes('ollama')) {
+        score += 5;
+      }
+      
+      // Bonus for Groq (fast, typically good for conventional commits)
+      if (item.providers.includes('groq')) {
+        score += 3;
+      }
+
+      return {
+        ...item,
+        score,
+      };
+    });
+
+    // Sort by score and take best ones
+    scoredMessages.sort((a, b) => b.score - a.score);
+    
+    const bestMessages = scoredMessages.slice(0, targetCount);
+    
+    // Log merge details
+    console.log(chalk.cyan('\n🎯 Intelligent merging results:'));
+    bestMessages.forEach((item, index) => {
+      const providersStr = item.providers.join(' + ');
+      console.log(
+        chalk.dim(`  ${index + 1}. [${providersStr}] ${item.message}`)
+      );
+    });
+
+    return bestMessages.map((item) => item.message);
   }
 
   /**
@@ -738,132 +632,6 @@ class AICommitGenerator {
     console.log(`Most used provider: ${stats.mostUsedProvider}`);
     console.log(`Average response time: ${stats.averageResponseTime}ms`);
     console.log(`Cache hit rate: ${stats.cacheHitRate}%`);
-  }
-
-  /**
-   * Lint staged files
-   */
-  async lint(options = {}) {
-    const spinner = ora('Initializing linting...').start();
-
-    try {
-      // Validate git repository
-      spinner.text = 'Checking git repository...';
-      await this.gitManager.validateRepository();
-
-      // Get files to lint - only staged files
-      const filesToLint = await this.gitManager.getStagedFiles();
-
-      // Filter files to exclude backup/temporary files and include only relevant source code files
-      const relevantExtensions = [
-        '.js',
-        '.jsx',
-        '.ts',
-        '.tsx',
-        '.json',
-        '.css',
-        '.scss',
-        '.sass',
-        '.less',
-        '.html',
-        '.php',
-        '.py',
-        '.java',
-        '.go',
-        '.rs',
-        '.vue',
-        '.svelte',
-      ];
-      const filteredFiles = filesToLint.filter((file) => {
-        const ext = path.extname(file).toLowerCase();
-        // Exclude backup files (files ending with .backup.* or containing backup patterns)
-        const isBackup =
-          file.includes('.backup.') ||
-          file.includes('backup') ||
-          file.endsWith('~');
-        return !isBackup && relevantExtensions.includes(ext);
-      });
-
-      if (!filteredFiles || filteredFiles.length === 0) {
-        spinner.fail('No relevant files to lint found.');
-        console.log(
-          chalk.yellow(
-            'No staged source code files found. Please stage your changes first.'
-          )
-        );
-        return;
-      }
-
-      console.log(
-        chalk.cyan(`\\n📝 Linting ${filteredFiles.length} relevant file(s):`)
-      );
-      filteredFiles.forEach((file) => console.log(chalk.gray(`  - ${file}`)));
-
-      // Run linting using the test validator
-      spinner.text = 'Running linting checks...';
-      const lintResults = await this.testValidator.runLinting(filteredFiles);
-
-      // Display results
-      spinner.stop();
-      console.log(chalk.cyan('\\n🔍 Linting Results:'));
-
-      if (lintResults.success) {
-        console.log(chalk.green('✅ All files passed linting!'));
-
-        if (lintResults.output) {
-          console.log(chalk.gray('Details:'));
-          console.log(lintResults.output);
-        }
-      } else {
-        console.log(chalk.red('❌ Linting failed:'));
-
-        // Show errors
-        if (lintResults.errors && lintResults.errors.length > 0) {
-          console.log(chalk.red(`Errors (${lintResults.errors.length}):`));
-          lintResults.errors.forEach((error) => {
-            console.log(chalk.red(`  ${error}`));
-          });
-        }
-
-        // Show warnings
-        if (lintResults.warnings && lintResults.warnings.length > 0) {
-          console.log(
-            chalk.yellow(`Warnings (${lintResults.warnings.length}):`)
-          );
-          lintResults.warnings.forEach((warning) => {
-            console.log(chalk.yellow(`  ${warning}`));
-          });
-        }
-
-        // Show output
-        if (lintResults.output) {
-          console.log(chalk.gray('\\nFull output:'));
-          console.log(lintResults.output);
-        }
-
-        // Apply auto-fixes if requested (and not disabled with --no-lint-fix)
-        if (
-          options.fix &&
-          !options['no-lint-fix'] &&
-          lintResults.fixableErrors &&
-          lintResults.fixableErrors.length > 0
-        ) {
-          console.log(chalk.blue('\\n🔧 Applying auto-fixes...'));
-          const fixes = await this.autoCorrector.fixLintingIssues(
-            lintResults.fixableErrors
-          );
-          console.log(
-            chalk.green(`✅ Applied fixes to ${fixes.length} issue(s)`)
-          );
-        }
-
-        // Exit with error code if there were linting issues
-        process.exit(1);
-      }
-    } catch (error) {
-      spinner.fail(`Linting failed: ${error.message}`);
-      throw error;
-    }
   }
 }
 

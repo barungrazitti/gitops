@@ -194,17 +194,7 @@ class AIProviderFactory {
       recommendation: {
         reason: `Selected ${bestOption.model.name} from ${bestOption.providerInfo.displayName}`,
         alternatives: Object.keys(configs)
-          .filter((p) =>
-            [
-              'groq',
-              'ollama',
-              'openai',
-              'anthropic',
-              'gemini',
-              'mistral',
-              'cohere',
-            ].includes(p)
-          )
+          .filter((p) => ['groq', 'ollama'].includes(p))
           .filter((p) => p !== bestOption.provider),
       },
     };

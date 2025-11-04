@@ -16,7 +16,7 @@ const { version } = require('../package.json');
 const AutoGit = require('../src/auto-git.js');
 const AICommitGenerator = require('../src/index.js');
 
-// Configure the CLI program
+// Configure CLI program
 program
   .name('aic')
   .description('AI Commit - Super simple git workflow automation')
@@ -30,21 +30,6 @@ program
   .option('-s, --skip-pull', 'Skip pulling before push')
   .option('-n, --no-push', "Don't push after commit")
   .option('--dry-run', 'Show what would be done without executing')
-  .option('--test-validate', 'Run tests and auto-fix errors before committing')
-  .option('--no-auto-fix', 'Disable automatic error fixing')
-  .option('--format-code', 'Run advanced multi-language code formatting')
-  .option('--no-format', 'Disable code formatting')
-  .option('--lint', 'Run syntax linting before committing (default: enabled)')
-  .option('--no-lint', 'Disable syntax linting')
-  .option(
-    '--no-lint-fix',
-    'Disable auto-fixing of linting errors (default: enabled)'
-  )
-  .option(
-    '--ai-lint',
-    'Use AI to fix unfixable linting errors (default: enabled)'
-  )
-  .option('--no-ai-lint', 'Disable AI linting fixes')
   .action(async (message, options) => {
     try {
       const autoGit = new AutoGit();
@@ -53,64 +38,21 @@ program
         console.log(
           chalk.cyan('🔍 Dry run mode - showing what would be done:\n')
         );
+        
         const steps = [];
         steps.push('1. Check git repository');
         steps.push('2. Stage all changes');
-
-        if (options.lint !== false) {
-          steps.push('3. Run syntax linting');
-          if (options.lintFix !== false) {
-            steps.push('4. Auto-fix linting errors');
-          }
-          steps.push(
-            options.lintFix !== false
-              ? '5. Generate AI commit message (or use provided)'
-              : '4. Generate AI commit message (or use provided)'
-          );
-          steps.push(
-            options.lintFix !== false
-              ? '6. Commit changes'
-              : '5. Commit changes'
-          );
-          if (!options.skipPull) {
-            steps.push(
-              options.lintFix !== false
-                ? '7. Pull latest changes'
-                : '6. Pull latest changes'
-            );
-          }
-          steps.push(
-            options.lintFix !== false
-              ? '8. Auto-resolve conflicts if possible'
-              : '7. Auto-resolve conflicts if possible'
-          );
-          if (options.push !== false) {
-            steps.push(
-              options.lintFix !== false ? '9. Push changes' : '8. Push changes'
-            );
-          }
-        } else {
-          steps.push('3. Generate AI commit message (or use provided)');
-          steps.push('4. Commit changes');
-          if (!options.skipPull) {
-            steps.push('5. Pull latest changes');
-          }
-          steps.push('6. Auto-resolve conflicts if possible');
-          if (options.push !== false) {
-            steps.push('7. Push changes');
-          }
+        steps.push('3. Generate AI commit message (or use provided)');
+        steps.push('4. Commit changes');
+        
+        if (!options.skipPull) {
+          steps.push('5. Pull latest changes');
         }
-
-        if (options.testValidate) {
-          const testStepIndex = steps.findIndex((s) =>
-            s.includes('Generate AI commit message')
-          );
-          steps.splice(
-            testStepIndex,
-            0,
-            'Run tests and validation',
-            'Auto-fix any issues found'
-          );
+        
+        steps.push('6. Auto-resolve conflicts if possible');
+        
+        if (options.push !== false) {
+          steps.push('7. Push changes');
         }
 
         steps.forEach((step) => console.log(step));
@@ -152,7 +94,8 @@ program
   .option('--reset', 'Reset configuration to defaults')
   .action(async (options) => {
     try {
-      // Implement config command logic here
+      const generator = new AICommitGenerator();
+      await generator.config(options);
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
