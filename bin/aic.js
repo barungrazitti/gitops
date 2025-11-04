@@ -7,6 +7,7 @@
  *   aic           - Auto commit, pull, resolve conflicts, push
  *   aic setup     - Setup AI provider
  *   aic config    - Show configuration
+ *   aic stats     - Show usage statistics and activity analysis
  *   aic --help    - Show help
  */
 
@@ -96,6 +97,25 @@ program
     try {
       const generator = new AICommitGenerator();
       await generator.config(options);
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Stats command
+program
+  .command('stats')
+  .description('Show usage statistics and activity analysis')
+  .option('--analyze', 'Analyze recent activity logs')
+  .option('--export', 'Export activity logs')
+  .option('--format <format>', 'Export format (json|csv)', 'json')
+  .option('--days <days>', 'Number of days to analyze', '30')
+  .option('--reset', 'Reset all statistics')
+  .action(async (options) => {
+    try {
+      const generator = new AICommitGenerator();
+      await generator.stats(options);
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);

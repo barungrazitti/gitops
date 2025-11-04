@@ -16,6 +16,7 @@ class AutoGit {
     this.git = simpleGit();
     this.aiCommit = new AICommitGenerator();
     this.spinner = null;
+    this.activityLogger = this.aiCommit.activityLogger;
     // Configure git to prefer merge over rebase for safety
     this.git.raw(['config', 'pull.rebase', 'false']);
   }
@@ -25,8 +26,11 @@ class AutoGit {
    */
   async run(options = {}) {
     console.log(chalk.cyan('Auto Git Workflow Starting...\n'));
+    const startTime = Date.now();
 
     try {
+      await this.activityLogger.info('auto_git_started', { options });
+
       // Step 1: Validate git repository
       await this.validateRepository();
 
@@ -34,6 +38,7 @@ class AutoGit {
       const hasChanges = await this.checkForChanges();
       if (!hasChanges && !options.force) {
         console.log(chalk.yellow('No changes detected. Repository is clean!'));
+        await this.activityLogger.info('auto_git_completed', { reason: 'no_changes', duration: Date.now() - startTime });
         return;
       }
 
@@ -49,6 +54,7 @@ class AutoGit {
         commitMessage = await this.generateCommitMessage(options);
         if (!commitMessage) {
           console.log(chalk.yellow('Commit cancelled by user'));
+          await this.activityLogger.info('auto_git_cancelled', { reason: 'user_cancelled' });
           return;
         }
       }
@@ -73,7 +79,10 @@ class AutoGit {
             },
           ]);
 
-          if (!skipPull) {
+          if (skipPull) {
+            await this.activityLogger.warn('pull_skipped', { reason: pullError.message });
+          } else {
+            await this.activityLogger.info('auto_git_cancelled', { reason: 'pull_failed_cancelled' });
             return;
           }
         }
@@ -85,8 +94,18 @@ class AutoGit {
       }
 
       console.log(chalk.green('\n✅ Auto Git workflow completed successfully!'));
+      await this.activityLogger.info('auto_git_completed', { 
+        success: true,
+        duration: Date.now() - startTime,
+        commitMessage,
+      });
     } catch (error) {
       console.error(chalk.red('\n❌ Auto Git workflow failed:'), error.message);
+      await this.activityLogger.error('auto_git_failed', { 
+        error: error.message,
+        stack: error.stack,
+        duration: Date.now() - startTime,
+      });
       throw error;
     }
   }
@@ -329,6 +348,7 @@ class AutoGit {
    */
   async resolveConflictsWithAI(conflictedFiles) {
     console.log(chalk.blue('\n🤖 Using AI to intelligently resolve conflicts...'));
+    const resolutionStartTime = Date.now();
     
     for (const file of conflictedFiles) {
       console.log(chalk.cyan(`\n📄 Processing ${file}...`));
@@ -353,6 +373,17 @@ class AutoGit {
         ]);
         
         if (fallback === 'cancel') {
+          await this.activityLogger.logConflictResolution(
+            conflictedFiles, 
+            'ai', 
+            false, 
+            { 
+              error: error.message,
+              file,
+              fallbackUsed: fallback,
+              resolutionTime: Date.now() - resolutionStartTime,
+            }
+          );
           throw new Error('Operation cancelled due to resolution failure');
         }
         
@@ -367,6 +398,17 @@ class AutoGit {
     
     this.spinner.succeed(`AI resolved conflicts in ${conflictedFiles.length} file(s)`);
     console.log(chalk.green('✨ AI-powered conflict resolution completed!'));
+    
+    await this.activityLogger.logConflictResolution(
+      conflictedFiles, 
+      'ai', 
+      true, 
+      { 
+        resolutionTime: Date.now() - resolutionStartTime,
+        fallbackUsed: false,
+        chunkingUsed: conflictedFiles.some(f => this.isLargeFile(f)),
+      }
+    );
   }
 
   /**

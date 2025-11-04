@@ -14,6 +14,7 @@ const AnalysisEngine = require('./core/analysis-engine');
 const MessageFormatter = require('./core/message-formatter');
 const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
+const ActivityLogger = require('./core/activity-logger');
 const fs = require('fs-extra');
 
 class AICommitGenerator {
@@ -25,6 +26,7 @@ class AICommitGenerator {
     this.messageFormatter = new MessageFormatter();
     this.statsManager = new StatsManager();
     this.hookManager = new HookManager();
+    this.activityLogger = new ActivityLogger();
   }
 
   /**
@@ -32,8 +34,11 @@ class AICommitGenerator {
    */
   async generate(options = {}) {
     const spinner = ora('Initializing AI commit generator...').start();
+    const startTime = Date.now();
 
     try {
+      await this.activityLogger.info('generate_started', { options });
+
       // Load configuration
       const config = await this.configManager.load();
       const mergedOptions = { ...config, ...options };
@@ -41,6 +46,7 @@ class AICommitGenerator {
       // Validate git repository
       spinner.text = 'Checking git repository...';
       await this.gitManager.validateRepository();
+      await this.activityLogger.logGitOperation('validate_repository', { success: true });
 
       // Get staged changes
       spinner.text = 'Analyzing staged changes...';
@@ -50,6 +56,7 @@ class AICommitGenerator {
         spinner.fail(
           'No staged changes found. Please stage your changes first.'
         );
+        await this.activityLogger.warn('generate_failed', { reason: 'no_staged_changes' });
         return;
       }
 
@@ -58,15 +65,20 @@ class AICommitGenerator {
       if (mergedOptions.cache !== false) {
         spinner.text = 'Checking cache...';
         messages = await this.cacheManager.get(diff);
+        if (messages && messages.length > 0) {
+          await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
+        } else {
+          await this.activityLogger.debug('cache_miss', { diffLength: diff.length });
+        }
       }
 
-      // Advanced analysis and generation with intelligent merging
+      // Advanced analysis and generation with fallback
       if (!messages || messages.length === 0) {
         // Analyze repository context
         spinner.text = 'Analyzing repository context...';
         const context = await this.analysisEngine.analyzeRepository();
 
-        // Generate commit messages with Ollama-first fallback
+        // Generate commit messages with fallback
         spinner.text = 'Generating commit messages with AI...';
         messages = await this.generateWithFallback(diff, {
           context,
@@ -81,7 +93,12 @@ class AICommitGenerator {
         // Cache results
         if (mergedOptions.cache !== false) {
           await this.cacheManager.set(diff, messages);
+          await this.activityLogger.debug('cache_set', { messagesCount: messages.length });
         }
+
+        // Log commit generation details
+        await this.activityLogger.logCommitGeneration(diff, messages, null, context, 
+          mergedOptions.provider || config.defaultProvider);
       }
 
       spinner.succeed('Commit messages generated successfully!');
@@ -97,6 +114,7 @@ class AICommitGenerator {
         formattedMessages.forEach((msg, index) => {
           console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
         });
+        await this.activityLogger.info('dry_run_completed', { messagesCount: formattedMessages.length });
         return;
       }
 
@@ -110,9 +128,27 @@ class AICommitGenerator {
         await this.statsManager.recordCommit(
           mergedOptions.provider || config.defaultProvider
         );
+
+        // Log successful commit
+        await this.activityLogger.logGitOperation('commit', { 
+          message: selectedMessage,
+          success: true,
+          duration: Date.now() - startTime,
+        });
+
+        // Update commit generation log with selected message
+        await this.activityLogger.info('commit_completed', { 
+          selectedMessage,
+          messagesGenerated: messages.length,
+        });
       }
     } catch (error) {
       spinner.fail(`Failed to generate commit message: ${error.message}`);
+      await this.activityLogger.error('generate_failed', { 
+        error: error.message,
+        stack: error.stack,
+        duration: Date.now() - startTime,
+      });
       throw error;
     }
   }
@@ -445,6 +481,7 @@ class AICommitGenerator {
 
     // Try providers sequentially: Ollama first, then Groq as fallback
     for (const providerName of providers) {
+      const providerStartTime = Date.now();
       try {
         console.log(chalk.blue(`🤖 Trying ${providerName}...`));
         const provider = AIProviderFactory.create(providerName);
@@ -483,13 +520,26 @@ class AICommitGenerator {
 
           messages = this.selectBestMessages(chunkMessages, generationOptions.count || 5);
         } else {
-          messages = await provider.generateCommitMessages(diff, enrichedOptions);
+          const prompt = this.buildPrompt(diff, enrichedOptions);
+          messages = await provider.generateCommitMessages(prompt, enrichedOptions);
         }
 
+        const responseTime = Date.now() - providerStartTime;
+        
         if (messages && messages.length > 0) {
           await this.statsManager.recordCommit(providerName);
           console.log(
             chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
+          );
+          
+          // Log AI interaction
+          await this.activityLogger.logAIInteraction(
+            providerName, 
+            'commit_generation', 
+            diff, 
+            messages.join('\n'), 
+            responseTime, 
+            true
           );
           
           // Log context usage for debugging
@@ -502,6 +552,8 @@ class AICommitGenerator {
           return messages;
         }
       } catch (error) {
+        const responseTime = Date.now() - providerStartTime;
+        
         if (providerName === 'ollama') {
           console.warn(
             chalk.yellow(`⚠️  ${providerName} failed, trying Groq as fallback: ${error.message}`)
@@ -511,6 +563,16 @@ class AICommitGenerator {
             chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
           );
         }
+
+        // Log failed AI interaction
+        await this.activityLogger.logAIInteraction(
+          providerName, 
+          'commit_generation', 
+          diff, 
+          null, 
+          responseTime, 
+          false
+        );
       }
     }
 
@@ -529,6 +591,24 @@ class AICommitGenerator {
       return;
     }
 
+    if (options.analyze) {
+      const analysis = await this.activityLogger.analyzeLogs(options.days || 30);
+      this.displayLogAnalysis(analysis);
+      return;
+    }
+
+    if (options.export) {
+      const format = options.format || 'json';
+      const exportData = await this.activityLogger.exportLogs(options.days || 30, format);
+      
+      if (format === 'json') {
+        console.log(JSON.stringify(JSON.parse(exportData), null, 2));
+      } else {
+        console.log(exportData);
+      }
+      return;
+    }
+
     const stats = await this.statsManager.getStats();
     console.log(chalk.cyan('\n📊 Usage Statistics:'));
     console.log(`Total commits: ${stats.totalCommits}`);
@@ -538,16 +618,73 @@ class AICommitGenerator {
   }
 
   /**
+   * Display log analysis results
+   */
+  displayLogAnalysis(analysis) {
+    console.log(chalk.cyan('\n📈 Activity Analysis (Last 30 days):'));
+    
+    console.log(chalk.yellow('\n🔥 Usage Metrics:'));
+    console.log(`  Total Sessions: ${analysis.totalSessions}`);
+    console.log(`  AI Interactions: ${analysis.aiInteractions}`);
+    console.log(`  Successful Commits: ${analysis.successfulCommits}`);
+    console.log(`  Conflict Resolutions: ${analysis.conflictResolutions}`);
+    
+    console.log(chalk.yellow('\n🤖 Provider Usage:'));
+    Object.entries(analysis.providerUsage).forEach(([provider, count]) => {
+      console.log(`  ${provider}: ${count} (${Math.round(count / analysis.aiInteractions * 100)}%)`);
+    });
+    
+    if (analysis.averageResponseTime > 0) {
+      console.log(chalk.yellow('\n⚡ Performance:'));
+      console.log(`  Average Response Time: ${analysis.averageResponseTime}ms`);
+    }
+    
+    if (Object.keys(analysis.messagePatterns).length > 0) {
+      console.log(chalk.yellow('\n📝 Commit Patterns:'));
+      Object.entries(analysis.messagePatterns)
+        .sort(([,a], [,b]) => b - a)
+        .forEach(([type, count]) => {
+          const percentage = Math.round(count / analysis.successfulCommits * 100);
+          console.log(`  ${type}: ${count} (${percentage}%)`);
+        });
+    }
+    
+    if (Object.keys(analysis.commonErrors).length > 0) {
+      console.log(chalk.yellow('\n❌ Common Errors:'));
+      Object.entries(analysis.commonErrors)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .forEach(([error, count]) => {
+          console.log(`  ${error}: ${count}`);
+        });
+    }
+    
+    if (Object.keys(analysis.peakUsageHours).length > 0) {
+      console.log(chalk.yellow('\n🕐 Peak Usage Hours:'));
+      Object.entries(analysis.peakUsageHours)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 3)
+        .forEach(([hour, count]) => {
+          console.log(`  ${hour.toString().padStart(2, '0')}:00 - ${count} interactions`);
+        });
+    }
+    
+    console.log(chalk.dim('\n💡 Tip: Use --export to get detailed data for further analysis'));
+  }
+
+  /**
    * Resolve merge conflicts using AI with intelligent merging
    */
   async resolveConflictWithAI(conflictContext) {
     const spinner = ora('🤖 AI analyzing conflicts...').start();
+    const startTime = Date.now();
     
     try {
       // Try Ollama first, then fallback to Groq
       const providers = ['ollama', 'groq'];
       
       for (const providerName of providers) {
+        const providerStartTime = Date.now();
         try {
           const provider = AIProviderFactory.create(providerName);
           spinner.text = `🤖 Using ${providerName} to resolve conflicts...`;
@@ -566,6 +703,17 @@ class AICommitGenerator {
               conflictPrompt
             );
             spinner.succeed(`AI resolved conflicts using ${providerName}`);
+            
+            const responseTime = Date.now() - providerStartTime;
+            await this.activityLogger.logAIInteraction(
+              providerName, 
+              'conflict_resolution', 
+              conflictPrompt, 
+              resolvedContent, 
+              responseTime, 
+              true
+            );
+            
             return resolvedContent;
           } else {
             const resolutionOptions = {
@@ -578,27 +726,63 @@ class AICommitGenerator {
             };
             
             const resolutions = await provider.generateCommitMessages(conflictPrompt, resolutionOptions);
+            const responseTime = Date.now() - providerStartTime;
             
             if (resolutions && resolutions.length > 0) {
               // Extract actual resolved content from AI response
               const resolvedContent = this.extractResolvedContent(resolutions[0], conflictContext.conflictedContent);
               spinner.succeed(`AI resolved conflicts using ${providerName}`);
               await this.statsManager.recordCommit(providerName);
+              
+              await this.activityLogger.logAIInteraction(
+                providerName, 
+                'conflict_resolution', 
+                conflictPrompt, 
+                resolvedContent, 
+                responseTime, 
+                true
+              );
+              
               return resolvedContent;
+            } else {
+              await this.activityLogger.logAIInteraction(
+                providerName, 
+                'conflict_resolution', 
+                conflictPrompt, 
+                null, 
+                responseTime, 
+                false
+              );
             }
           }
         } catch (error) {
+          const responseTime = Date.now() - providerStartTime;
+          
           if (providerName === 'ollama') {
             spinner.text = `⚠️  ${providerName} failed, trying Groq as fallback: ${error.message}`;
           } else {
             spinner.fail(`⚠️  ${providerName} failed: ${error.message}`);
           }
+          
+          await this.activityLogger.logAIInteraction(
+            providerName, 
+            'conflict_resolution', 
+            this.buildConflictResolutionPrompt(conflictContext), 
+            null, 
+            responseTime, 
+            false
+          );
         }
       }
       
       throw new Error('All AI providers failed to resolve conflicts');
     } catch (error) {
       spinner.fail('AI conflict resolution failed');
+      await this.activityLogger.error('conflict_resolution_failed', {
+        error: error.message,
+        filePath: conflictContext.filePath,
+        duration: Date.now() - startTime,
+      });
       throw error;
     }
   }
