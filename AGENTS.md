@@ -78,8 +78,10 @@ No linting/formatting tools - removed per user request.
 ### Comprehensive Activity Logging
 
 - **Detailed Tracking**: Logs all AI interactions, git operations, and user choices
-- **Session Management**: Unique session IDs for tracking workflow sessions
+- **Full Prompt Logging**: Captures actual prompts sent to LLM (truncated at 10KB)
+- **Response Logging**: Records LLM responses (truncated at 2KB) for quality analysis
 - **Performance Metrics**: Response times, success rates, and error patterns
+- **Session Management**: Unique session IDs for tracking workflow sessions
 - **Data Retention**: Automatic log rotation and cleanup (30-day retention)
 - **Export & Analysis**: Built-in analysis tools and export capabilities (JSON/CSV)
 - **Usage Patterns**: Peak hours, provider usage, commit message patterns

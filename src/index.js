@@ -459,6 +459,15 @@ class AICommitGenerator {
   }
 
   /**
+   * Build prompt using base provider logic
+   */
+  buildPrompt(diff, options) {
+    const BaseProvider = require('./providers/base-provider');
+    const tempProvider = new BaseProvider();
+    return tempProvider.buildPrompt(diff, options);
+  }
+
+  /**
    * Generate commit messages with fallback from Ollama to Groq
    */
   async generateWithFallback(diff, options) {
@@ -499,10 +508,12 @@ class AICommitGenerator {
 
           const chunks = this.chunkDiff(diff, 3000);
           const chunkMessages = [];
+          let totalChunkTime = 0;
 
           for (let i = 0; i < chunks.length; i++) {
             const chunk = chunks[i];
             const isLastChunk = i === chunks.length - 1;
+            const chunkStartTime = Date.now();
 
             const chunkOptions = {
               ...enrichedOptions,
@@ -513,46 +524,67 @@ class AICommitGenerator {
             };
 
             const chunkResult = await provider.generateCommitMessages(chunk, chunkOptions);
+            totalChunkTime += Date.now() - chunkStartTime;
+            
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
             }
           }
 
+          const responseTime = totalChunkTime; // Use total time for all chunks
           messages = this.selectBestMessages(chunkMessages, generationOptions.count || 5);
+          
+          // Log AI interaction for chunking case
+          if (messages && messages.length > 0) {
+            await this.activityLogger.logAIInteraction(
+              providerName, 
+              'commit_generation', 
+              `CHUNKED_PROMPT (${chunks.length} chunks) - First chunk:\n${chunks[0].substring(0, 2000)}...`, 
+              messages.join('\n'), 
+              responseTime, 
+              true
+            );
+          }
         } else {
           const prompt = this.buildPrompt(diff, enrichedOptions);
           messages = await provider.generateCommitMessages(prompt, enrichedOptions);
-        }
-
-        const responseTime = Date.now() - providerStartTime;
-        
-        if (messages && messages.length > 0) {
-          await this.statsManager.recordCommit(providerName);
-          console.log(
-            chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
-          );
           
-          // Log AI interaction
-          await this.activityLogger.logAIInteraction(
-            providerName, 
-            'commit_generation', 
-            diff, 
-            messages.join('\n'), 
-            responseTime, 
-            true
-          );
+          const responseTime = Date.now() - providerStartTime;
           
-          // Log context usage for debugging
-          if (enrichedOptions.context.hasSemanticContext) {
+          if (messages && messages.length > 0) {
+            await this.statsManager.recordCommit(providerName);
             console.log(
-              chalk.blue(`🧠 Used semantic context for better analysis`)
+              chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
             );
+            
+            // Log AI interaction with actual prompt
+            await this.activityLogger.logAIInteraction(
+              providerName, 
+              'commit_generation', 
+              prompt, // Use actual prompt, not just diff
+              messages.join('\n'), 
+              responseTime, 
+              true
+            );
+            
+            // Log context usage for debugging
+            if (enrichedOptions.context.hasSemanticContext) {
+              console.log(
+                chalk.blue(`🧠 Used semantic context for better analysis`)
+              );
+            }
+            
+            return messages;
           }
           
-          return messages;
         }
       } catch (error) {
         const responseTime = Date.now() - providerStartTime;
+        
+        // Use actual prompt for logging failed attempts too
+        const prompt = estimatedTokens > 4000 ? 
+          `CHUNKED_PROMPT (${this.chunkDiff(diff, 3000).length} chunks)` : 
+          this.buildPrompt(diff, enrichedOptions);
         
         if (providerName === 'ollama') {
           console.warn(
@@ -568,7 +600,7 @@ class AICommitGenerator {
         await this.activityLogger.logAIInteraction(
           providerName, 
           'commit_generation', 
-          diff, 
+          prompt, // Use actual prompt even for failed attempts
           null, 
           responseTime, 
           false
@@ -578,7 +610,6 @@ class AICommitGenerator {
 
     throw new Error('All AI providers failed to generate commit messages');
   }
-
 
 
   /**

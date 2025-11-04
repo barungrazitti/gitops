@@ -223,6 +223,10 @@ class ActivityLogger {
       responseTime,
       success,
       timestamp: Date.now(),
+      // Log the actual prompt for analysis (truncated if too large)
+      prompt: prompt && prompt.length > 10000 ? prompt.substring(0, 10000) + '...[TRUNCATED]' : prompt,
+      // Log the actual response for quality analysis (truncated if too large)
+      response: response && response.length > 2000 ? response.substring(0, 2000) + '...[TRUNCATED]' : response,
     });
   }
 
