@@ -73,6 +73,45 @@ class GeminiProvider extends BaseProvider {
   }
 
   /**
+   * Generate AI response for general prompts
+   */
+  async generateResponse(prompt, options = {}) {
+    await this.initializeClient();
+    const config = await this.getConfig();
+
+    return await this.withRetry(async () => {
+      try {
+        const model = this.client.getGenerativeModel({
+          model: config.model || 'gemini-pro',
+        });
+
+        const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
+        const result = await model.generateContent({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: fullPrompt }],
+            },
+          ],
+          generationConfig: {
+            maxOutputTokens: options.maxTokens || 2000,
+            temperature: options.temperature || 0.3,
+          },
+        });
+
+        const content = result.response.text();
+        if (!content) {
+          throw new Error('No response content from Gemini');
+        }
+
+        return [content.trim()];
+      } catch (error) {
+        throw this.handleError(error, 'Gemini');
+      }
+    }, config.retries || 3);
+  }
+
+  /**
    * Validate Gemini configuration
    */
   async validate(config) {

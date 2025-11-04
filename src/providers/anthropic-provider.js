@@ -79,6 +79,45 @@ class AnthropicProvider extends BaseProvider {
   }
 
   /**
+   * Generate AI response for general prompts
+   */
+  async generateResponse(prompt, options = {}) {
+    await this.initializeClient();
+    const config = await this.getConfig();
+
+    // Auto-select best available model if not specified
+    if (!config.model) {
+      const bestModel = await this.getBestAvailableModel();
+      config.model = bestModel?.id || 'claude-3-haiku-20240307';
+    }
+
+    try {
+      const response = await this.withRetry(async () => {
+        return this.client.messages.create({
+          model: config.model,
+          max_tokens: options.maxTokens || 2000,
+          temperature: options.temperature || 0.3,
+          messages: [
+            {
+              role: 'user',
+              content: `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`,
+            },
+          ],
+        });
+      }, config.retries || 3);
+
+      const content = response.content[0]?.text;
+      if (!content) {
+        throw new Error('No response content from Anthropic');
+      }
+
+      return [content.trim()];
+    } catch (error) {
+      throw this.handleError(error, 'Anthropic');
+    }
+  }
+
+  /**
    * Validate Anthropic configuration
    */
   async validate(config) {

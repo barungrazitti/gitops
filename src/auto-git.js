@@ -8,11 +8,13 @@ const ora = require('ora');
 const inquirer = require('inquirer');
 const simpleGit = require('simple-git');
 const AICommitGenerator = require('./index.js');
+const LintManager = require('./core/lint-manager');
 
 class AutoGit {
   constructor() {
     this.git = simpleGit();
     this.aiCommit = new AICommitGenerator();
+    this.lintManager = new LintManager();
     this.spinner = null;
     // Configure git to prefer merge over rebase for safety
     this.git.raw(['config', 'pull.rebase', 'false']);
@@ -38,7 +40,41 @@ class AutoGit {
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
 
-      // Step 4: Run test validation if requested
+      // Step 4: Run linting if enabled (default: enabled with auto-fix and AI fallback)
+      if (options.lint !== false) {
+        // Default to auto-fix and AI fallback unless explicitly disabled
+        const autoFix = options.lintFix !== false;
+        const useAI = options.aiLint !== false;
+        const lintResults = await this.runLinting({
+          ...options,
+          autoFix,
+          useAI,
+          aiFallback: useAI,
+        });
+
+        if (!lintResults.success) {
+          console.log(
+            chalk.yellow(
+              'Linting failed with unfixable errors. Use --no-lint to skip or --ai-lint to enable AI fixes.'
+            )
+          );
+
+          const { continueAnyway } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'continueAnyway',
+              message: 'Continue with commit despite linting failures?',
+              default: false,
+            },
+          ]);
+
+          if (!continueAnyway) {
+            return;
+          }
+        }
+      }
+
+      // Step 5: Run test validation if requested
       if (options.testValidate) {
         const fixes = await this.runTestValidation(options);
         if (fixes === false && options.autoFix !== false) {
@@ -51,7 +87,7 @@ class AutoGit {
         }
       }
 
-      // Step 5: Generate or use provided commit message
+      // Step 6: Generate or use provided commit message
       let commitMessage;
       if (options.manualMessage) {
         commitMessage = options.manualMessage;
@@ -64,10 +100,10 @@ class AutoGit {
         }
       }
 
-      // Step 6: Commit changes
+      // Step 7: Commit changes
       await this.commitChanges(commitMessage, options);
 
-      // Step 6: Pull latest changes and handle conflicts (unless skipped)
+      // Step 7: Pull latest changes and handle conflicts (unless skipped)
       if (!options.skipPull) {
         try {
           await this.pullAndHandleConflicts();
@@ -90,7 +126,7 @@ class AutoGit {
         }
       }
 
-      // Step 7: Push changes (unless disabled)
+      // Step 8: Push changes (unless disabled)
       if (options.push !== false) {
         await this.pushChanges();
       }
@@ -1304,6 +1340,96 @@ Respond with only the resolved conflict content, no explanation:`;
     }
 
     return `   ${summary.join(', ')}`;
+  }
+
+  /**
+   * Run linting workflow
+   */
+  async runLinting(options = {}) {
+    try {
+      const {
+        autoFix = true,
+        projectType = null,
+        useAI = true,
+        aiFallback = true,
+      } = options;
+
+      // Get staged files
+      const status = await this.git.status();
+      const stagedFiles = [
+        ...status.created,
+        ...status.modified,
+        ...status.renamed.map((f) => f.to),
+      ];
+
+      if (stagedFiles.length === 0) {
+        console.log(chalk.yellow('⚠️  No staged files to lint'));
+        return {
+          success: true,
+          results: [],
+          summary: { total: 0, passed: 0, failed: 0, fixed: 0 },
+        };
+      }
+
+      // Get repository root for project detection
+      const repoRoot = await this.git.revparse(['--show-toplevel']);
+
+      // First try standard linting with auto-fix
+      const standardResults = await this.lintManager.lintFiles(stagedFiles, {
+        autoFix,
+        projectType,
+        repoRoot: repoRoot.trim(),
+      });
+
+      // If standard linting succeeded or AI fallback is disabled, return results
+      if (standardResults.success || !aiFallback) {
+        this.lintManager.printResults(standardResults);
+        return standardResults;
+      }
+
+      // Try AI fallback for unfixable errors
+      if (useAI) {
+        // Initialize AI provider if not already done
+        if (!this.lintManager.aiProvider) {
+          try {
+            const AIProviderFactory = require('./providers/ai-provider-factory');
+            const config = await this.aiCommit.configManager.load();
+            const providerName = config.defaultProvider || 'groq';
+            this.lintManager.aiProvider =
+              AIProviderFactory.create(providerName);
+          } catch (error) {
+            console.log(
+              chalk.yellow(
+                '   ⚠️  Could not initialize AI provider for linting fixes'
+              )
+            );
+            this.lintManager.printResults(standardResults);
+            return standardResults;
+          }
+        }
+        console.log(
+          chalk.blue('\n🤖 Standard linting failed, attempting AI fixes...')
+        );
+
+        const aiResults = await this.lintManager.lintFilesWithAI(stagedFiles, {
+          autoFix: false, // Don't double-fix
+          useAI: true,
+          projectType,
+          repoRoot: repoRoot.trim(),
+        });
+
+        // Print enhanced results
+        this.lintManager.printResults(aiResults);
+        return aiResults;
+      }
+
+      // Print standard results if AI is not available
+      this.lintManager.printResults(standardResults);
+      return standardResults;
+    } catch (error) {
+      console.error(chalk.red(`❌ Linting failed: ${error.message}`));
+      return { success: false, error: error.message };
+    }
   }
 
   /**

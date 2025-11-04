@@ -86,6 +86,52 @@ class OpenAIProvider extends BaseProvider {
   }
 
   /**
+   * Generate AI response for general prompts
+   */
+  async generateResponse(prompt, options = {}) {
+    await this.initializeClient();
+    const config = await this.getConfig();
+
+    // Auto-select best available model if not specified
+    if (!config.model) {
+      const models = await this.getAvailableModels();
+      const recommendedModel = models.find((m) => m.recommended) || models[0];
+      config.model = recommendedModel?.id || 'gpt-3.5-turbo';
+    }
+
+    try {
+      const response = await this.withRetry(async () => {
+        return this.client.chat.completions.create({
+          model: config.model,
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an expert software developer who helps fix code issues and improve code quality.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          max_tokens: options.maxTokens || 2000,
+          temperature: options.temperature || 0.3,
+          n: 1,
+        });
+      }, config.retries || 3);
+
+      const content = response.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error('No response content from OpenAI');
+      }
+
+      return [content.trim()];
+    } catch (error) {
+      throw this.handleError(error, 'OpenAI');
+    }
+  }
+
+  /**
    * Get available models (cached with dynamic fetching)
    */
   async getAvailableModels(forceRefresh = false) {

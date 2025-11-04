@@ -64,6 +64,35 @@ class CohereProvider extends BaseProvider {
   }
 
   /**
+   * Generate AI response for general prompts
+   */
+  async generateResponse(prompt, options = {}) {
+    await this.initializeClient();
+    const config = await this.getConfig();
+
+    return await this.withRetry(async () => {
+      try {
+        const response = await this.client.generate({
+          model: config.model || 'command',
+          prompt: `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`,
+          max_tokens: options.maxTokens || 2000,
+          temperature: options.temperature || 0.3,
+          stop_sequences: ['\n\n'],
+        });
+
+        const content = response.generations[0]?.text;
+        if (!content) {
+          throw new Error('No response content from Cohere');
+        }
+
+        return [content.trim()];
+      } catch (error) {
+        throw this.handleError(error, 'Cohere');
+      }
+    }, config.retries || 3);
+  }
+
+  /**
    * Validate Cohere configuration
    */
   async validate(config) {

@@ -20,6 +20,13 @@ class BaseProvider {
   }
 
   /**
+   * Generate AI response for general prompts - must be implemented by subclasses
+   */
+  async generateResponse(prompt, _options = {}) {
+    throw new Error('generateResponse must be implemented by subclass');
+  }
+
+  /**
    * Validate provider configuration
    */
   async validate(_config) {

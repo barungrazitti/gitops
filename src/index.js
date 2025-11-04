@@ -2,6 +2,7 @@
  * AI Commit Message Generator - Main Class
  */
 
+const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
 const inquirer = require('inquirer');
@@ -737,6 +738,132 @@ class AICommitGenerator {
     console.log(`Most used provider: ${stats.mostUsedProvider}`);
     console.log(`Average response time: ${stats.averageResponseTime}ms`);
     console.log(`Cache hit rate: ${stats.cacheHitRate}%`);
+  }
+
+  /**
+   * Lint staged files
+   */
+  async lint(options = {}) {
+    const spinner = ora('Initializing linting...').start();
+
+    try {
+      // Validate git repository
+      spinner.text = 'Checking git repository...';
+      await this.gitManager.validateRepository();
+
+      // Get files to lint - only staged files
+      const filesToLint = await this.gitManager.getStagedFiles();
+
+      // Filter files to exclude backup/temporary files and include only relevant source code files
+      const relevantExtensions = [
+        '.js',
+        '.jsx',
+        '.ts',
+        '.tsx',
+        '.json',
+        '.css',
+        '.scss',
+        '.sass',
+        '.less',
+        '.html',
+        '.php',
+        '.py',
+        '.java',
+        '.go',
+        '.rs',
+        '.vue',
+        '.svelte',
+      ];
+      const filteredFiles = filesToLint.filter((file) => {
+        const ext = path.extname(file).toLowerCase();
+        // Exclude backup files (files ending with .backup.* or containing backup patterns)
+        const isBackup =
+          file.includes('.backup.') ||
+          file.includes('backup') ||
+          file.endsWith('~');
+        return !isBackup && relevantExtensions.includes(ext);
+      });
+
+      if (!filteredFiles || filteredFiles.length === 0) {
+        spinner.fail('No relevant files to lint found.');
+        console.log(
+          chalk.yellow(
+            'No staged source code files found. Please stage your changes first.'
+          )
+        );
+        return;
+      }
+
+      console.log(
+        chalk.cyan(`\\n📝 Linting ${filteredFiles.length} relevant file(s):`)
+      );
+      filteredFiles.forEach((file) => console.log(chalk.gray(`  - ${file}`)));
+
+      // Run linting using the test validator
+      spinner.text = 'Running linting checks...';
+      const lintResults = await this.testValidator.runLinting(filteredFiles);
+
+      // Display results
+      spinner.stop();
+      console.log(chalk.cyan('\\n🔍 Linting Results:'));
+
+      if (lintResults.success) {
+        console.log(chalk.green('✅ All files passed linting!'));
+
+        if (lintResults.output) {
+          console.log(chalk.gray('Details:'));
+          console.log(lintResults.output);
+        }
+      } else {
+        console.log(chalk.red('❌ Linting failed:'));
+
+        // Show errors
+        if (lintResults.errors && lintResults.errors.length > 0) {
+          console.log(chalk.red(`Errors (${lintResults.errors.length}):`));
+          lintResults.errors.forEach((error) => {
+            console.log(chalk.red(`  ${error}`));
+          });
+        }
+
+        // Show warnings
+        if (lintResults.warnings && lintResults.warnings.length > 0) {
+          console.log(
+            chalk.yellow(`Warnings (${lintResults.warnings.length}):`)
+          );
+          lintResults.warnings.forEach((warning) => {
+            console.log(chalk.yellow(`  ${warning}`));
+          });
+        }
+
+        // Show output
+        if (lintResults.output) {
+          console.log(chalk.gray('\\nFull output:'));
+          console.log(lintResults.output);
+        }
+
+        // Apply auto-fixes if requested (and not disabled with --no-lint-fix)
+        if (
+          options.fix &&
+          !options['no-lint-fix'] &&
+          lintResults.fixableErrors &&
+          lintResults.fixableErrors.length > 0
+        ) {
+          console.log(chalk.blue('\\n🔧 Applying auto-fixes...'));
+          const fixes = await this.autoCorrector.fixLintingIssues(
+            lintResults.fixableErrors
+          );
+          console.log(
+            chalk.green(`✅ Applied fixes to ${fixes.length} issue(s)`)
+          );
+        }
+
+        // Exit with error code if there were linting issues
+        process.exit(1);
+      }
+    } catch (error) {
+      spinner.fail(`Linting failed: ${error.message}`);
+      throw error;
+    }
   }
 }
 
