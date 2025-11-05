@@ -61,14 +61,15 @@ class CacheManager {
         return cached.messages;
       }
 
+ // DISABLED: Semantic similarity matching causing context contamination
       // Try semantic similarity matching for near-instant hits
-      const similarKey = await this.findSimilarKey(diff);
-      if (similarKey) {
-        const similarCached = this.memoryCache.get(similarKey);
-        if (similarCached) {
-          return similarCached.messages;
-        }
-      }
+      // const similarKey = await this.findSimilarKey(diff);
+      // if (similarKey) {
+      //   const similarCached = this.memoryCache.get(similarKey);
+      //   if (similarCached) {
+      //     return similarCached.messages;
+      //   }
+      // }
 
       // Try persistent cache
       const cacheFile = path.join(this.cacheDir, `${key}.json`);
