@@ -19,7 +19,8 @@ class OllamaProvider extends BaseProvider {
     const config = await this.getConfig();
     const model = options.model || config.model || 'deepseek-v3.1:671b-cloud';
 
-    const prompt = this.buildPrompt(diff, options);
+    // Add context isolation to prevent hallucination
+    const isolatedPrompt = `IMPORTANT: Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
 
     return await this.withRetry(async () => {
       try {
@@ -27,10 +28,10 @@ class OllamaProvider extends BaseProvider {
           `${this.baseURL}/api/generate`,
           {
             model: model,
-            prompt: prompt,
+            prompt: isolatedPrompt,
             stream: false,
             options: {
-              temperature: config.temperature || 0.7,
+              temperature: config.temperature || 0.3,
               num_predict: config.maxTokens || 150,
             },
           },

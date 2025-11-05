@@ -57,8 +57,7 @@ class GroqProvider extends BaseProvider {
             messages: [
               {
                 role: 'system',
-                content:
-                  'You are an expert software developer who writes clear, concise commit messages.',
+                content: 'You are an expert software developer who writes clear, concise commit messages. IMPORTANT: Only analyze the provided diff, do not reference any previous commits or external context.',
               },
               {
                 role: 'user',
@@ -66,7 +65,7 @@ class GroqProvider extends BaseProvider {
               },
             ],
             max_tokens: config.maxTokens || 150,
-            temperature: config.temperature || 0.7,
+            temperature: config.temperature || 0.3,
           });
 
           const content = response.choices[0]?.message?.content;
@@ -129,8 +128,8 @@ class GroqProvider extends BaseProvider {
                 {
                   role: 'system',
                   content: isLastChunk
-                    ? 'You are an expert software developer who writes clear, concise commit messages. This is the final chunk of changes.'
-                    : 'You are an expert software developer who writes clear, concise commit messages. This is part of a larger diff.',
+                    ? 'You are an expert software developer who writes clear, concise commit messages. This is the final chunk of changes. IMPORTANT: Only analyze this chunk, do not reference any previous commits or external context.'
+                    : 'You are an expert software developer who writes clear, concise commit messages. This is part of a larger diff. IMPORTANT: Only analyze this chunk, do not reference any previous commits or external context.',
                 },
                 {
                   role: 'user',
@@ -138,7 +137,7 @@ class GroqProvider extends BaseProvider {
                 },
               ],
               max_tokens: (await this.getConfig()).maxTokens || 150,
-              temperature: (await this.getConfig()).temperature || 0.7,
+              temperature: (await this.getConfig()).temperature || 0.3,
             });
 
             const content = response.choices[0]?.message?.content;
@@ -210,8 +209,7 @@ class GroqProvider extends BaseProvider {
               messages: [
                 {
                   role: 'system',
-                  content:
-                    'You are an expert software developer who writes clear, concise commit messages.',
+                  content: 'You are an expert software developer who writes clear, concise commit messages. IMPORTANT: Only analyze the provided diff, do not reference any previous commits or external context.',
                 },
                 {
                   role: 'user',
@@ -219,7 +217,7 @@ class GroqProvider extends BaseProvider {
                 },
               ],
               max_tokens: config.maxTokens || 150,
-              temperature: config.temperature || 0.7,
+              temperature: config.temperature || 0.3,
             });
 
             const content = response.choices[0]?.message?.content;
