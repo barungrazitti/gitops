@@ -33,7 +33,7 @@ class ConfigManager {
       cache: true,
       cacheExpiry: 86400000, // 24 hours in milliseconds
       proxy: null,
-      timeout: 30000, // 30 seconds
+      timeout: 120000, // 2 minutes for large files
       retries: 3,
       customPrompts: {},
       excludeFiles: [

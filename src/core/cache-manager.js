@@ -49,6 +49,53 @@ class CacheManager {
   }
 
   /**
+   * Ultra-fast cache get with semantic similarity
+   */
+  async getUltraFast(diff) {
+    try {
+      const key = this.generateKey(diff);
+
+      // Try memory cache first (fastest)
+      let cached = this.memoryCache.get(key);
+      if (cached) {
+        return cached.messages;
+      }
+
+      // Try semantic similarity matching for near-instant hits
+      const similarKey = await this.findSimilarKey(diff);
+      if (similarKey) {
+        const similarCached = this.memoryCache.get(similarKey);
+        if (similarCached) {
+          return similarCached.messages;
+        }
+      }
+
+      // Try persistent cache
+      const cacheFile = path.join(this.cacheDir, `${key}.json`);
+      if (await fs.pathExists(cacheFile)) {
+        const cacheData = await fs.readJson(cacheFile);
+
+        // Check if cache is still valid
+        const now = Date.now();
+        if (now - cacheData.timestamp < 86400000) {
+          // 24 hours
+          // Add to memory cache for faster access
+          this.memoryCache.set(key, cacheData);
+          return cacheData.messages;
+        } else {
+          // Remove expired cache file
+          await fs.remove(cacheFile);
+        }
+      }
+
+      return null;
+    } catch (error) {
+      console.warn('Ultra-fast cache get error:', error.message);
+      return null;
+    }
+  }
+
+  /**
    * Get cached commit messages
    */
   async get(diff) {
@@ -96,6 +143,7 @@ class CacheManager {
         messages,
         timestamp: Date.now(),
         diff: this.truncateDiff(diff), // Store truncated diff for debugging
+        diffHash: this.quickHash(diff), // Quick hash for ultra-fast similarity
       };
 
       // Set in memory cache
@@ -217,6 +265,42 @@ class CacheManager {
       console.warn('Cache cleanup error:', error.message);
       return 0;
     }
+  }
+
+  /**
+   * Find similar key in memory cache for ultra-fast matching
+   */
+  async findSimilarKey(diff, threshold = 0.75) {
+    try {
+      const keys = this.memoryCache.keys();
+      const diffHash = this.quickHash(diff);
+      
+      for (const key of keys) {
+        const cached = this.memoryCache.get(key);
+        if (cached && cached.diffHash) {
+          // Quick hash comparison first
+          if (Math.abs(diffHash - cached.diffHash) < 100) {
+            return key;
+          }
+        }
+      }
+      
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
+   * Quick hash for fast similarity comparison
+   */
+  quickHash(text) {
+    let hash = 0;
+    const words = text.toLowerCase().split(/\s+/).slice(0, 50); // First 50 words
+    for (const word of words) {
+      hash += word.charCodeAt(0) * word.length;
+    }
+    return hash;
   }
 
   /**

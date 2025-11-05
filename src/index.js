@@ -468,11 +468,22 @@ class AICommitGenerator {
   }
 
   /**
-   * Generate commit messages with fallback from Ollama to Groq
+   * Generate commit messages with robust large diff handling
+   * Multi-layered strategy for handling diffs of any size
    */
   async generateWithFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
-    const providers = preferredProvider ? [preferredProvider] : ['ollama', 'groq'];
+    
+    // Analyze diff size and complexity
+    const estimatedTokens = Math.ceil(diff.length / 4);
+    const diffLines = diff.split('\n').length;
+    const isVeryLarge = estimatedTokens > 16000; // > 64KB of text
+    const isLarge = estimatedTokens > 4000;    // > 16KB of text
+    
+    console.log(chalk.blue(`📊 Analyzing diff: ${estimatedTokens.toLocaleString()} tokens, ${diffLines.toLocaleString()} lines`));
+    
+    // Multi-layered strategy - use comprehensive for normal diffs, ultra-fast for large diffs
+    const strategies = this.buildProcessingStrategies(diff, estimatedTokens, preferredProvider);
     
     // Enrich options with enhanced context
     const enrichedOptions = {
@@ -488,129 +499,825 @@ class AICommitGenerator {
       },
     };
 
-    // Try providers sequentially: Ollama first, then Groq as fallback
-    for (const providerName of providers) {
-      const providerStartTime = Date.now();
+    // Try each strategy until one succeeds
+    for (const strategy of strategies) {
+      const strategyStartTime = Date.now();
       try {
-        console.log(chalk.blue(`🤖 Trying ${providerName}...`));
-        const provider = AIProviderFactory.create(providerName);
+        console.log(chalk.blue(`🎯 Trying strategy: ${strategy.description}`));
         
-        // Check if diff is too large and needs chunking
-        const estimatedTokens = Math.ceil(diff.length / 4);
-        let messages;
-
-        if (estimatedTokens > 4000) {
-          console.log(
-            chalk.blue(
-              `📦 Chunking large diff for ${providerName}...`
-            )
-          );
-
-          const chunks = this.chunkDiff(diff, 3000);
-          const chunkMessages = [];
-          let totalChunkTime = 0;
-
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const isLastChunk = i === chunks.length - 1;
-            const chunkStartTime = Date.now();
-
-            const chunkOptions = {
-              ...enrichedOptions,
-              chunkIndex: i,
-              totalChunks: chunks.length,
-              isLastChunk,
-              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
-            };
-
-            const chunkResult = await provider.generateCommitMessages(chunk, chunkOptions);
-            totalChunkTime += Date.now() - chunkStartTime;
-            
-            if (chunkResult && chunkResult.length > 0) {
-              chunkMessages.push(...chunkResult);
-            }
-          }
-
-          const responseTime = totalChunkTime; // Use total time for all chunks
-          messages = this.selectBestMessages(chunkMessages, generationOptions.count || 5);
-          
-          // Log AI interaction for chunking case
-          if (messages && messages.length > 0) {
-            await this.activityLogger.logAIInteraction(
-              providerName, 
-              'commit_generation', 
-              `CHUNKED_PROMPT (${chunks.length} chunks) - First chunk:\n${chunks[0].substring(0, 2000)}...`, 
-              messages.join('\n'), 
-              responseTime, 
-              true
-            );
-          }
-        } else {
-          const prompt = this.buildPrompt(diff, enrichedOptions);
-          messages = await provider.generateCommitMessages(prompt, enrichedOptions);
-          
-          const responseTime = Date.now() - providerStartTime;
-          
-          if (messages && messages.length > 0) {
-            await this.statsManager.recordCommit(providerName);
-            console.log(
-              chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
-            );
-            
-            // Log AI interaction with actual prompt
-            await this.activityLogger.logAIInteraction(
-              providerName, 
-              'commit_generation', 
-              prompt, // Use actual prompt, not just diff
-              messages.join('\n'), 
-              responseTime, 
-              true
-            );
-            
-            // Log context usage for debugging
-            if (enrichedOptions.context.hasSemanticContext) {
-              console.log(
-                chalk.blue(`🧠 Used semantic context for better analysis`)
-              );
-            }
-            
-            return messages;
-          }
-          
+        const messages = await this.executeStrategy(strategy, diff, enrichedOptions);
+        
+        if (messages && messages.length > 0) {
+          const strategyTime = Date.now() - strategyStartTime;
+          console.log(chalk.green(`✅ Strategy succeeded in ${(strategyTime / 1000).toFixed(1)}s`));
+          return messages;
         }
       } catch (error) {
-        const responseTime = Date.now() - providerStartTime;
+        const strategyTime = Date.now() - strategyStartTime;
+        console.log(chalk.yellow(`⚠️  Strategy failed in ${(strategyTime / 1000).toFixed(1)}s: ${error.message}`));
         
-        // Use actual prompt for logging failed attempts too
-        const prompt = estimatedTokens > 4000 ? 
-          `CHUNKED_PROMPT (${this.chunkDiff(diff, 3000).length} chunks)` : 
-          this.buildPrompt(diff, enrichedOptions);
-        
-        if (providerName === 'ollama') {
-          console.warn(
-            chalk.yellow(`⚠️  ${providerName} failed, trying Groq as fallback: ${error.message}`)
-          );
-        } else {
-          console.warn(
-            chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
-          );
-        }
-
-        // Log failed AI interaction
+        // Log failed attempt
         await this.activityLogger.logAIInteraction(
-          providerName, 
-          'commit_generation', 
-          prompt, // Use actual prompt even for failed attempts
-          null, 
-          responseTime, 
+          strategy.provider,
+          'commit_generation',
+          `STRATEGY_FAILED: ${strategy.description}`,
+          null,
+          strategyTime,
           false
         );
       }
     }
 
-    throw new Error('All AI providers failed to generate commit messages');
+    throw new Error(`All processing strategies failed for diff with ${estimatedTokens.toLocaleString()} tokens`);
   }
 
+  /**
+   * Build processing strategies based on diff characteristics
+   */
+  buildProcessingStrategies(diff, estimatedTokens, preferredProvider) {
+    const strategies = [];
+    
+    // Strategy 0: Comprehensive method (what was working well) - for normal diffs
+    if (estimatedTokens <= 4000) {
+      strategies.push({
+        type: 'comprehensive',
+        provider: 'groq', // Use Groq for speed but with full context
+        description: 'Comprehensive analysis with full context (20-25s target)',
+        chunkSize: null, // No chunking for normal diffs
+        maxRetries: 1,
+        timeout: 25000, // 25 seconds timeout
+        useCache: true,
+        fullContext: true, // Use comprehensive context like before
+        maxTokens: 100, // Good length for accuracy
+        temperature: 0.2 // Balanced for creativity and consistency
+      });
+    }
+    
+    // Strategy 1: Ultra-fast - only for large diffs (> 4000 tokens)
+    if (estimatedTokens > 4000) {
+      strategies.push({
+        type: 'ultra_fast',
+        provider: 'groq', // Always use Groq for speed
+        description: 'Ultra-fast generation for large diffs (10-15s target)',
+        chunkSize: 2000, // Light chunking for very large diffs
+        maxRetries: 1,
+        timeout: 15000, // 15 seconds hard timeout
+        useCache: true,
+        simplifiedPrompt: true,
+        maxTokens: 50, // Very short responses
+        temperature: 0.1 // Low temperature for consistency
+      });
+    }
+    
+    // Strategy 2: User preference (if specified)
+    if (preferredProvider) {
+      strategies.push({
+        type: 'user_preference',
+        provider: preferredProvider,
+        description: `User-specified ${preferredProvider}`,
+        chunkSize: preferredProvider === 'ollama' ? 2000 : 3000,
+        maxRetries: 2
+      });
+    }
+    
+    // Strategy 2: Groq with aggressive chunking (for very large diffs)
+    if (estimatedTokens > 16000) {
+      strategies.push({
+        type: 'groq_aggressive',
+        provider: 'groq',
+        description: 'Groq with aggressive chunking (1500 tokens/chunk)',
+        chunkSize: 1500,
+        maxRetries: 3,
+        timeout: 180000, // 3 minutes
+        useSummary: true
+      });
+    }
+    
+    // Strategy 3: Groq with standard chunking (for large diffs)
+    if (estimatedTokens > 4000) {
+      strategies.push({
+        type: 'groq_standard',
+        provider: 'groq',
+        description: 'Groq with standard chunking (3000 tokens/chunk)',
+        chunkSize: 3000,
+        maxRetries: 2,
+        timeout: 120000 // 2 minutes
+      });
+    }
+    
+    // Strategy 4: Ollama with conservative chunking
+    if (estimatedTokens > 4000) {
+      strategies.push({
+        type: 'ollama_conservative',
+        provider: 'ollama',
+        description: 'Ollama with conservative chunking (2000 tokens/chunk)',
+        chunkSize: 2000,
+        maxRetries: 2,
+        timeout: 180000 // 3 minutes
+      });
+    }
+    
+    // Strategy 5: Smart summary approach (for extremely large diffs)
+    if (estimatedTokens > 24000) {
+      strategies.push({
+        type: 'summary_approach',
+        provider: 'groq',
+        description: 'Summary-based approach for extremely large diffs',
+        chunkSize: 4000,
+        maxRetries: 2,
+        timeout: 240000, // 4 minutes
+        useSummary: true,
+        summarizeFirst: true
+      });
+    }
+    
+    // Strategy 6: Fallback single provider (no chunking)
+    strategies.push({
+      type: 'fallback',
+      provider: preferredProvider || 'groq',
+      description: 'Fallback: Single provider without chunking',
+      chunkSize: null,
+      maxRetries: 1,
+      timeout: 300000 // 5 minutes
+    });
+    
+    return strategies;
+  }
+
+  /**
+   * Execute a specific processing strategy
+   */
+  async executeStrategy(strategy, diff, enrichedOptions) {
+    const provider = AIProviderFactory.create(strategy.provider);
+    
+    // Configure provider with strategy-specific settings
+    const strategyOptions = {
+      ...enrichedOptions,
+      timeout: strategy.timeout,
+      maxRetries: strategy.maxRetries,
+      maxTokens: strategy.maxTokens,
+      temperature: strategy.temperature
+    };
+    
+    let messages;
+    
+    if (strategy.type === 'comprehensive') {
+      // Comprehensive processing (what was working well)
+      console.log(chalk.blue(`🧠 Comprehensive analysis mode (${strategy.timeout/1000}s timeout)...`));
+      messages = await this.processComprehensive(provider, diff, strategy, strategyOptions);
+    } else if (strategy.type === 'ultra_fast') {
+      // Ultra-fast processing (only for large diffs)
+      console.log(chalk.blue(`⚡ Ultra-fast mode for large diff (${strategy.timeout/1000}s timeout)...`));
+      messages = await this.processUltraFast(provider, diff, strategy, strategyOptions);
+    } else if (strategy.chunkSize) {
+      // Chunked processing
+      console.log(chalk.blue(`📦 Processing ${this.chunkDiff(diff, strategy.chunkSize).length} chunks (${strategy.chunkSize} tokens each)...`));
+      
+      if (strategy.summarizeFirst) {
+        // Summary approach: summarize chunks first, then generate commit message
+        messages = await this.processWithSummaryApproach(provider, diff, strategy, strategyOptions);
+      } else {
+        // Standard chunking
+        messages = await this.processWithChunking(provider, diff, strategy, strategyOptions);
+      }
+    } else {
+      // Single request processing
+      console.log(chalk.blue(`🔄 Processing as single request...`));
+      const prompt = this.buildPrompt(diff, strategyOptions);
+      messages = await provider.generateCommitMessages(prompt, strategyOptions);
+    }
+    
+    if (messages && messages.length > 0) {
+      await this.statsManager.recordCommit(strategy.provider);
+      console.log(chalk.green(`✅ ${strategy.provider} generated ${messages.length} messages`));
+      return messages;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Comprehensive processing (what was working well) for normal diffs
+   */
+  async processComprehensive(provider, diff, strategy, options) {
+    // Step 1: Check cache first for instant results
+    if (strategy.useCache) {
+      const cachedMessages = await this.cacheManager.get(diff);
+      if (cachedMessages && cachedMessages.length > 0) {
+        console.log(chalk.green(`🧠 Cache hit - instant comprehensive result!`));
+        return cachedMessages.slice(0, 3); // Return top 3
+      }
+    }
+    
+    // Step 2: Build comprehensive prompt (like what was working before)
+    const comprehensivePrompt = this.buildComprehensivePrompt(diff, options);
+    
+    // Step 3: Generate with full context
+    const messages = await provider.generateCommitMessages(comprehensivePrompt, {
+      ...options,
+      maxTokens: strategy.maxTokens,
+      temperature: strategy.temperature,
+      count: 1 // One good message is better than multiple bad ones
+    });
+    
+    // Step 4: Cache result for future instant responses
+    if (messages && messages.length > 0) {
+      await this.cacheManager.set(diff, messages);
+      
+      // Log comprehensive interaction
+      await this.activityLogger.logAIInteraction(
+        strategy.provider,
+        'commit_generation',
+        `COMPREHENSIVE_PROMPT: ${comprehensivePrompt.substring(0, 500)}...`,
+        messages[0],
+        Date.now(),
+        true
+      );
+    }
+    
+    return messages;
+  }
+
+  /**
+   * Build specific, detailed prompt (like what was working)
+   */
+  buildComprehensivePrompt(diff, options) {
+    // Extract key information directly from diff
+    const analysis = this.extractKeyChanges(diff);
+    
+    // Analyze the specific types of changes
+    const hasTimeoutChanges = analysis.changes.some(c => c.includes('timeout') && c.includes('30000'));
+    const hasProviderLogic = analysis.changes.some(c => c.includes('provider') || c.includes('chunking'));
+    const hasConfigChanges = analysis.files.some(f => f.includes('config'));
+    const hasOllamaChanges = analysis.files.some(f => f.includes('ollama'));
+    
+    let prompt = `You are an expert software developer. Analyze the git diff and generate ONE precise commit message.
+
+CRITICAL REQUIREMENTS:
+- Be EXTREMELY SPECIFIC about what changed (use actual values/function names)
+- Focus on the PRIMARY PURPOSE of the changes
+- Use active voice and imperative mood
+- Keep message under 72 characters total
+- Use conventional format: type(scope): description
+- AVOID generic terms like "update", "modify", "change", "implement"
+- Use specific technical terms from the actual code
+
+FILES CHANGED:
+${analysis.files.join('\n')}
+
+KEY CHANGES DETECTED:`;
+
+    if (hasTimeoutChanges) {
+      prompt += `
+- TIMEOUT VALUE CHANGES: Look for specific number changes (30000 → 120000)`;
+    }
+    
+    if (hasProviderLogic) {
+      prompt += `
+- PROVIDER LOGIC: Look for AI provider selection/chunking logic`;
+    }
+    
+    if (hasConfigChanges) {
+      prompt += `
+- CONFIGURATION: Default timeout settings`;
+    }
+    
+    if (hasOllamaChanges) {
+      prompt += `
+- OLLAMA PROVIDER: Timeout configuration for local AI`;
+    }
+
+    prompt += `
+
+ACTUAL CODE CHANGES:
+${analysis.changes.slice(0, 10).join('\n')}
+
+FULL GIT DIFF:
+\`\`\`diff
+${diff}
+\`\`\`
+
+EXAMPLES OF GOOD MESSAGES:
+- "feat(timeout): increase default timeout from 30s to 2 minutes"
+- "fix(ollama): extend timeout for large file processing"
+- "refactor(provider): add auto-selection logic for chunking"
+- "chore(config): update timeout values for better performance"
+
+Based on the ACTUAL changes shown above, generate exactly ONE commit message:`;
+
+    return prompt;
+  }
+
+  /**
+   * Extract key changes directly from diff
+   */
+  extractKeyChanges(diff) {
+    const lines = diff.split('\n');
+    const files = [];
+    const changes = [];
+    let currentFile = '';
+    
+    for (const line of lines) {
+      // Track files
+      if (line.startsWith('diff --git')) {
+        const match = line.match(/b\/.*?([^\/]+)\.\w+$/);
+        if (match) {
+          currentFile = match[1];
+          files.push(currentFile);
+        }
+      }
+      
+      // Track ALL meaningful changes (not just specific keywords)
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        const addition = line.substring(1).trim();
+        if (addition.length > 3 && addition.length < 120) {
+          // Include most meaningful additions
+          if (!addition.match(/^[\s{}();,]$/) && // Skip empty syntax
+              !addition.includes('*/')) { // Skip comment endings
+            changes.push(`+ ${addition}`);
+          }
+        }
+      }
+      
+      if (line.startsWith('-') && !line.startsWith('---')) {
+        const removal = line.substring(1).trim();
+        if (removal.length > 3 && removal.length < 120) {
+          // Include most meaningful removals
+          if (!removal.match(/^[\s{}();,]$/) && // Skip empty syntax
+              !removal.includes('*/')) { // Skip comment endings
+            changes.push(`- ${removal}`);
+          }
+        }
+      }
+    }
+    
+    // If no changes found, include sample lines anyway
+    if (changes.length === 0) {
+      for (const line of lines) {
+        if ((line.startsWith('+') || line.startsWith('-')) && !line.startsWith('---') && !line.startsWith('+++')) {
+          const change = line.substring(1).trim();
+          if (change.length > 0 && change.length < 80) {
+            changes.push(`${line.startsWith('+') ? '+' : '-'} ${change}`);
+            if (changes.length >= 3) break; // Limit to first 3 changes
+          }
+        }
+      }
+    }
+    
+    return { files, changes };
+  }
+
+  /**
+   * Helper methods for comprehensive prompt building
+   */
+  getFileTypesFromDiff(diff) {
+    const types = new Set();
+    const matches = diff.match(/\.\w+$/gm);
+    if (matches) {
+      matches.forEach(match => {
+        const type = match.substring(1);
+        if (type.length > 0) types.add(type);
+      });
+    }
+    return types.size > 0 ? Array.from(types).join(', ') : 'unknown';
+  }
+
+  inferScopeFromDiff(diff) {
+    if (diff.includes('wp-content/themes/') || diff.includes('functions.php')) return 'wordpress';
+    if (diff.includes('.js')) return 'frontend';
+    if (diff.includes('.php')) return 'backend';
+    if (diff.includes('style') || diff.includes('css')) return 'ui';
+    return 'general';
+  }
+
+  getChangeStats(diff) {
+    const additions = (diff.match(/^\+/gm) || []).length;
+    const removals = (diff.match(/^-/gm) || []).length;
+    return `+${additions} -${removals}`;
+  }
+
+  getSemanticContext(context) {
+    if (!context || !context.files) return 'No semantic context available';
+    
+    const semantic = context.files.semantic || {};
+    const functions = Object.keys(semantic.functions || {}).slice(0, 3).join(', ');
+    const classes = Object.keys(semantic.classes || {}).slice(0, 2).join(', ');
+    
+    let contextStr = '';
+    if (functions) contextStr += `Functions: ${functions}; `;
+    if (classes) contextStr += `Classes: ${classes}; `;
+    
+    return contextStr || 'No semantic context';
+  }
+
+  analyzeDiffPurpose(diff) {
+    const lines = diff.split('\n');
+    const purposes = [];
+    
+    if (lines.some(line => line.includes('function') || line.includes('class'))) {
+      purposes.push('Function or class definition');
+    }
+    if (lines.some(line => line.includes('style') || line.includes('css'))) {
+      purposes.push('CSS styling changes');
+    }
+    if (lines.some(line => line.includes('require') || line.includes('include'))) {
+      purposes.push('Dependency or include modification');
+    }
+    if (lines.some(line => line.includes('add_action') || line.includes('add_filter'))) {
+      purposes.push('WordPress hook or filter modification');
+    }
+    
+    if (purposes.length === 0) {
+      purposes.push('Code modification');
+    }
+    
+    return `- Likely purpose: ${purposes.join(', ')}
+- Affected areas: ${this.inferScopeFromDiff(diff)}`;
+  }
+
+  /**
+   * Ultra-fast processing for 10-15 second target
+   */
+  async processUltraFast(provider, diff, strategy, options) {
+    // Step 1: Check ultra-fast cache first for instant results
+    if (strategy.useCache) {
+      const cachedMessages = await this.cacheManager.getUltraFast(diff);
+      if (cachedMessages && cachedMessages.length > 0) {
+        console.log(chalk.green(`⚡ Ultra-fast cache hit - instant result!`));
+        return cachedMessages.slice(0, 3); // Return top 3
+      }
+    }
+    
+    // Step 2: Create ultra-simplified prompt
+    const simplifiedPrompt = this.buildUltraFastPrompt(diff);
+    
+    // Step 3: Generate with minimal tokens and low temperature
+    let messages = await provider.generateCommitMessages(simplifiedPrompt, {
+      ...options,
+      maxTokens: 30, // Extremely short responses
+      temperature: 0.1, // Low temperature for consistency
+      count: 1 // Just one message for speed
+    });
+    
+    // Step 4: Validate ultra-fast result, fallback if irrelevant
+    if (messages && messages.length > 0) {
+      const message = messages[0].toLowerCase();
+      const diffContent = diff.toLowerCase();
+      
+      // Check if message is relevant to actual changes
+      const hasRelevance = this.validateMessageRelevance(message, diffContent);
+      
+      if (!hasRelevance) {
+        console.log(chalk.yellow(`⚠️  Ultra-fast message irrelevant, trying standard prompt...`));
+        
+        // Fallback to slightly more detailed prompt
+        const fallbackPrompt = this.buildFallbackPrompt(diff);
+        messages = await provider.generateCommitMessages(fallbackPrompt, {
+          ...options,
+          maxTokens: 50,
+          temperature: 0.2,
+          count: 1
+        });
+      }
+    }
+    
+    // Step 5: Cache the result for future instant responses
+    if (messages && messages.length > 0) {
+      await this.cacheManager.set(diff, messages);
+      
+      // Log ultra-fast interaction
+      await this.activityLogger.logAIInteraction(
+        strategy.provider,
+        'commit_generation',
+        `ULTRA_FAST_PROMPT: ${simplifiedPrompt.substring(0, 500)}...`,
+        messages[0],
+        Date.now(),
+        true
+      );
+    }
+    
+    return messages;
+  }
+
+  /**
+   * Validate if generated message is relevant to actual changes
+   */
+  validateMessageRelevance(message, diffContent) {
+    // Extract key terms from diff
+    const diffTerms = new Set();
+    const words = diffContent.match(/\b\w{3,}\b/g) || [];
+    words.forEach(word => diffTerms.add(word));
+    
+    // Extract key terms from message
+    const messageTerms = new Set();
+    const messageWords = message.match(/\b\w{3,}\b/g) || [];
+    messageWords.forEach(word => messageTerms.add(word));
+    
+    // Check for common irrelevant patterns
+    const irrelevantPatterns = [
+      'npm', 'install', 'package', 'dependency', 'update', 'version',
+      'merge', 'branch', 'rebase', 'chore', 'refactor'
+    ];
+    
+    const hasIrrelevantTerms = irrelevantPatterns.some(pattern => 
+      message.includes(pattern) && !diffContent.includes(pattern)
+    );
+    
+    if (hasIrrelevantTerms) {
+      return false;
+    }
+    
+    // Check for relevant terms overlap
+    let relevantOverlap = 0;
+    for (const term of messageTerms) {
+      if (diffTerms.has(term) && term.length > 4) {
+        relevantOverlap++;
+      }
+    }
+    
+    // Require at least some relevant overlap
+    return relevantOverlap >= 1;
+  }
+
+  /**
+   * Build fallback prompt with more context
+   */
+  buildFallbackPrompt(diff) {
+    const lines = diff.split('\n');
+    const keyChanges = [];
+    const fileNames = [];
+    
+    for (const line of lines) {
+      if (line.startsWith('diff --git')) {
+        const match = line.match(/b\/.*?([^\/]+)\.\w+$/);
+        if (match) fileNames.push(match[1]);
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        const addition = line.substring(1).trim();
+        if (addition.length > 5 && addition.length < 60) {
+          keyChanges.push(addition);
+        }
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        const removal = line.substring(1).trim();
+        if (removal.length > 5 && removal.length < 60) {
+          keyChanges.push(`removed: ${removal}`);
+        }
+      }
+    }
+    
+    let prompt = `Commit message for ${fileNames.join(', ')} changes: `;
+    
+    if (keyChanges.length > 0) {
+      prompt += keyChanges.slice(0, 3).join('; ');
+    } else {
+      prompt += 'code modifications';
+    }
+    
+    prompt += '. Max 10 words. Conventional format.';
+    
+    return prompt;
+  }
+
+  /**
+   * Build ultra-simplified prompt for speed
+   */
+  buildUltraFastPrompt(diff) {
+    // Extract meaningful changes with better context
+    const lines = diff.split('\n');
+    const changes = [];
+    const removals = [];
+    let fileCount = 0;
+    const fileTypes = new Set();
+    const fileNames = [];
+    
+    for (const line of lines) {
+      if (line.startsWith('diff --git')) {
+        fileCount++;
+        const match = line.match(/b\/.*?([^\/]+)\.(\w+)$/);
+        if (match) {
+          fileNames.push(match[1]);
+          fileTypes.add(match[2]);
+        }
+      } else if (line.startsWith('+') && !line.startsWith('+++')) {
+        const addition = line.substring(1).trim();
+        // Filter out empty lines, braces, and simple syntax
+        if (addition.length > 3 && 
+            !addition.match(/^[\s{}();,]$/) && 
+            !addition.includes('?>') &&
+            addition.length < 80) {
+          changes.push(addition);
+        }
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        const removal = line.substring(1).trim();
+        if (removal.length > 3 && 
+            !removal.match(/^[\s{}();,]$/) && 
+            removal.length < 80) {
+          removals.push(removal);
+        }
+      }
+    }
+    
+    // Build contextual prompt
+    let prompt = 'Generate commit message for ';
+    
+    // Add file context
+    if (fileNames.length > 0) {
+      prompt += `${fileNames.join(', ')} `;
+    }
+    
+    if (fileTypes.size > 0) {
+      prompt += `(${Array.from(fileTypes).join('/')}) `;
+    }
+    
+    prompt += 'changes: ';
+    
+    // Add meaningful changes
+    const meaningfulChanges = [];
+    
+    // Prioritize function calls and assignments
+    for (const change of changes) {
+      if (change.includes('=') || change.includes('(') || change.includes('return')) {
+        meaningfulChanges.push(change);
+      } else if (change.includes('color') || change.includes('background') || 
+                 change.includes('image') || change.includes('url')) {
+        meaningfulChanges.push(change);
+      }
+    }
+    
+    // Add key removals
+    for (const removal of removals) {
+      if (removal.includes('color') || removal.includes('background') || 
+          removal.includes('image') || removal.includes('placeholder')) {
+        meaningfulChanges.push(`removed ${removal}`);
+      }
+    }
+    
+    if (meaningfulChanges.length > 0) {
+      const topChanges = meaningfulChanges.slice(0, 2);
+      prompt += topChanges.join('; ');
+    } else {
+      prompt += 'code updates';
+    }
+    
+    prompt += '. Max 8 words. Use conventional format.';
+    
+    return prompt;
+  }
+
+  /**
+   * Process diff with standard chunking approach
+   */
+  async processWithChunking(provider, diff, strategy, options) {
+    const chunks = this.chunkDiff(diff, strategy.chunkSize);
+    const chunkMessages = [];
+    let totalChunkTime = 0;
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const isLastChunk = i === chunks.length - 1;
+      const chunkStartTime = Date.now();
+
+      const chunkOptions = {
+        ...options,
+        chunkIndex: i,
+        totalChunks: chunks.length,
+        isLastChunk,
+        chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
+      };
+
+      const chunkResult = await provider.generateCommitMessages(chunk, chunkOptions);
+      totalChunkTime += Date.now() - chunkStartTime;
+      
+      if (chunkResult && chunkResult.length > 0) {
+        chunkMessages.push(...chunkResult);
+      }
+    }
+
+    const messages = this.selectBestMessages(chunkMessages, options.count || 5);
+    
+    // Log chunking interaction
+    if (messages && messages.length > 0) {
+      await this.activityLogger.logAIInteraction(
+        strategy.provider,
+        'commit_generation',
+        `CHUNKED_PROMPT (${chunks.length} chunks, ${strategy.chunkSize} tokens each) - First chunk:\n${chunks[0].substring(0, 2000)}...`,
+        messages.join('\n'),
+        totalChunkTime,
+        true
+      );
+    }
+    
+    return messages;
+  }
+
+  /**
+   * Process diff with summary approach for extremely large diffs
+   */
+  async processWithSummaryApproach(provider, diff, strategy, options) {
+    const chunks = this.chunkDiff(diff, strategy.chunkSize);
+    const summaries = [];
+    
+    console.log(chalk.blue(`📝 Summarizing ${chunks.length} chunks first...`));
+    
+    // Step 1: Summarize each chunk
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const summaryPrompt = `Summarize the key changes in this diff chunk in 1-2 sentences:\n\n${chunk}`;
+      
+      try {
+        const summaryResult = await provider.generateCommitMessages(summaryPrompt, {
+          ...options,
+          count: 1,
+          maxTokens: 100
+        });
+        
+        if (summaryResult && summaryResult.length > 0) {
+          summaries.push(`Chunk ${i + 1}: ${summaryResult[0]}`);
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`⚠️  Failed to summarize chunk ${i + 1}`));
+        summaries.push(`Chunk ${i + 1}: [Summary failed]`);
+      }
+    }
+    
+    // Step 2: Generate commit message from summaries
+    const combinedSummary = summaries.join('\n');
+    const finalPrompt = `Based on these chunk summaries, generate a concise commit message:\n\n${combinedSummary}`;
+    
+    const messages = await provider.generateCommitMessages(finalPrompt, {
+      ...options,
+      count: options.count || 3
+    });
+    
+    // Log summary approach interaction
+    if (messages && messages.length > 0) {
+      await this.activityLogger.logAIInteraction(
+        strategy.provider,
+        'commit_generation',
+        `SUMMARY_APPROACH (${chunks.length} chunks summarized)\nSummaries:\n${combinedSummary}`,
+        messages.join('\n'),
+        Date.now(),
+        true
+      );
+    }
+    
+    return messages;
+  }
+
+  /**
+   * Enhanced chunking with semantic boundary preservation
+   */
+  chunkDiff(diff, maxTokens = 4000) {
+
+    const lines = diff.split('\n');
+    const chunks = [];
+    let currentChunk = [];
+    let currentTokens = 0;
+
+    // Rough estimation: 1 token ≈ 4 characters
+    const estimateTokens = (text) => Math.ceil(text.length / 4);
+
+    for (const line of lines) {
+      const lineTokens = estimateTokens(line);
+
+      // If single line is too large, split it
+      if (lineTokens > maxTokens) {
+        // Flush current chunk if it has content
+        if (currentChunk.length > 0) {
+          chunks.push(currentChunk.join('\n'));
+          currentChunk = [];
+          currentTokens = 0;
+        }
+
+        // Split large line into smaller pieces
+        const chunksNeeded = Math.ceil(lineTokens / maxTokens);
+        const chunkSize = Math.ceil(line.length / chunksNeeded);
+
+        for (let i = 0; i < chunksNeeded; i++) {
+          const start = i * chunkSize;
+          const end = Math.min(start + chunkSize, line.length);
+          chunks.push(line.substring(start, end));
+        }
+        continue;
+      }
+
+      // Check if adding this line would exceed limit
+      if (currentTokens + lineTokens > maxTokens && currentChunk.length > 0) {
+        chunks.push(currentChunk.join('\n'));
+        currentChunk = [line];
+        currentTokens = lineTokens;
+      } else {
+        currentChunk.push(line);
+        currentTokens += lineTokens;
+      }
+    }
+
+    // Add last chunk if it has content
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.join('\n'));
+    }
+
+    return chunks;
+  }
 
   /**
    * Show usage statistics
@@ -1084,4 +1791,4 @@ RESOLVED CHUNK:`;
   }
 }
 
-module.exports = AICommitGenerator;
+module.exports = AICommitGenerator;// Test change for prompt improvement

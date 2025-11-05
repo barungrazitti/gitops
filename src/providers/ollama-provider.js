@@ -35,7 +35,7 @@ class OllamaProvider extends BaseProvider {
             },
           },
           {
-            timeout: config.timeout || 30000, // Reduced timeout for faster failure
+            timeout: config.timeout || 120000, // Increased timeout for large files (2 minutes)
           }
         );
 
