@@ -1792,3 +1792,4 @@ RESOLVED CHUNK:`;
 }
 
 module.exports = AICommitGenerator;// Test change for prompt improvement
+// Fix timeout handling to prevent null errors
