@@ -6,3 +6,6 @@ export const formatDate = (date) => {
     day: 'numeric',
   }).format(date);
 };
+// Adding new utility function for date formatting
+
+export function formatDate(date) { return date.toISOString().split('T')[0]; }

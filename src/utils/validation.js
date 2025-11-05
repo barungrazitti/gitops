@@ -8,3 +8,4 @@ export const validatePhone = (phone) => {
   const phoneRegex = /^\+?[\d\s-()]+$/;
   return phoneRegex.test(phone);
 };
+export function isValidEmail(email) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email); }

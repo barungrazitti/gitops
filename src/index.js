@@ -546,7 +546,7 @@ class AICommitGenerator {
         chunkSize: null, // No chunking for normal diffs
         maxRetries: 1,
         timeout: 25000, // 25 seconds timeout
-        useCache: true,
+        useCache: false,
         fullContext: true, // Use comprehensive context like before
         maxTokens: 100, // Good length for accuracy
         temperature: 0.2 // Balanced for creativity and consistency
@@ -562,7 +562,7 @@ class AICommitGenerator {
         chunkSize: 2000, // Light chunking for very large diffs
         maxRetries: 1,
         timeout: 15000, // 15 seconds hard timeout
-        useCache: true,
+        useCache: false,
         simplifiedPrompt: true,
         maxTokens: 50, // Very short responses
         temperature: 0.1 // Low temperature for consistency
@@ -700,14 +700,15 @@ class AICommitGenerator {
    * Comprehensive processing (what was working well) for normal diffs
    */
   async processComprehensive(provider, diff, strategy, options) {
+    // DISABLED: Cache check to debug hallucination issue
     // Step 1: Check cache first for instant results
-    if (strategy.useCache) {
-      const cachedMessages = await this.cacheManager.get(diff);
-      if (cachedMessages && cachedMessages.length > 0) {
-        console.log(chalk.green(`🧠 Cache hit - instant comprehensive result!`));
-        return cachedMessages.slice(0, 3); // Return top 3
-      }
-    }
+    // if (strategy.useCache) {
+    //   const cachedMessages = await this.cacheManager.get(diff);
+    //   if (cachedMessages && cachedMessages.length > 0) {
+    //     console.log(chalk.green(`🧠 Cache hit - instant comprehensive result!`));
+    //     return cachedMessages.slice(0, 3); // Return top 3
+    //   }
+    // }
     
     // Step 2: Build comprehensive prompt (like what was working before)
     const comprehensivePrompt = this.buildComprehensivePrompt(diff, options);
