@@ -28,6 +28,20 @@ class AutoGit {
     console.log(chalk.cyan('Auto Git Workflow Starting...\n'));
     const startTime = Date.now();
 
+    // Handle dry-run mode
+    if (options.dryRun) {
+      console.log(chalk.yellow('🔍 Dry run mode - showing what would be done:\n'));
+      console.log(chalk.blue('1. Check git repository'));
+      console.log(chalk.blue('2. Stage all changes'));
+      console.log(chalk.blue('3. Generate AI commit message (or use provided)'));
+      console.log(chalk.blue('4. Commit changes'));
+      console.log(chalk.blue('5. Pull latest changes'));
+      console.log(chalk.blue('6. Auto-resolve conflicts if possible'));
+      console.log(chalk.blue('7. Push changes'));
+      console.log();
+      return;
+    }
+
     try {
       await this.activityLogger.info('auto_git_started', { options });
 
@@ -185,16 +199,21 @@ class AutoGit {
       // Get repository context for better AI generation
       const context = await this.aiCommit.analysisEngine.analyzeRepository();
 
-      // Use the AI commit generator with Ollama-first fallback
-      const messages = await this.aiCommit.generateWithFallback(
-        await this.git.diff(['--staged']),
-        {
-          count: 1, // Only need one message for auto-commit
-          conventional: true,
-          provider: options.provider,
-          context: context, // Add proper context
-        }
-      );
+      // Get the staged diff
+      const diff = await this.git.diff(['--staged']);
+
+      if (!diff || diff.trim().length === 0) {
+        this.spinner.fail('No staged changes found for commit message generation');
+        throw new Error('No staged changes available');
+      }
+
+      // Use the main AI commit generator with intelligent merging
+      const messages = await this.aiCommit.generateWithIntelligentMerging(diff, {
+        context,
+        count: 1, // Only need one message for auto-commit
+        conventional: true,
+        provider: options.provider,
+      });
 
       this.spinner.succeed('AI commit message generated');
       return messages[0]; // Return the best message

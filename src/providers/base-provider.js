@@ -34,19 +34,10 @@ class BaseProvider {
   }
 
   /**
-   * Preprocess diff to make it more AI-friendly while preserving context
+   * Preprocess diff to make it more AI-friendly while preserving full context
    */
   preprocessDiff(diff) {
-    // Check if diff is too large to process efficiently
-    if (diff.length > 500000) {
-      // 500KB limit
-      return (
-        diff.substring(0, 10000) +
-        '\n... (diff too large, truncated for processing)'
-      );
-    }
-
-    // Remove binary file indicators
+    // Remove binary file indicators but keep everything else
     let processed = diff.replace(
       /^Binary files? .* differ$/gm,
       '[Binary file modified]'
@@ -75,46 +66,30 @@ class BaseProvider {
         continue;
       }
 
-      // Keep added/removed lines
+      // Keep ALL added/removed lines (no more filtering)
       if (line.startsWith('+') || line.startsWith('-')) {
-        if (!this.isTrivialChange(line)) {
-          importantLines.push(line);
+        importantLines.push(line);
 
-          // Extract function signatures from changes
-          const trimmedLine = line.substring(1).trim();
-          if (trimmedLine.match(/^(function|class|def|const|let|var)\s+\w+/)) {
-            functionSignatures.push(trimmedLine);
-          }
+        // Extract function signatures from changes
+        const trimmedLine = line.substring(1).trim();
+        if (trimmedLine.match(/^(function|class|def|const|let|var)\s+\w+/)) {
+          functionSignatures.push(trimmedLine);
         }
         continue;
       }
 
-      // Keep context lines that contain important patterns
-      if (this.isImportantContext(line)) {
-        contextLines.push(line);
-      }
+      // Keep ALL context lines (no more filtering)
+      contextLines.push(line);
     }
 
-    // Combine lines intelligently
+    // Combine lines to preserve full context
     processedLines.push(...importantLines);
+    processedLines.push(...contextLines.map((line) => ' ' + line));
 
-    // Add context lines with priority
-    if (contextLines.length > 0) {
-      const maxContextLines = 30;
-      const prioritizedContext = this.prioritizeContextLines(
-        contextLines,
-        functionSignatures
-      );
-      processedLines.push(
-        ...prioritizedContext
-          .slice(0, maxContextLines)
-          .map((line) => ' ' + line)
-      );
-    }
-
-    // Limit total size while preserving important content
-    const maxLines = 250; // Increased limit for better context
+    // Only limit if extremely large (preserve much more content)
+    const maxLines = 1000; // Increased from 250 to 1000
     if (processedLines.length > maxLines) {
+      // Prioritize keeping headers and changes, limit context
       const headers = processedLines.filter(
         (line) =>
           line.startsWith('diff --git') ||
@@ -139,24 +114,25 @@ class BaseProvider {
           !line.startsWith('-')
       );
 
+      // Keep all headers, all changes, and as much context as possible
       const finalLines = [
         ...headers,
-        ...changes.slice(0, maxLines - headers.length - 20),
-        ...context.slice(0, 20),
+        ...changes,
+        ...context.slice(0, maxLines - headers.length - changes.length),
       ];
 
-      processed = finalLines.join('\n') + '\n... (diff truncated)';
+      processed = finalLines.join('\n') + '\n... (diff truncated for size)';
     } else {
       processed = processedLines.join('\n');
     }
 
     // Handle very long lines more intelligently
-    processed = processed.replace(/^.{300,}$/gm, (match) => {
+    processed = processed.replace(/^.{500,}$/gm, (match) => {
       if (match.includes('import') || match.includes('require')) {
-        return match.substring(0, 150) + '... [import statement truncated]';
+        return match.substring(0, 200) + '... [import statement truncated]';
       }
       if (match.includes('function') || match.includes('class')) {
-        return match.substring(0, 180) + '... [function/class truncated]';
+        return match.substring(0, 250) + '... [function/class truncated]';
       }
       return '[Long line truncated]';
     });
@@ -165,31 +141,11 @@ class BaseProvider {
   }
 
   /**
-   * Check if a context line is important
+   * Check if a context line is important (disabled - keeping all context)
    */
   isImportantContext(line) {
-    if (!line.trim() || line.startsWith(' ')) return false;
-
-    const importantPatterns = [
-      /function\s+\w+/,
-      /class\s+\w+/,
-      /def\s+\w+/,
-      /interface\s+\w+/,
-      /type\s+\w+/,
-      /const\s+\w+\s*=/,
-      /let\s+\w+\s*=/,
-      /var\s+\w+\s*=/,
-      /import\s+.*from/,
-      /require\s*\(/,
-      /export\s+/,
-      /module\.exports/,
-      /app\.(get|post|put|delete|patch)/,
-      /router\.(get|post|put|delete|patch)/,
-      /add_action|add_filter/, // WordPress
-      /@.*\(/, // Decorators
-    ];
-
-    return importantPatterns.some((pattern) => pattern.test(line));
+    // Always return true to keep all context lines
+    return line.trim().length > 0;
   }
 
   /**
@@ -222,29 +178,16 @@ class BaseProvider {
   }
 
   /**
-   * Check if a change is trivial and can be ignored
+   * Check if a change is trivial (only filter out truly empty changes)
    */
   isTrivialChange(line) {
     const content = line.substring(1).trim(); // Remove + or - prefix
 
-    // Ignore whitespace-only changes
+    // Only ignore truly empty changes
     if (!content) return true;
 
-    // Ignore common trivial changes
-    const trivialPatterns = [
-      /^\s*$/, // empty lines
-      /^\s*\/\/\s*$/, // empty comments
-      /^\s*\*\s*$/, // empty docstring lines
-      /^\s*}\s*$/, // closing braces
-      /^\s*{\s*$/, // opening braces
-      /^\s*;\s*$/, // semicolons
-      /^\s*\/\/ TODO.*$/, // TODO comments
-      /^\s*\/\/ FIXME.*$/, // FIXME comments
-      /^\s*console\.log\(['"]test['"].*\)\s*;?\s*$/, // test console logs
-      /^\s*debugger;?\s*$/, // debugger statements
-    ];
-
-    return trivialPatterns.some((pattern) => pattern.test(content));
+    // Keep everything else - no more aggressive filtering
+    return false;
   }
 
   /**
@@ -265,16 +208,16 @@ class BaseProvider {
       options.count = 3;
     }
 
-    let prompt = `You are an expert software developer specializing in writing precise, meaningful commit messages. Analyze the following git diff and generate ${options.count || 3} highly relevant commit messages.
+    // Simplified prompt generation for better focus
+    let prompt = `You are an expert software developer. Analyze git diff and generate exactly ${options.count || 3} precise, relevant commit messages.
 
-CRITICAL REQUIREMENTS:
- - Be EXTREMELY SPECIFIC about what changed (use actual function/class names)
- - Focus on the PRIMARY PURPOSE of the changes
- - Use active voice and imperative mood (e.g., "Add ShoppingCart class" not "Added functionality")
- - Keep titles under 72 characters but be descriptive
- - AVOID generic terms like "functionality", "features", "updates"
- - Use specific technical terms from the code
- - Each message should be UNIQUE and highlight different aspects`;
+REQUIREMENTS:
+- Be SPECIFIC about what actually changed (use exact function/class names)
+- Focus on PRIMARY purpose of these changes
+- Use active, imperative voice ("Add X" not "Added X")
+- Maximum 72 characters for title, but be descriptive
+- NO generic terms like "functionality", "features", "updates", "various"
+- Each message must be UNIQUE and highlight different aspects`;
 
     // Add chunking context if applicable
     if (totalChunks && totalChunks > 1) {

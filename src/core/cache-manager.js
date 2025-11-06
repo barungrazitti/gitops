@@ -33,19 +33,45 @@ class CacheManager {
   }
 
   /**
-   * Generate cache key from diff content
+   * Generate cache key with content fingerprinting
    */
   generateKey(diff) {
-    // Normalize diff by removing timestamps and file paths that might change
-    const normalizedDiff = diff
-      .replace(/^index [a-f0-9]+\.\.[a-f0-9]+.*$/gm, '') // Remove index lines
-      .replace(/^@@.*@@$/gm, '') // Remove hunk headers
-      .replace(/^\+\+\+ .*$/gm, '') // Remove +++ lines
-      .replace(/^--- .*$/gm, '') // Remove --- lines
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .trim();
+    // More robust key generation that preserves semantic context
+    const semanticFingerprint = this.extractSemanticFingerprint(diff);
+    const structuralFingerprint = this.extractStructuralFingerprint(diff);
+    const combined = `${semanticFingerprint}:${structuralFingerprint}`;
+    
+    return crypto.createHash('sha256').update(combined).digest('hex');
+  }
 
-    return crypto.createHash('sha256').update(normalizedDiff).digest('hex');
+  /**
+   * Extract semantic fingerprint for similarity detection
+   */
+  extractSemanticFingerprint(diff) {
+    const lines = diff.split('\n');
+    const semanticLines = lines
+      .filter(line => {
+        const trimmed = line.substring(1).trim();
+        // Focus on actual code changes, not context
+        return (line.startsWith('+') || line.startsWith('-')) &&
+               trimmed.length > 3 &&
+               !trimmed.startsWith('//') &&
+               !trimmed.startsWith('*') &&
+               !trimmed.startsWith('*/');
+      })
+      .map(line => line.substring(1).trim())
+      .join('|');
+    
+    return crypto.createHash('md5').update(semanticLines).digest('hex').substring(0, 16);
+  }
+
+  /**
+   * Extract structural fingerprint for file-level context
+   */
+  extractStructuralFingerprint(diff) {
+    const files = diff.match(/\+\+\+ b\/(.+)/g) || [];
+    const fileNames = files.map(f => f.replace('+++ b/', '').trim()).sort().join(',');
+    return crypto.createHash('md5').update(fileNames).digest('hex').substring(0, 16);
   }
 
   /**
@@ -97,16 +123,23 @@ class CacheManager {
   }
 
   /**
-   * Get cached commit messages
+   * Get cached commit messages with validation
    */
-  async get(diff) {
+  async getValidated(diff) {
     try {
       const key = this.generateKey(diff);
+      const semanticFingerprint = this.extractSemanticFingerprint(diff);
 
       // Try memory cache first
       let cached = this.memoryCache.get(key);
       if (cached) {
-        return cached.messages;
+        // Validate semantic similarity before returning
+        if (this.validateSemanticSimilarity(diff, cached.diff || '')) {
+          return cached.messages;
+        } else {
+          // Remove invalid cache entry
+          this.memoryCache.del(key);
+        }
       }
 
       // Try persistent cache
@@ -116,11 +149,16 @@ class CacheManager {
 
         // Check if cache is still valid
         const now = Date.now();
-        if (now - cacheData.timestamp < 86400000) {
-          // 24 hours
-          // Add to memory cache for faster access
-          this.memoryCache.set(key, cacheData);
-          return cacheData.messages;
+        if (now - cacheData.timestamp < 86400000) { // 24 hours
+          // Validate semantic similarity
+          if (this.validateSemanticSimilarity(diff, cacheData.diff || '')) {
+            // Add to memory cache for faster access
+            this.memoryCache.set(key, cacheData);
+            return cacheData.messages;
+          } else {
+            // Remove invalid cache file
+            await fs.remove(cacheFile);
+          }
         } else {
           // Remove expired cache file
           await fs.remove(cacheFile);
@@ -129,22 +167,23 @@ class CacheManager {
 
       return null;
     } catch (error) {
-      console.warn('Cache get error:', error.message);
+      console.warn('Validated cache get error:', error.message);
       return null;
     }
   }
 
   /**
-   * Set cached commit messages
+   * Set cached commit messages with validation
    */
-  async set(diff, messages) {
+  async setValidated(diff, messages) {
     try {
       const key = this.generateKey(diff);
       const cacheData = {
         messages,
         timestamp: Date.now(),
-        diff: this.truncateDiff(diff), // Store truncated diff for debugging
-        diffHash: this.quickHash(diff), // Quick hash for ultra-fast similarity
+        diff: this.truncateDiff(diff), // Store truncated diff for validation
+        semanticFingerprint: this.extractSemanticFingerprint(diff),
+        structuralFingerprint: this.extractStructuralFingerprint(diff),
       };
 
       // Set in memory cache
@@ -154,15 +193,15 @@ class CacheManager {
       const cacheFile = path.join(this.cacheDir, `${key}.json`);
       await fs.writeJson(cacheFile, cacheData);
     } catch (error) {
-      console.warn('Cache set error:', error.message);
+      console.warn('Validated cache set error:', error.message);
     }
   }
 
   /**
-   * Truncate diff for storage (keep first 500 chars for debugging)
+   * Truncate diff for storage (keep more content for debugging)
    */
   truncateDiff(diff) {
-    return diff.length > 500 ? diff.substring(0, 500) + '...' : diff;
+    return diff.length > 2000 ? diff.substring(0, 2000) + '...' : diff;
   }
 
   /**
@@ -350,18 +389,57 @@ class CacheManager {
   }
 
   /**
-   * Calculate similarity between two diff arrays
+   * Validate semantic similarity between current and cached diff
    */
-  calculateSimilarity(diff1, diff2) {
-    if (diff1.length === 0 && diff2.length === 0) return 1;
-    if (diff1.length === 0 || diff2.length === 0) return 0;
+  validateSemanticSimilarity(currentDiff, cachedDiff, threshold = 0.7) {
+    try {
+      const currentSemantic = this.extractSemanticFingerprint(currentDiff);
+      const cachedSemantic = this.extractSemanticFingerprint(cachedDiff);
+      
+      // If fingerprints are identical, high similarity
+      if (currentSemantic === cachedSemantic) {
+        return true;
+      }
+      
+      // Extract actual code changes for comparison
+      const currentChanges = this.extractCodeChanges(currentDiff);
+      const cachedChanges = this.extractCodeChanges(cachedDiff);
+      
+      if (currentChanges.length === 0 || cachedChanges.length === 0) {
+        return false;
+      }
+      
+      // Calculate Jaccard similarity
+      const currentSet = new Set(currentChanges);
+      const cachedSet = new Set(cachedChanges);
+      const intersection = new Set([...currentSet].filter(x => cachedSet.has(x)));
+      const union = new Set([...currentSet, ...cachedSet]);
+      
+      const similarity = intersection.size / union.size;
+      return similarity >= threshold;
+    } catch (error) {
+      console.warn('Semantic validation error:', error.message);
+      return false; // Fail safe - don't use cached result
+    }
+  }
 
-    const set1 = new Set(diff1);
-    const set2 = new Set(diff2);
-    const intersection = new Set([...set1].filter((x) => set2.has(x)));
-    const union = new Set([...set1, ...set2]);
-
-    return intersection.size / union.size;
+  /**
+   * Extract actual code changes from diff
+   */
+  extractCodeChanges(diff) {
+    const lines = diff.split('\n');
+    return lines
+      .filter(line => {
+        const trimmed = line.substring(1).trim();
+        return (line.startsWith('+') || line.startsWith('-')) &&
+               trimmed.length > 3 &&
+               !trimmed.startsWith('//') &&
+               !trimmed.startsWith('*') &&
+               !trimmed.startsWith('*/') &&
+               !trimmed.match(/^\/\/\s*$/) &&
+               !trimmed.match(/^\/\*.*\*\/$/);
+      })
+      .map(line => line.substring(1).trim().toLowerCase());
   }
 }
 
