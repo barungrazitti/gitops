@@ -60,11 +60,12 @@ class AICommitGenerator {
         return;
       }
 
-      // Check cache with enhanced validation
+      // Simplified cache check (exact match only)
       let messages = [];
       if (mergedOptions.cache !== false) {
         spinner.text = 'Checking cache...';
-        messages = await this.cacheManager.getValidated(diff);
+        // Only cache exact matches to avoid complexity
+        messages = await this.cacheManager.get(diff);
         if (messages && messages.length > 0) {
           await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
         } else {
@@ -78,9 +79,9 @@ class AICommitGenerator {
         spinner.text = 'Analyzing repository context...';
         const context = await this.analysisEngine.analyzeRepository();
 
-        // Generate commit messages with intelligent merging
+        // Generate commit messages with sequential fallback
         spinner.text = 'Generating commit messages with AI...';
-        messages = await this.generateWithIntelligentMerging(diff, {
+        messages = await this.generateWithSequentialFallback(diff, {
           context,
           count: parseInt(mergedOptions.count) || 3,
           type: mergedOptions.type,
@@ -90,9 +91,9 @@ class AICommitGenerator {
           preferredProvider: mergedOptions.provider || config.defaultProvider,
         });
 
-        // Cache results with validation
+        // Cache results (simple exact match)
         if (mergedOptions.cache !== false) {
-          await this.cacheManager.setValidated(diff, messages);
+          await this.cacheManager.set(diff, messages);
         }
       }
 
@@ -188,9 +189,23 @@ class AICommitGenerator {
     }
 
     if (selectedMessage === 'regenerate') {
-      // TODO: Implement regeneration logic
-      console.log(chalk.yellow('Regeneration not implemented yet.'));
-      return null;
+      console.log(chalk.yellow('Regenerating commit messages...'));
+      // Regenerate with same options
+      const regeneratedMessages = await this.generateWithSequentialFallback(diff, {
+        context,
+        count: parseInt(mergedOptions.count) || 3,
+        type: mergedOptions.type,
+        language: mergedOptions.language || 'en',
+        conventional: mergedOptions.conventional || config.conventionalCommits,
+        preferredProvider: mergedOptions.provider || config.defaultProvider,
+      });
+      
+      // Show regenerated messages
+      const { regenerate } = await this.selectMessage(regeneratedMessages, { 
+        allowRegenerate: false, 
+        title: 'Select from regenerated messages:' 
+      });
+      return regenerate;
     }
 
     if (selectedMessage === 'custom') {
@@ -514,21 +529,24 @@ class AICommitGenerator {
   }
 
   /**
-   * Generate commit messages with intelligent merging
+   * Generate commit messages with sequential fallback (Ollama first, Groq on failure)
    */
-  async generateWithIntelligentMerging(diff, options) {
+  async generateWithSequentialFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
-    const providers = ['ollama', 'groq'];
+    const providers = preferredProvider ? [preferredProvider] : ['ollama', 'groq'];
     
-    console.log(chalk.blue('🤖 Running intelligent AI merging...'));
+    console.log(chalk.blue('🤖 Using sequential AI generation (Ollama first)...'));
     
-    // Enrich options with enhanced context
+    // Step 1: Intelligent diff management
+    const diffManagement = this.manageDiffForAI(diff);
+    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
+    console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
+    
+    // Enrich options with context
     const enrichedOptions = {
       ...generationOptions,
       context: {
         ...context,
-        enhanced: true,
-        semanticAnalysis: context?.files?.semantic || {},
         hasSemanticContext: !!(
           context?.files?.semantic &&
           Object.keys(context.files.semantic).length > 0
@@ -536,183 +554,300 @@ class AICommitGenerator {
       },
     };
 
-    // Try to use both providers in parallel for intelligent merging
-    const allProviderResults = {};
-    let successfulProviders = [];
-
+    // Step 2: Try providers sequentially
     for (const providerName of providers) {
+      const startTime = Date.now();
+      
       try {
         const provider = AIProviderFactory.create(providerName);
-        
-        // Check if diff is too large and needs chunking
-        const estimatedTokens = Math.ceil(diff.length / 4);
         let messages;
+        let actualPrompt;
 
-        if (estimatedTokens > 4000) {
+        // Step 3: Handle different diff strategies
+        if (diffManagement.strategy === 'full') {
+          // Simple case: full diff in one prompt
+          const prompt = provider.buildPrompt(diffManagement.data, enrichedOptions);
+          messages = await provider.generateCommitMessages(diffManagement.data, enrichedOptions);
+          actualPrompt = prompt;
+          
+        } else {
+          // Complex case: chunked processing
           console.log(
             chalk.blue(
-              `📦 Chunking large diff for ${providerName}...`
+              `📦 Processing ${diffManagement.chunks} chunks with ${providerName}...`
             )
           );
 
-          const chunks = this.chunkDiff(diff, 3000);
           const chunkMessages = [];
-
-          for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const isLastChunk = i === chunks.length - 1;
+          
+          for (let i = 0; i < diffManagement.data.length; i++) {
+            const chunk = diffManagement.data[i];
+            const isLastChunk = i === diffManagement.data.length - 1;
 
             const chunkOptions = {
               ...enrichedOptions,
               chunkIndex: i,
-              totalChunks: chunks.length,
+              totalChunks: diffManagement.data.length,
               isLastChunk,
               chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
+              // Add chunk-specific context
+              context: {
+                ...enrichedOptions.context,
+                chunkInfo: {
+                  index: i,
+                  total: diffManagement.data.length,
+                  size: chunk.size,
+                  files: chunk.context.files,
+                  functions: chunk.context.functions,
+                  classes: chunk.context.classes,
+                  hasSignificantChanges: chunk.context.hasSignificantChanges
+                }
+              }
             };
 
-            const chunkResult = await provider.generateCommitMessages(chunk, chunkOptions);
+            // Generate with this chunk
+            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
+            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
+            
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
+              
+              // Log the actual prompt for this chunk
+              await this.activityLogger.logAIInteraction(
+                providerName,
+                'commit_generation_chunk',
+                chunkPrompt,
+                chunkResult[0], // Log first message
+                Date.now() - startTime,
+                true
+              );
             }
           }
 
-          messages = this.selectBestMessages(chunkMessages, generationOptions.count || 5);
-        } else {
-          messages = await provider.generateCommitMessages(diff, enrichedOptions);
+          messages = this.selectBestMessages(chunkMessages, generationOptions.count || 3);
+          actualPrompt = `Chunked processing (${diffManagement.chunks} chunks)`;
         }
 
+        const responseTime = Date.now() - startTime;
+        
         if (messages && messages.length > 0) {
-          allProviderResults[providerName] = messages;
-          successfulProviders.push(providerName);
+          await this.statsManager.recordCommit(providerName);
           
           console.log(
-            chalk.green(`✅ ${providerName} generated ${messages.length} messages`)
+            chalk.green(`✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`)
           );
+          
+          // Log the actual interaction with full prompt
+          await this.activityLogger.logAIInteraction(
+            providerName,
+            'commit_generation',
+            actualPrompt,
+            messages.join('\n'),
+            responseTime,
+            true
+          );
+          
+          // Log diff management info
+          await this.activityLogger.info('diff_management', {
+            ...diffManagement.info,
+            provider: providerName,
+            responseTime,
+            success: true
+          });
+          
+          // Log context usage for debugging
+          if (enrichedOptions.context.hasSemanticContext) {
+            console.log(
+              chalk.blue(`🧠 Used semantic context for ${providerName}`)
+            );
+          }
+
+          return messages;
         }
       } catch (error) {
+        const responseTime = Date.now() - startTime;
+        
         console.warn(
           chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
         );
+        
+        // Log failed interaction
+        await this.activityLogger.logAIInteraction(
+          providerName,
+          'commit_generation',
+          diffManagement.strategy === 'full' ? diff : `Chunked processing (${diffManagement.chunks} chunks)`,
+          null,
+          responseTime,
+          false
+        );
+        
+        // Log diff management info for failure
+        await this.activityLogger.info('diff_management', {
+          ...diffManagement.info,
+          provider: providerName,
+          responseTime,
+          success: false,
+          error: error.message
+        });
+        
+        // If preferred provider fails, try Groq as fallback
+        if (providerName === preferredProvider && preferredProvider !== 'groq') {
+          console.log(chalk.blue('🔄 Falling back to Groq...'));
+          try {
+            const groqProvider = AIProviderFactory.create('groq');
+            const messages = await groqProvider.generateCommitMessages(diffManagement.data, enrichedOptions);
+            if (messages && messages.length > 0) {
+              await this.statsManager.recordCommit('groq');
+              console.log(chalk.green(`✅ Groq fallback generated ${messages.length} messages`));
+              return messages;
+            }
+          } catch (fallbackError) {
+            console.warn(chalk.yellow(`⚠️  Groq fallback also failed: ${fallbackError.message}`));
+          }
+        }
       }
     }
 
-    // Intelligent merging logic
-    if (successfulProviders.length === 0) {
-      throw new Error('All AI providers failed to generate commit messages');
-    }
-
-    if (successfulProviders.length === 1) {
-      // Only one provider worked, use its results
-      const providerName = successfulProviders[0];
-      await this.statsManager.recordCommit(providerName);
-      return allProviderResults[providerName];
-    }
-
-    // Multiple providers succeeded - intelligent merging
-    console.log(chalk.cyan('🧠 Merging results from multiple providers...'));
-    
-    const mergedMessages = this.intelligentlyMergeResults(
-      allProviderResults,
-      generationOptions.count || 3,
-      preferredProvider
-    );
-
-    // Record usage for all successful providers
-    for (const providerName of successfulProviders) {
-      await this.statsManager.recordCommit(providerName);
-    }
-
-    // Log context usage for debugging
-    if (enrichedOptions.context.hasSemanticContext) {
-      console.log(
-        chalk.blue(`🧠 Used semantic context with intelligent merging`)
-      );
-    }
-
-    return mergedMessages;
+    throw new Error('All AI providers failed to generate commit messages');
   }
 
   /**
    * Intelligently merge results from multiple AI providers
    */
-  intelligentlyMergeResults(providerResults, targetCount, preferredProvider = null) {
-    const allMessages = [];
-    const messageSources = new Map();
 
-    // Collect all messages with their source providers
-    for (const [providerName, messages] of Object.entries(providerResults)) {
-      messages.forEach((message, index) => {
-        const normalizedMessage = message.trim().toLowerCase();
-        
-        if (!messageSources.has(normalizedMessage)) {
-          messageSources.set(normalizedMessage, {
-            message: message.trim(),
-            providers: [providerName],
-            originalIndex: index,
-          });
-          allMessages.push(messageSources.get(normalizedMessage));
-        } else {
-          // Message already seen from another provider - merge
-          const existing = messageSources.get(normalizedMessage);
-          if (!existing.providers.includes(providerName)) {
-            existing.providers.push(providerName);
-          }
+
+
+
+
+
+
+  /**
+   * Intelligent diff management for optimal AI generation
+   */
+  manageDiffForAI(diff, options = {}) {
+    const MAX_DIFF_SIZE = 15000; // 15K chars max for single prompt
+    const CHUNK_SIZE = 8000; // 8K chars for chunks
+    const MAX_CONTEXT_LINES = 50; // Max context lines per chunk
+    
+    const diffSize = diff.length;
+    
+    // Strategy 1: Use full diff if under limit
+    if (diffSize <= MAX_DIFF_SIZE) {
+      return {
+        strategy: 'full',
+        data: diff,
+        chunks: null,
+        info: {
+          strategy: 'full',
+          size: diffSize,
+          chunks: 1,
+          reasoning: 'Diff size manageable, using full content'
         }
+      };
+    }
+    
+    // Strategy 2: Chunk large diffs intelligently
+    const lines = diff.split('\n');
+    const chunks = [];
+    let currentChunk = [];
+    let currentSize = 0;
+    let inContext = false;
+    let contextBuffer = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineSize = line.length + 1; // +1 for newline
+      
+      // Detect diff headers and file boundaries
+      const isFileHeader = line.startsWith('diff --git') || 
+                           line.startsWith('index ') ||
+                           line.startsWith('---') ||
+                           line.startsWith('+++');
+      
+      const isContextLine = line.startsWith(' ') || line.startsWith('');
+      const isCodeLine = line.startsWith('+') || line.startsWith('-');
+      
+      // Start new chunk if size limit reached and we're at a good boundary
+      if (currentSize + lineSize > CHUNK_SIZE && 
+          (isFileHeader || (inContext && contextBuffer.length >= MAX_CONTEXT_LINES))) {
+        
+        // Add current chunk to list
+        chunks.push({
+          content: currentChunk.join('\n'),
+          size: currentSize,
+          lines: currentChunk.length,
+          context: this.extractChunkContext(currentChunk.join('\n'))
+        });
+        
+        // Reset for next chunk, but carry some context
+        currentChunk = [...contextBuffer.slice(-10)]; // Keep last 10 context lines
+        currentSize = currentChunk.join('\n').length + 1;
+        contextBuffer = [];
+        inContext = false;
+      }
+      
+      // Add line to current chunk
+      currentChunk.push(line);
+      currentSize += lineSize;
+      
+      // Track context for intelligent boundaries
+      if (isContextLine) {
+        contextBuffer.push(line);
+        inContext = true;
+      } else if (isCodeLine) {
+        inContext = false;
+      }
+      
+      // Reset context buffer at file boundaries
+      if (isFileHeader) {
+        contextBuffer = [];
+      }
+    }
+    
+    // Add final chunk
+    if (currentChunk.length > 0) {
+      chunks.push({
+        content: currentChunk.join('\n'),
+        size: currentChunk.join('\n').length,
+        lines: currentChunk.length,
+        context: this.extractChunkContext(currentChunk.join('\n'))
       });
     }
-
-    // Score messages based on multiple factors
-    const scoredMessages = allMessages.map((item) => {
-      let score = this.scoreCommitMessage(item.message);
-      
-      // Bonus for messages from multiple providers (consensus)
-      if (item.providers.length > 1) {
-        score += 15 * item.providers.length; // 15 points per additional provider
-      }
-      
-      // Bonus for preferred provider
-      if (preferredProvider && item.providers.includes(preferredProvider)) {
-        score += 10;
-      }
-      
-      // Bonus for Ollama (local, typically more context-aware)
-      if (item.providers.includes('ollama')) {
-        score += 5;
-      }
-      
-      // Bonus for Groq (fast, typically good for conventional commits)
-      if (item.providers.includes('groq')) {
-        score += 3;
-      }
-
-      return {
-        ...item,
-        score,
-      };
-    });
-
-    // Sort by score and take best ones
-    scoredMessages.sort((a, b) => b.score - a.score);
     
-    const bestMessages = scoredMessages.slice(0, targetCount);
-    
-    // Log merge details
-    console.log(chalk.cyan('\n🎯 Intelligent merging results:'));
-    bestMessages.forEach((item, index) => {
-      const providersStr = item.providers.join(' + ');
-      console.log(
-        chalk.dim(`  ${index + 1}. [${providersStr}] ${item.message}`)
-      );
-    });
-
-    return bestMessages.map((item) => item.message);
+    return {
+      strategy: 'chunked',
+      data: chunks,
+      chunks: chunks.length,
+      info: {
+        strategy: 'intelligent_chunking',
+        originalSize: diffSize,
+        chunkCount: chunks.length,
+        avgChunkSize: Math.round(diffSize / chunks.length),
+        reasoning: `Diff too large (${diffSize} chars), intelligently chunked into ${chunks.length} parts with preserved context`
+      }
+    };
   }
-
-
-
-
-
-
+  
+  /**
+   * Extract key context from chunk for better generation
+   */
+  extractChunkContext(chunkContent) {
+    const files = chunkContent.match(/\+\+\+ b\/(.+)/g) || [];
+    const fileNames = files.map(f => f.replace('+++ b/', '').trim());
+    
+    const functions = (chunkContent.match(/\+.*function\s+(\w+)/g) || [])
+      .map(m => m.replace(/\+.*function\s+/, ''));
+    
+    const classes = (chunkContent.match(/\+.*class\s+(\w+)/g) || [])
+      .map(m => m.replace(/\+.*class\s+/, ''));
+    
+    return {
+      files: fileNames,
+      functions: functions.slice(0, 5), // Top 5 functions
+      classes: classes.slice(0, 5), // Top 5 classes
+      hasSignificantChanges: functions.length > 0 || classes.length > 0
+    };
+  }
 
   /**
    * Show usage statistics

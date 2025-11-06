@@ -224,14 +224,32 @@ REQUIREMENTS:
       prompt += `
 
 CHUNKING CONTEXT:
-- This is chunk ${chunkIndex + 1} of ${totalChunks}
-- Position: ${chunkContext} chunk
-- Focus on the changes in this specific chunk
-- Generate messages that accurately represent this portion of changes`;
+- This is chunk ${chunkIndex + 1} of ${totalChunks} (${chunkContext} position)
+- Focus only on changes in this specific chunk`;
 
-      if (isLastChunk) {
-        prompt += `
-- This is the final chunk - consider the overall impact`;
+      // Add chunk-specific context if available
+      if (options.context && options.context.chunkInfo) {
+        const chunkInfo = options.context.chunkInfo;
+        
+        if (chunkInfo.files && chunkInfo.files.length > 0) {
+          prompt += `
+- Files in this chunk: ${chunkInfo.files.slice(0, 5).join(', ')}`;
+        }
+        
+        if (chunkInfo.functions && chunkInfo.functions.length > 0) {
+          prompt += `
+- Key functions: ${chunkInfo.functions.slice(0, 3).join(', ')}`;
+        }
+        
+        if (chunkInfo.classes && chunkInfo.classes.length > 0) {
+          prompt += `
+- Key classes: ${chunkInfo.classes.slice(0, 3).join(', ')}`;
+        }
+        
+        if (!chunkInfo.hasSignificantChanges) {
+          prompt += `
+- Note: This chunk contains minor/structural changes only`;
+        }
       }
     }
 
@@ -281,8 +299,8 @@ REPOSITORY CONTEXT:`;
 - Changes: +${context.files.changes?.insertions || 0} -${context.files.changes?.deletions || 0}`;
       }
 
-      // Add semantic context
-      if (context.files.semantic) {
+      // Add semantic context only if it exists
+      if (context.files && context.files.semantic) {
         const semantic = context.files.semantic;
         const semanticInfo = [];
 

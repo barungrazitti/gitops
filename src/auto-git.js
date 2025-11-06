@@ -207,8 +207,8 @@ class AutoGit {
         throw new Error('No staged changes available');
       }
 
-      // Use the main AI commit generator with intelligent merging
-      const messages = await this.aiCommit.generateWithIntelligentMerging(diff, {
+      // Use the main AI commit generator with sequential fallback
+      const messages = await this.aiCommit.generateWithSequentialFallback(diff, {
         context,
         count: 1, // Only need one message for auto-commit
         conventional: true,
