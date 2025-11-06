@@ -345,7 +345,7 @@ class ConfigManager {
         ];
         providerConfig.model = ollamaModels.includes(config.model)
           ? config.model
-          : 'deepseek-v3.1:671b-cloud';
+          : 'mistral:7b-instruct';
         providerConfig.baseURL = 'http://localhost:11434';
         break;
       }

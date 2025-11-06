@@ -17,7 +17,7 @@ class OllamaProvider extends BaseProvider {
    */
   async generateCommitMessages(diff, options = {}) {
     const config = await this.getConfig();
-    const model = options.model || config.model || 'deepseek-v3.1:671b-cloud';
+    const model = options.model || config.model || 'mistral:7b-instruct';
 
     // Add context isolation to prevent hallucination
     const isolatedPrompt = `IMPORTANT: Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
