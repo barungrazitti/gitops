@@ -5,7 +5,27 @@
 const GitManager = require('../src/core/git-manager');
 
 // Mock simple-git
-jest.mock('simple-git');
+jest.mock('simple-git', () => {
+  return jest.fn(() => ({
+    checkIsRepo: jest.fn(),
+    diff: jest.fn(),
+    log: jest.fn(),
+    branch: jest.fn(),
+    revparse: jest.fn(),
+    status: jest.fn(),
+    commit: jest.fn(),
+    diffSummary: jest.fn(),
+    getRemotes: jest.fn(),
+    checkoutLocalBranch: jest.fn(),
+    checkout: jest.fn(),
+    deleteLocalBranch: jest.fn(),
+    add: jest.fn(),
+    push: jest.fn(),
+    stash: jest.fn(),
+    stashList: jest.fn(),
+    reset: jest.fn()
+  }));
+});
 
 describe('GitManager', () => {
   let gitManager;
@@ -15,30 +35,9 @@ describe('GitManager', () => {
     // Reset all mocks
     jest.clearAllMocks();
     
-    // Mock simple-git instance
-    mockGit = {
-      checkIsRepo: jest.fn(),
-      diff: jest.fn(),
-      log: jest.fn(),
-      branch: jest.fn(),
-      revparse: jest.fn(),
-      status: jest.fn(),
-      commit: jest.fn(),
-      diffSummary: jest.fn(),
-      getRemotes: jest.fn(),
-      checkoutLocalBranch: jest.fn(),
-      checkout: jest.fn(),
-      deleteLocalBranch: jest.fn(),
-      add: jest.fn(),
-      push: jest.fn(),
-      stash: jest.fn(),
-      stashList: jest.fn(),
-      reset: jest.fn()
-    };
-    
-    // Mock simple-git constructor
+    // Get the mock instance
     const simpleGit = require('simple-git');
-    simpleGit.mockReturnValue(mockGit);
+    mockGit = simpleGit();
     
     gitManager = new GitManager();
   });
