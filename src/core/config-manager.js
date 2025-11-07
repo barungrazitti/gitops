@@ -345,7 +345,7 @@ class ConfigManager {
         ];
         providerConfig.model = ollamaModels.includes(config.model)
           ? config.model
-          : 'mistral:7b-instruct';
+          : 'phi';
         providerConfig.baseURL = 'http://localhost:11434';
         break;
       }
