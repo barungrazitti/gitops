@@ -4,12 +4,20 @@
 
 const axios = require('axios');
 const BaseProvider = require('./base-provider');
+const CircuitBreaker = require('../core/circuit-breaker');
 
 class OllamaProvider extends BaseProvider {
   constructor() {
     super();
     this.name = 'ollama';
     this.baseURL = 'http://localhost:11434';
+    
+    // Initialize circuit breaker for Ollama
+    this.circuitBreaker = new CircuitBreaker({
+      failureThreshold: 3,
+      timeout: 120000, // 2 minutes for local models
+      monitoringPeriod: 30000 // 30 seconds
+    });
   }
 
   /**
@@ -23,7 +31,7 @@ class OllamaProvider extends BaseProvider {
     const isolatedPrompt = `IMPORTANT: Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
 
     return await this.withRetry(async () => {
-      try {
+      return await this.circuitBreaker.execute(async () => {
         const response = await axios.post(
           `${this.baseURL}/api/generate`,
           {
@@ -47,12 +55,8 @@ class OllamaProvider extends BaseProvider {
 
         const messages = this.parseResponse(content);
         return messages.filter((msg) => this.validateCommitMessage(msg));
-      } catch (error) {
-        // Log the error but don't show to user if it's a retryable error
-        this.logError(error, 'Ollama API request failed');
-        throw this.handleError(error, 'Ollama');
-      }
-    }, config.retries || 3);
+      }, { provider: 'ollama' });
+    });
   }
 
   /**
@@ -65,7 +69,7 @@ class OllamaProvider extends BaseProvider {
     const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
 
     return await this.withRetry(async () => {
-      try {
+      return await this.circuitBreaker.execute(async () => {
         const response = await axios.post(
           `${this.baseURL}/api/generate`,
           {
@@ -88,10 +92,8 @@ class OllamaProvider extends BaseProvider {
         }
 
         return [content.trim()];
-      } catch (error) {
-        throw this.handleError(error, 'Ollama');
-      }
-    }, config.retries || 3);
+      }, { provider: 'ollama' });
+    });
   }
 
   /**

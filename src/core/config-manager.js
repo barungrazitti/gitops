@@ -345,7 +345,7 @@ class ConfigManager {
         ];
         providerConfig.model = ollamaModels.includes(config.model)
           ? config.model
-          : 'qwen2.5-coder:latest';
+          : 'mistral:7b-instruct';
         providerConfig.baseURL = 'http://localhost:11434';
         break;
       }

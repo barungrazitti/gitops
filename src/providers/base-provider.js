@@ -643,6 +643,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
             .replace(/^\d+\.?\s*/, '') // Strip numbering
             .replace(/^- \s*/, '') // Strip dashes
             .replace(/^\* \s*/, '') // Strip asterisks
+            .replace(/^["']|["']$/g, '') // Strip surrounding quotes
       )
       .filter((line) => line.length > 0)
       .slice(0, 3); // Limit to 3 messages max

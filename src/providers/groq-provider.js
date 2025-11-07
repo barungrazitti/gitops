@@ -4,12 +4,20 @@
 
 const Groq = require('groq-sdk');
 const BaseProvider = require('./base-provider');
+const CircuitBreaker = require('../core/circuit-breaker');
 
 class GroqProvider extends BaseProvider {
   constructor() {
     super();
     this.name = 'groq';
     this.client = null;
+    
+    // Initialize circuit breaker for Groq
+    this.circuitBreaker = new CircuitBreaker({
+      failureThreshold: 5,
+      timeout: 60000, // 1 minute for cloud API
+      monitoringPeriod: 15000 // 15 seconds
+    });
   }
 
   /**
@@ -36,22 +44,21 @@ class GroqProvider extends BaseProvider {
    * Generate commit messages using Groq
    */
   async generateCommitMessages(diff, options = {}) {
-    try {
-      await this.initializeClient();
-      const config = await this.getConfig();
+    await this.initializeClient();
+    const config = await this.getConfig();
 
-      // Groq has strict TPM limits, so we need to be more aggressive with chunking
-      const maxTokens = 4000; // Leave room for system message and response
-      const prompt = this.buildPrompt(diff, options);
+    // Groq has strict TPM limits, so we need to be more aggressive with chunking
+    const maxTokens = 4000; // Leave room for system message and response
+    const prompt = this.buildPrompt(diff, options);
 
-      // Check if we need to chunk the diff
-      const estimatedTokens = this.estimateTokens(prompt);
-      if (estimatedTokens > maxTokens) {
-        return await this.generateFromChunks(diff, options, maxTokens);
-      }
+    // Check if we need to chunk the diff
+    const estimatedTokens = this.estimateTokens(prompt);
+    if (estimatedTokens > maxTokens) {
+      return await this.generateFromChunks(diff, options, maxTokens);
+    }
 
       return await this.withRetry(async () => {
-        try {
+        return await this.circuitBreaker.execute(async () => {
           const response = await this.client.chat.completions.create({
             model: options.model || config.model || 'llama-3.1-8b-instant',
             messages: [
@@ -75,26 +82,8 @@ class GroqProvider extends BaseProvider {
 
           const messages = this.parseResponse(content);
           return messages.filter((msg) => this.validateCommitMessage(msg));
-        } catch (error) {
-          // Handle rate limiting specifically
-          if (
-            error.status === 413 ||
-            error.error?.code === 'rate_limit_exceeded'
-          ) {
-            // If we hit rate limits, try with smaller chunks
-            console.warn('Groq rate limit hit, trying with smaller chunks...');
-            return await this.generateFromChunks(
-              diff,
-              options,
-              Math.max(2000, 100)
-            );
-          }
-          throw this.handleError(error, 'Groq');
-        }
-      }, config.retries || 3);
-    } catch (error) {
-      throw this.handleError(error, 'Groq');
-    }
+        }, { provider: 'groq' });
+      });
   }
 
   /**
@@ -356,31 +345,33 @@ class GroqProvider extends BaseProvider {
    */
   async generateSingleResponse(prompt, options, config) {
     return await this.withRetry(async () => {
-      const response = await this.client.chat.completions.create({
-        model: config.model || 'llama3-8b-8192',
-        messages: [
-          {
-            role: 'system',
-            content:
-              'You are an expert software developer who helps fix code issues and improve code quality.',
-          },
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-        max_tokens: options.maxTokens || 2000,
-        temperature: options.temperature || 0.3,
-        n: 1,
-      });
+      return await this.circuitBreaker.execute(async () => {
+        const response = await this.client.chat.completions.create({
+          model: config.model || 'llama3-8b-8192',
+          messages: [
+            {
+              role: 'system',
+              content:
+                'You are an expert software developer who helps fix code issues and improve code quality.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          max_tokens: options.maxTokens || 2000,
+          temperature: options.temperature || 0.3,
+          n: 1,
+        });
 
-      const content = response.choices[0]?.message?.content;
-      if (!content) {
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
         throw new Error('No response content from Groq');
       }
 
-      return [content.trim()];
-    }, config.retries || 3);
+        return [content.trim()];
+      }, { provider: 'groq' });
+    });
   }
 
   /**
