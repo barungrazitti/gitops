@@ -25,7 +25,7 @@ class OllamaProvider extends BaseProvider {
    */
   async generateCommitMessages(diff, options = {}) {
     const config = await this.getConfig();
-    const model = options.model || config.model || 'phi';
+    const model = options.model || config.model || 'qwen2.5-coder:latest';
 
     // Add context isolation to prevent hallucination
     const isolatedPrompt = `IMPORTANT: Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
