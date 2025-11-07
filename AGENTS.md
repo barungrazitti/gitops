@@ -90,8 +90,19 @@ No linting/formatting tools - removed per user request.
 
 - **Ollama**: Local AI with DeepSeek V3.1, Qwen3 Coder, Mistral models
 - **Groq**: Fast cloud API with Mixtral, Llama, Gemma models
-- **Chunking**: Automatic large diff handling for both providers
+- **Chunking**: Automatic large diff handling for both providers (with plugin update exceptions)
 - **Context Enrichment**: Advanced semantic analysis integration
+
+### Intelligent Diff Management with Plugin Update Detection
+
+- **Plugin Update Detection**: Automatically detects plugin/dependency updates and avoids chunking
+- **Package Managers**: Supports package.json, composer.json, requirements.txt, yarn.lock, etc.
+- **WordPress Support**: Detects WordPress plugin/theme updates in wp-content directories
+- **Version Changes**: Identifies version updates and dependency modifications
+- **Vendor Directories**: Recognizes changes in vendor/, node_modules/, and plugin directories
+- **Smart Context**: Preserves full context for plugin updates even with large diffs
+- **Visual Indicators**: Shows 🔌 plugin icon when plugin update is detected
+- **Selective Processing**: Only non-plugin updates get chunked when large
 
 ### Improved Git Merge Handling with AI
 

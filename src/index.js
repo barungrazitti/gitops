@@ -542,6 +542,11 @@ class AICommitGenerator {
     console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
     
+    // Special indicator for plugin updates
+    if (diffManagement.info.pluginUpdate) {
+      console.log(chalk.yellow(`🔌 Plugin/dependency update detected - avoiding chunking`));
+    }
+    
     // Enrich options with context
     const enrichedOptions = {
       ...generationOptions,
@@ -731,8 +736,15 @@ class AICommitGenerator {
     
     const diffSize = diff.length;
     
-    // Strategy 1: Use full diff if under limit
-    if (diffSize <= MAX_DIFF_SIZE) {
+    // Check if this is a plugin/dependency update that should avoid chunking
+    const isPluginUpdate = this.detectPluginUpdate(diff);
+    
+    // Strategy 1: Use full diff if under limit OR if plugin update (even if large)
+    if (diffSize <= MAX_DIFF_SIZE || isPluginUpdate) {
+      const reasoning = isPluginUpdate 
+        ? 'Plugin/dependency update detected, avoiding chunking for better context'
+        : 'Diff size manageable, using full content';
+      
       return {
         strategy: 'full',
         data: diff,
@@ -741,7 +753,8 @@ class AICommitGenerator {
           strategy: 'full',
           size: diffSize,
           chunks: 1,
-          reasoning: 'Diff size manageable, using full content'
+          reasoning,
+          pluginUpdate: isPluginUpdate
         }
       };
     }
@@ -828,6 +841,69 @@ class AICommitGenerator {
     };
   }
   
+  /**
+   * Detect if diff represents a plugin/dependency update
+   */
+  detectPluginUpdate(diff) {
+    // Check for package manager files
+    const packageFiles = [
+      'package.json',
+      'package-lock.json',
+      'yarn.lock',
+      'pnpm-lock.yaml',
+      'composer.json',
+      'composer.lock',
+      'requirements.txt',
+      'Pipfile.lock',
+      'Gemfile.lock',
+      'Cargo.lock',
+      'go.mod',
+      'go.sum',
+      'pom.xml',
+      'build.gradle'
+    ];
+    
+    // Check for WordPress plugin/theme patterns
+    const wordpressPatterns = [
+      /wp-content\/plugins\//,
+      /wp-content\/themes\//,
+      /plugins\//,
+      /themes\//
+    ];
+    
+    // Extract file paths from diff
+    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
+      .map(f => f.replace('+++ b/', '').trim());
+    
+    // Check if any changed files are package managers
+    const hasPackageFiles = filePaths.some(file => 
+      packageFiles.some(pkg => file.endsWith(pkg))
+    );
+    
+    // Check if this is a WordPress plugin/theme update
+    const hasWordPressUpdate = filePaths.some(file => 
+      wordpressPatterns.some(pattern => pattern.test(file))
+    );
+    
+    // Check for dependency update patterns in diff content
+    const depPatterns = [
+      /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm, // package.json version updates
+      /^\+.*version\s*[:=]\s*["'][\d][^"']*["']/gm, // version property updates
+      /^\+.*\b(upgraded|updated|downgraded|bumped)\b.*\b(version|dependency|package)\b/gmi,
+      /^\+.*\b(install|require|include)\b.*\b(package|dependency|module|plugin)\b/gmi
+    ];
+    
+    const hasDependencyChanges = depPatterns.some(pattern => pattern.test(diff));
+    
+    // Also check for large lock files or vendor directories
+    const hasVendorChanges = filePaths.some(file => 
+      /vendor|node_modules|wp-content\/(plugins|themes)/.test(file) &&
+      (file.includes('lock') || file.endsWith('.json') || file.endsWith('.lock'))
+    );
+    
+    return hasPackageFiles || hasWordPressUpdate || hasDependencyChanges || hasVendorChanges;
+  }
+
   /**
    * Extract key context from chunk for better generation
    */
