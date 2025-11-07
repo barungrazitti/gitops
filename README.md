@@ -188,7 +188,13 @@ When you run `aicommit` without a message, it enters interactive mode, which pre
 - **Write custom message:** Choose this option to write your own commit message from scratch.
 - **Cancel:** Exit the interactive mode without making a commit.
 
-**📖 For detailed installation, setup, and usage examples, see [EXAMPLES.md](EXAMPLES.md)**
+**📖 Quick Start:** [QUICK_START.md](QUICK_START.md) - Get running in 3 minutes
+
+**📚 Installation Guides:**
+- [INSTALLATION.md](INSTALLATION.md) - Complete installation guide (npm & clone)
+- [CLONE_INSTALLATION.md](CLONE_INSTALLATION.md) - Install by cloning repository
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Enterprise deployment strategies
+- [EXAMPLES.md](EXAMPLES.md) - Usage examples and advanced features
 
 ### Command Options
 
@@ -315,41 +321,75 @@ Configure files to exclude from analysis:
 aicommit config --set excludeFiles="*.log,dist/**,node_modules/**"
 ```
 
-## 🚀 Production Deployment
+## 📦 Installation
 
-This application is production-ready with comprehensive build and deployment scripts.
-
-### Build for Production
+### Quick Installation (3 Commands)
 
 ```bash
-# Build and validate the application
-npm run build:prod
+# 1. Install Node.js (https://nodejs.org)
+# 2. Clone and install the tool
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm link
 
-# This will:
-# - Clean previous build artifacts
-# - Install dependencies
-# - Run linting and tests
-# - Generate coverage report
-# - Validate package.json
-# - Create build information
+# 3. Setup your AI provider
+aic setup
 ```
 
-### Deploy to Production
+### Platform-Specific Installation
+
+**macOS:**
+```bash
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm link
+```
+
+**Windows:**
+```powershell
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm link
+```
+
+**Linux:**
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install nodejs npm
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+sudo npm link
+
+# CentOS/RHEL/Fedora
+sudo dnf install nodejs npm
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+sudo npm link
+```
+
+### Enterprise Deployment
+
+For team and enterprise deployment strategies, see:
+- [INSTALLATION.md](INSTALLATION.md) - Complete installation guide for all platforms
+- [CLONE_INSTALLATION.md](CLONE_INSTALLATION.md) - Detailed clone installation guide
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Enterprise deployment strategies and CI/CD integration
+
+### Development
 
 ```bash
-# Prepare for deployment
-npm run deploy
-
-# Deploy and publish to npm
-npm run deploy:publish
+# Clone and develop locally
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm run dev
 ```
-
-### Production Scripts
-
-- `npm run build` - Run linting and tests
-- `npm run build:prod` - Full production build with validation
-- `npm run deploy` - Prepare and validate for deployment
-- `npm run deploy:publish` - Deploy and publish to npm
 
 ## 🤝 Contributing
 

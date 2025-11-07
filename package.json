@@ -39,20 +39,13 @@
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "conf": "^10.2.0",
-    "conventional-commits-parser": "^5.0.0",
-    "cosmiconfig": "^8.3.6",
     "fs-extra": "^11.1.1",
-    "git-raw-commits": "^4.0.0",
     "groq-sdk": "^0.33.0",
     "inquirer": "^8.2.6",
     "joi": "^17.11.0",
-    "lodash": "^4.17.21",
     "node-cache": "^5.1.2",
     "ora": "^5.4.1",
-    "rc": "^1.2.8",
-    "semver": "^7.5.4",
-    "simple-git": "^3.20.0",
-    "yaml": "^2.3.4"
+    "simple-git": "^3.20.0"
   },
   "devDependencies": {
     "jest": "^29.7.0"

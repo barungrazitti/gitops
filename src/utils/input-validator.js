@@ -1,7 +1,14 @@
 // Final test with new default model
-export const validateInput = (input) => {
+const validateInput = (input) => {
   if (!input || typeof input !== 'string') {
     throw new Error('Invalid input: must be a non-empty string');
   }
-  return input.trim().length > 0;
+  if (input.trim().length === 0) {
+    throw new Error('Invalid input: must be a non-empty string');
+  }
+  return true;
+};
+
+module.exports = {
+  validateInput
 };
