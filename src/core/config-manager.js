@@ -53,7 +53,7 @@ class ConfigManager {
         formatCommand: 'npm run format',
         aiProvider: 'ollama',
         confirmFixes: true,
-        timeout: 30000,
+        timeout: 120000,
         pushAfterValidation: false,
       },
       // Advanced code formatting settings
