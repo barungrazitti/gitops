@@ -63,6 +63,47 @@ class AIProviderFactory {
   }
 
   /**
+   * Check if a provider is available
+   */
+  static isProviderAvailable(providerName) {
+    const providers = this.getAvailableProviders();
+    return providers.some(p => p.name === providerName.toLowerCase());
+  }
+
+  /**
+   * Get default provider with fallback
+   */
+  static getDefaultProvider() {
+    try {
+      const configManager = require('../core/config-manager');
+      const manager = new configManager();
+      const defaultProvider = manager.get('provider');
+
+      if (defaultProvider && this.isProviderAvailable(defaultProvider)) {
+        return this.create(defaultProvider);
+      }
+    } catch (error) {
+      // Fall through to fallback
+    }
+
+    // Fallback to groq
+    return this.create('groq');
+  }
+
+  /**
+   * Get provider configuration
+   */
+  static getProviderConfig(providerName) {
+    try {
+      const configManager = require('../core/config-manager');
+      const manager = new configManager();
+      return manager.get(providerName) || {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  /**
    * Validate provider configuration
    */
   static async validateProvider(providerName, config) {
