@@ -39,11 +39,11 @@ class AIProviderFactory {
         description: 'Fast inference models',
         requiresApiKey: true,
         models: [
-          'mixtral-8x7b-32768',
-          'llama2-70b-4096',
-          'gemma-7b-it',
-          'llama3-8b-8192',
-          'llama3-70b-8192',
+          'llama-3.1-8b-instant',
+          'llama-3.3-70b-versatile',
+          'openai/gpt-oss-20b',
+          'qwen/qwen3-32b',
+          'meta-llama/llama-4-scout-17b-16e-instruct',
         ],
       },
       {

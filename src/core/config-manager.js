@@ -330,9 +330,13 @@ class ConfigManager {
             config.model &&
             (config.model.includes('mixtral') ||
               config.model.includes('llama') ||
-              config.model.includes('gemma'))
+              config.model.includes('gemma') ||
+              config.model.includes('llama-3.1') ||
+              config.model.includes('llama-3.3') ||
+              config.model.includes('gpt-oss') ||
+              config.model.includes('qwen'))
               ? config.model
-              : 'mixtral-8x7b-32768';
+              : 'llama-3.1-8b-instant';
         break;
       case 'ollama': {
         // For Ollama, always use the default unless it's explicitly an Ollama model

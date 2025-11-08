@@ -347,7 +347,7 @@ class GroqProvider extends BaseProvider {
     return await this.withRetry(async () => {
       return await this.circuitBreaker.execute(async () => {
         const response = await this.client.chat.completions.create({
-          model: config.model || 'llama3-8b-8192',
+          model: config.model || 'llama-3.1-8b-instant',
           messages: [
             {
               role: 'system',
@@ -395,7 +395,7 @@ class GroqProvider extends BaseProvider {
       });
 
       const response = await client.chat.completions.create({
-        model: config.model || 'mixtral-8x7b-32768',
+        model: config.model || 'llama-3.1-8b-instant',
         messages: [
           {
             role: 'user',
@@ -414,7 +414,7 @@ class GroqProvider extends BaseProvider {
       return {
         success: true,
         message: 'Groq connection successful',
-        model: config.model || 'mixtral-8x7b-32768',
+        model: config.model || 'llama-3.1-8b-instant',
         response: content.trim(),
       };
     } catch (error) {
@@ -432,19 +432,24 @@ class GroqProvider extends BaseProvider {
   async getAvailableModels() {
     return [
       {
-        id: 'mixtral-8x7b-32768',
-        name: 'Mixtral 8x7B',
-        description: 'High-performance mixture of experts model',
+        id: 'llama-3.1-8b-instant',
+        name: 'Llama 3.1 8B Instant',
+        description: 'Fast and efficient model by Meta (recommended)',
       },
       {
-        id: 'llama2-70b-4096',
-        name: 'Llama 2 70B',
-        description: 'Large language model by Meta',
+        id: 'llama-3.3-70b-versatile',
+        name: 'Llama 3.3 70B Versatile',
+        description: 'High-performance model by Meta for complex tasks',
       },
       {
-        id: 'gemma-7b-it',
-        name: 'Gemma 7B IT',
-        description: 'Instruction-tuned model by Google',
+        id: 'openai/gpt-oss-120b',
+        name: 'GPT-OSS 120B',
+        description: 'OpenAI\'s flagship open-weight model with reasoning',
+      },
+      {
+        id: 'qwen/qwen3-32b',
+        name: 'Qwen 3 32B',
+        description: 'High-performance model by Alibaba Cloud',
       },
     ];
   }
