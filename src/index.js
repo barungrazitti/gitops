@@ -235,7 +235,7 @@ class AICommitGenerator {
     } else if (options.get) {
       const value = await this.configManager.get(options.get);
       console.log(`${options.get}: ${value || 'not set'}`);
-    } else if (options.list) {
+    } else if (options.list || !options.set && !options.get && !options.reset) {
       const config = await this.configManager.load();
       console.log(chalk.cyan('Current configuration:'));
       Object.entries(config).forEach(([key, value]) => {

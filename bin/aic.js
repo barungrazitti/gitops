@@ -92,6 +92,7 @@ program
   .description('Show current configuration')
   .option('--set <key=value>', 'Set a configuration value')
   .option('--get <key>', 'Get a configuration value')
+  .option('--list', 'List all configuration values')
   .option('--reset', 'Reset configuration to defaults')
   .action(async (options) => {
     try {

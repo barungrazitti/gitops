@@ -341,9 +341,9 @@ class ConfigManager {
       case 'ollama': {
         // For Ollama, always use the default unless it's explicitly an Ollama model
         const ollamaModels = [
+          'qwen2.5-coder:latest',
           'deepseek-v3.1:671b-cloud',
           'qwen3-coder:480b-cloud',
-          'qwen2.5-coder:latest',
           'mistral:7b-instruct',
           'deepseek-r1:8b',
         ];
