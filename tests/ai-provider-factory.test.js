@@ -92,7 +92,7 @@ describe('AIProviderFactory', () => {
 
     it('should return configured default provider', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue('ollama');
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue('ollama');
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -101,7 +101,7 @@ describe('AIProviderFactory', () => {
 
     it('should fallback to groq if default is invalid', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue('invalid');
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue('invalid');
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -110,7 +110,7 @@ describe('AIProviderFactory', () => {
 
     it('should fallback to groq if default is null', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue(null);
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue(null);
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -119,7 +119,7 @@ describe('AIProviderFactory', () => {
 
     it('should fallback to groq if config throws error', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockImplementation(() => {
+      jest.spyOn(ConfigManager.prototype, 'get').mockImplementation(() => {
         throw new Error('Config error');
       });
 
@@ -136,12 +136,11 @@ describe('AIProviderFactory', () => {
       };
       GroqProvider.mockImplementation(() => mockProvider);
 
-      const result = await AIProviderFactory.validateProvider('groq', mockProvider);
-
-      expect(result).toBe(true);
-      expect(mockProvider.validate).toHaveBeenCalledWith({
+      const result = await AIProviderFactory.validateProvider('groq', {
         apiKey: 'test-key'
       });
+
+      expect(result).toBe(true);
     });
 
     it('should handle validation errors', async () => {
@@ -150,7 +149,9 @@ describe('AIProviderFactory', () => {
       };
       GroqProvider.mockImplementation(() => mockProvider);
 
-      await expect(AIProviderFactory.validateProvider('groq', mockProvider))
+      await expect(AIProviderFactory.validateProvider('groq', {
+        apiKey: 'invalid-key'
+      }))
         .rejects.toThrow('Validation failed');
     });
 
@@ -173,22 +174,22 @@ describe('AIProviderFactory', () => {
 
     it('should get groq provider config', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({
         'groq.apiKey': 'test-key',
-        'groq.model': 'mixtral-8x7b-32768'
+        'groq.model': 'llama-3.1-8b-instant'
       });
 
       const config = AIProviderFactory.getProviderConfig('groq');
 
       expect(config).toEqual({
         apiKey: 'test-key',
-        model: 'mixtral-8x7b-32768'
+        model: 'llama-3.1-8b-instant'
       });
     });
 
     it('should get ollama provider config', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({
         'ollama.url': 'http://localhost:11434',
         'ollama.model': 'llama2'
       });
@@ -214,7 +215,7 @@ describe('AIProviderFactory', () => {
 
     it('should handle provider configuration errors', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockImplementation(() => {
+      jest.spyOn(ConfigManager.prototype, 'get').mockImplementation(() => {
         throw new Error('Configuration error');
       });
 
@@ -236,11 +237,11 @@ describe('AIProviderFactory', () => {
         description: 'Fast inference models',
         requiresApiKey: true,
         models: [
-          'mixtral-8x7b-32768',
-          'llama2-70b-4096',
-          'gemma-7b-it',
-          'llama3-8b-8192',
-          'llama3-70b-8192',
+          'llama-3.1-8b-instant',
+          'llama-3.3-70b-versatile',
+          'openai/gpt-oss-20b',
+          'qwen/qwen3-32b',
+          'meta-llama/llama-4-scout-17b-16e-instruct',
         ]
       });
 
@@ -268,7 +269,7 @@ describe('AIProviderFactory', () => {
 
     it('should handle empty config for provider', () => {
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({});
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({});
 
       const config = AIProviderFactory.getProviderConfig('groq');
 

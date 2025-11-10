@@ -746,6 +746,326 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       // Silently fail if logging fails
     }
   }
+
+  /**
+   * Preprocess and chunk diff for large content
+   */
+  preprocessDiff(diff, maxChunkSize = 4000) {
+    // First check if diff is already reasonable size
+    if (!diff || diff.length < maxChunkSize) {
+      return diff;
+    }
+
+    // Use the existing preprocessing logic
+    return this.preprocessDiff(diff);
+  }
+
+  /**
+   * Chunk diff into smaller pieces
+   */
+  chunkDiff(diff, maxTokens = 4000) {
+    const lines = diff.split('\n');
+    const chunks = [];
+    let currentChunk = [];
+    let currentSize = 0;
+
+    for (const line of lines) {
+      const lineSize = line.length;
+
+      // If a single line is too big, try to break it down
+      if (lineSize > maxTokens) {
+        // For very long lines, break into smaller segments
+        for (let i = 0; i < line.length; i += maxTokens) {
+          const segment = line.substring(i, i + maxTokens);
+          chunks.push(segment);
+        }
+        continue;
+      }
+
+      if (currentSize + lineSize > maxTokens && currentChunk.length > 0) {
+        // Add current chunk to results and start new chunk
+        chunks.push(currentChunk.join('\n'));
+        currentChunk = [line];
+        currentSize = lineSize;
+      } else {
+        // Add to current chunk
+        currentChunk.push(line);
+        currentSize += lineSize;
+      }
+    }
+
+    // Add the last chunk if it's not empty
+    if (currentChunk.length > 0) {
+      chunks.push(currentChunk.join('\n'));
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Estimate token count in text
+   */
+  estimateTokens(text) {
+    if (!text) return 0;
+    
+    // Rough estimation: 1 token ≈ 4 characters for English text
+    // Be more conservative for Groq due to strict limits
+    return Math.ceil(text.length / 3.5);
+  }
+
+  /**
+   * Analyze diff for semantic changes
+   */
+  analyzeDiff(diff) {
+    const lines = diff.split('\n');
+    const changes = [];
+    let currentFile = null;
+
+    lines.forEach(line => {
+      // Look for file headers
+      const fileMatch = line.match(/diff --git a\/(.+) b\/(.+)/);
+      if (fileMatch) {
+        currentFile = {
+          file: fileMatch[2],
+          additions: 0,
+          deletions: 0,
+          changes: []
+        };
+        changes.push(currentFile);
+      }
+
+      // Count additions and deletions
+      if (currentFile) {
+        if (line.startsWith('+') && !line.startsWith('+++')) {
+          currentFile.additions++;
+          currentFile.changes.push({ type: 'addition', content: line.substring(1) });
+        } else if (line.startsWith('-') && !line.startsWith('---')) {
+          currentFile.deletions++;
+          currentFile.changes.push({ type: 'deletion', content: line.substring(1) });
+        }
+      }
+    });
+
+    // Calculate overall summary
+    const summary = {
+      files: changes.length,
+      additions: changes.reduce((sum, file) => sum + file.additions, 0),
+      deletions: changes.reduce((sum, file) => sum + file.deletions, 0)
+    };
+
+    return {
+      summary,
+      changes,
+      keyChanges: this.extractKeyChanges(changes),
+      semanticChanges: this.extractSemanticChanges(diff),
+      likelyPurpose: this.inferLikelyPurpose(changes)
+    };
+  }
+
+  /**
+   * Extract key changes from diff
+   */
+  extractKeyChanges(changes) {
+    const keyChanges = [];
+    
+    changes.forEach(change => {
+      if (change.additions > 0 && change.deletions === 0) {
+        keyChanges.push(`new file: ${change.file}`);
+      } else if (change.additions > 0 && change.deletions > 0) {
+        keyChanges.push(`modifications in: ${change.file}`);
+      } else if (change.additions === 0 && change.deletions > 0) {
+        keyChanges.push(`deletions in: ${change.file}`);
+      }
+    });
+    
+    return keyChanges;
+  }
+
+  /**
+   * Extract semantic changes from diff (functions, classes, etc.)
+   */
+  extractSemanticChanges(diff) {
+    const semanticChanges = {
+      newFunctions: [],
+      modifiedFunctions: [],
+      newClasses: [],
+      apiChanges: [],
+      testChanges: [],
+      configChanges: [],
+      breakingChanges: [],
+    };
+    
+    const lines = diff.split('\n');
+    
+    for (const line of lines) {
+      if (line.startsWith('+')) {
+        const content = line.substring(1);
+        
+        // Match new functions
+        const funcMatch = content.match(/\b(?:function|const|let|var)\s+(\w+)/);
+        if (funcMatch) {
+          semanticChanges.newFunctions.push(funcMatch[1]);
+        }
+        
+        // Match new classes
+        const classMatch = content.match(/\bclass\s+(\w+)/);
+        if (classMatch) {
+          semanticChanges.newClasses.push(classMatch[1]);
+        }
+        
+        // Match API changes
+        const apiMatch = content.match(/app\.(get|post|put|delete|patch)\(['"`](.+?)['"`]/);
+        if (apiMatch) {
+          semanticChanges.apiChanges.push(`${apiMatch[1].toUpperCase()} ${apiMatch[2]}`);
+        }
+        
+        // Match config changes
+        if (/require\(['"`]config|import.*config|process\.env/.test(content)) {
+          semanticChanges.configChanges.push(content.trim());
+        }
+        
+        // Match test changes
+        if (/\b(describe|it|test|expect|assert)\b/.test(content)) {
+          semanticChanges.testChanges.push(content.trim());
+        }
+        
+        // Match potential breaking changes
+        if (/\b(?:removed|deleted|breaking|BREAKING)\b/.test(content)) {
+          semanticChanges.breakingChanges.push(content.trim());
+        }
+      }
+    }
+    
+    return semanticChanges;
+  }
+
+  /**
+   * Infer likely purpose of changes
+   */
+  inferLikelyPurpose(changes) {
+    if (changes.some(change => change.file && change.file.includes('test'))) {
+      return 'test-related changes';
+    } else if (changes.some(change => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file))) {
+      return 'javascript/typescript changes';
+    } else if (changes.some(change => change.file && /\.(py)$/.test(change.file))) {
+      return 'python changes';
+    } else if (changes.some(change => change.file && /\.(php)$/.test(change.file))) {
+      return 'php changes';
+    } else if (changes.some(change => {
+      return change.changes && change.changes.some(c => 
+        c.content && /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
+      );
+    })) {
+      return 'bug fix';
+    } else if (changes.some(change => {
+      return change.changes && change.changes.some(c => 
+        c.content && /\b(feature|add|implement|create|new)\b/i.test(c.content)
+      );
+    })) {
+      return 'feature addition';
+    } else {
+      return 'general modification';
+    }
+  }
+
+  /**
+   * Preprocess diff before sending to AI
+   */
+  preprocessDiff(diff) {
+    // Remove binary file indicators
+    let processed = diff.replace(
+      /^Binary files? .* differ$/gm,
+      '[Binary file modified]'
+    );
+
+    // Remove timestamps and other noise that might confuse the AI
+    processed = processed.replace(/index [a-f0-9]+\.\.[a-f0-9]+ [0-7]+/gm, 'index [hash]..[hash] [mode]');
+    
+    // Truncate very long lines to prevent token flooding
+    const lines = processed.split('\n');
+    const maxLineLength = 200;
+    const truncatedLines = lines.map(line => {
+      if (line.length > maxLineLength && 
+          (line.startsWith('+') || line.startsWith('-') || line.startsWith(' '))) {
+        return line.substring(0, maxLineLength) + '... [truncated]';
+      }
+      return line;
+    });
+    
+    return truncatedLines.join('\n');
+  }
+
+  /**
+   * Generate commit messages from diff chunks
+   */
+  async generateFromChunks(diff, options = {}, maxTokens = 4000) {
+    const chunks = this.chunkDiff(diff, maxTokens);
+    const allMessages = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const isLastChunk = i === chunks.length - 1;
+      const chunkOptions = {
+        ...options,
+        chunkIndex: i,
+        totalChunks: chunks.length,
+        isLastChunk: isLastChunk,
+        chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle'
+      };
+
+      try {
+        const messages = await this.generateCommitMessages(chunk, chunkOptions);
+        allMessages.push(...messages);
+      } catch (error) {
+        // If any chunk fails, return early
+        throw error;
+      }
+    }
+
+    // Return unique messages
+    return [...new Set(allMessages)];
+  }
+
+  /**
+   * Send HTTP request with error handling
+   */
+  async sendHTTPRequest(url, options = {}) {
+    try {
+      const config = await this.getConfig();
+      const axios = require('axios');
+      
+      // Set default timeout and merge with user options
+      const requestOptions = {
+        timeout: config.timeout || 120000,
+        ...options
+      };
+
+      const response = await axios(url, requestOptions);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, this.name);
+    }
+  }
+
+  /**
+   * Make direct API request for provider-specific operations
+   */
+  async makeDirectAPIRequest(endpoint, params = {}) {
+    try {
+      const config = await this.getConfig();
+      return await this.sendHTTPRequest(`${this.baseURL}${endpoint}`, params);
+    } catch (error) {
+      throw new Error(`Direct API request failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Cleanup method for resource release
+   */
+  cleanup() {
+    // Base cleanup method - can be extended by subclasses
+    this.client = null;
+  }
 }
 
 module.exports = BaseProvider;

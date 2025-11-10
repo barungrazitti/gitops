@@ -170,6 +170,71 @@ class CircuitBreaker {
   }
 
   /**
+   * Get current state of the circuit breaker
+   */
+  getState() {
+    return this.state;
+  }
+
+  /**
+   * Get circuit breaker statistics
+   */
+  getStats() {
+    const now = Date.now();
+    const activeWindowMs = now - this.metrics.lastStateChange;
+    const successRate = this.metrics.totalRequests > 0 
+      ? (this.metrics.successfulRequests / this.metrics.totalRequests) * 100 
+      : 100;
+
+    return {
+      state: this.state,
+      successRate: Math.round(successRate * 100) / 100,
+      totalRequests: this.metrics.totalRequests,
+      successfulRequests: this.metrics.successfulRequests,
+      failedRequests: this.metrics.failedRequests,
+      lastFailureTime: this.lastFailureTime,
+      failureCount: this.failureCount,
+      successCount: this.successCount,
+      windowDuration: activeWindowMs,
+      isOpen: this.state === 'OPEN',
+    };
+  }
+
+  /**
+   * Get detailed metrics
+   */
+  getMetrics() {
+    return this.metrics;
+  }
+
+  /**
+   * Reset circuit breaker metrics
+   */
+  resetMetrics() {
+    this.requestCount = 0;
+    this.successCount = 0;
+    this.failureCount = 0;
+    this.metrics = {
+      totalRequests: 0,
+      successfulRequests: 0,
+      failedRequests: 0,
+      averageResponseTime: 0,
+      lastStateChange: Date.now()
+    };
+  }
+
+  /**
+   * Clean up resources
+   */
+  dispose() {
+    // Clear any scheduled timers or listeners if needed
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+  }
+
+  /**
    * Check if circuit breaker should allow requests
    */
   canExecute() {

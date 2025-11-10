@@ -498,7 +498,7 @@ echo Installation complete!
       const configFile = path.join(testDir, '.aic', 'config.json');
       const config = {
         provider: 'groq',
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
         conventionalCommits: true
       };
 
@@ -512,7 +512,7 @@ echo Installation complete!
       const validConfig = {
         provider: 'groq',
         apiKey: 'sk-test123',
-        model: 'mixtral-8x7b-32768'
+        model: 'llama-3.1-8b-instant'
       };
 
       const validationResult = await validateConfiguration(validConfig);
@@ -664,7 +664,7 @@ echo Installation complete!
   async function createDefaultConfiguration() {
     return {
       provider: 'groq',
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-8b-instant',
       conventionalCommits: true,
       language: 'en',
       messageCount: 3

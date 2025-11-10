@@ -800,6 +800,125 @@ class AnalysisEngine {
 
     return complexity;
   }
+
+  /**
+   * Analyze code complexity with enhanced detection
+   */
+  analyzeComplexityWithEnhancement(diff) {
+    const lines = diff.split('\n');
+    const addedLines = lines.filter((line) => line.startsWith('+')).length;
+    const removedLines = lines.filter((line) => line.startsWith('-')).length;
+
+    // Enhanced complexity indicators
+    const complexity = {
+      linesAdded: addedLines,
+      linesRemoved: removedLines,
+      netChange: addedLines - removedLines,
+      hasLogic: /if|else|for|while|switch|try|catch/.test(diff),
+      hasImports: /import|require|from/.test(diff),
+      hasExports: /export|module\.exports/.test(diff),
+      hasFunctions: /function|=>|def |class |constructor/.test(diff),
+      hasTests: /test|spec|describe|it\(|expect|assert/.test(diff),
+      hasConfig: /config|env|setting|constant/.test(diff),
+      hasAuth: /auth|login|user|session|jwt|passport/.test(diff),
+      hasApi: /api|endpoint|route|controller|handler/.test(diff),
+      hasDb: /database|db|model|schema|migration|sql/.test(diff),
+      hasUi: /component|view|template|style|css|html/.test(diff),
+      hasFix: /fix|bug|error|issue|problem|correct/.test(diff),
+      hasFeature: /add|new|implement|create|introduce|feature/.test(diff),
+      hasRefactor: /refactor|restructure|reorganize|clean|improve/.test(diff),
+      hasPerf: /performance|optimize|cache|lazy|memo|speed/.test(diff),
+      hasDocs: /doc|readme|comment|documentation/.test(diff),
+      hasDeps: /package|npm|yarn|dependency|requirement/.test(diff),
+    };
+
+    // Enhanced change type determination with priority scoring
+    const typeScores = {
+      test: complexity.hasTests ? 10 : 0,
+      fix: complexity.hasFix ? 9 : 0,
+      feat: complexity.hasFeature ? 8 : 0,
+      refactor: complexity.hasRefactor ? 7 : 0,
+      perf: complexity.hasPerf ? 6 : 0,
+      docs: complexity.hasDocs ? 5 : 0,
+      deps: complexity.hasDeps ? 4 : 0,
+      chore: complexity.hasConfig ? 3 : 0,
+      build: 0,
+      ci: 0,
+      style: 0,
+    };
+
+    // Determine primary change type based on highest score
+    let maxScore = 0;
+    let primaryType = 'chore';
+
+    for (const [type, score] of Object.entries(typeScores)) {
+      if (score > maxScore) {
+        maxScore = score;
+        primaryType = type;
+      }
+    }
+
+    // Fallback logic for edge cases
+    if (maxScore === 0) {
+      if (complexity.hasImports || complexity.hasExports) {
+        primaryType = 'refactor';
+      } else if (addedLines === 0 && removedLines > 0) {
+        primaryType = 'remove';
+      } else if (complexity.hasFunctions && addedLines > removedLines) {
+        primaryType = 'feat';
+      } else if (complexity.hasLogic) {
+        primaryType = 'fix';
+      }
+    }
+
+    complexity.changeType = primaryType;
+    complexity.confidence = maxScore > 0 ? maxScore / 10 : 0.1;
+
+    return complexity;
+  }
+
+  /**
+   * Extract code changes from diff with advanced filtering
+   */
+  extractCodeChanges(diff, minLineLength = 10) {
+    const lines = diff.split('\n');
+    let currentFile = '';
+    const changes = [];
+
+    // Track current file context
+    lines.forEach(line => {
+      const fileMatch = line.match(/diff --git a\/(.+) b\/(.+)/);
+      if (fileMatch) {
+        currentFile = fileMatch[2];
+      }
+
+      // Capture + and - lines that are meaningful code changes
+      if ((line.startsWith('+') || line.startsWith('-')) && 
+          !line.startsWith('+++') && 
+          !line.startsWith('---') && 
+          !/^[\s\-\+]*(function|class|import|export|const|let|var|def|if|else|for|while|return|switch|case).*$/i.test(line.substring(1).trim())) {
+        const content = line.substring(1).trim();
+        
+        // Filter out comments and very short lines
+        if (content.length >= minLineLength && 
+            !content.startsWith('//') && 
+            !content.startsWith('/*') && 
+            !content.startsWith('*') && 
+            !content.startsWith('*/') && 
+            !content.startsWith('#') &&
+            !content.match(/^[\s\*\/]+$/)) { // Empty or whitespace-only lines
+          changes.push({
+            file: currentFile,
+            type: line.startsWith('+') ? 'addition' : 'deletion',
+            content: content,
+            lineNum: -1 // Not tracking exact line numbers in diff analysis
+          });
+        }
+      }
+    });
+
+    return changes;
+  }
 }
 
 module.exports = AnalysisEngine;

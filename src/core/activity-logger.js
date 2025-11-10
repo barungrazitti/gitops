@@ -423,6 +423,26 @@ class ActivityLogger {
     
     return csvLines.join('\n');
   }
+
+  /**
+   * Export logs with different formats
+   */
+  async exportLogs(format = 'json', options = {}) {
+    const logs = this.buffer;
+    
+    switch (format.toLowerCase()) {
+      case 'json':
+        return JSON.stringify(logs, null, 2);
+      case 'csv':
+        return this.convertToCSV(logs);
+      case 'text':
+        return logs.map(log => 
+          `[${new Date(log.timestamp).toISOString()}] ${log.level.toUpperCase()} ${log.action}${log.data ? ': ' + JSON.stringify(log.data) : ''}`
+        ).join('\n');
+      default:
+        throw new Error(`Unsupported format: ${format}. Use 'json', 'csv', or 'text'.`);
+    }
+  }
 }
 
 module.exports = ActivityLogger;

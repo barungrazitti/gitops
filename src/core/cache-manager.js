@@ -441,6 +441,131 @@ class CacheManager {
       })
       .map(line => line.substring(1).trim().toLowerCase());
   }
+
+  /**
+   * Validate semantic similarity between diffs
+   */
+  validateSemanticSimilarity(diff1, diff2, threshold = 0.7) {
+    try {
+      const fingerprint1 = this.extractSemanticFingerprint(diff1);
+      const fingerprint2 = this.extractSemanticFingerprint(diff2);
+      
+      if (fingerprint1 === fingerprint2) {
+        return true; // Exact match
+      }
+      
+      // Extract actual code changes for comparison
+      const changes1 = this.extractCodeChanges(diff1);
+      const changes2 = this.extractCodeChanges(diff2);
+      
+      if (changes1.length === 0 || changes2.length === 0) {
+        return false; // Nothing to compare
+      }
+      
+      // Calculate Jaccard similarity for code changes
+      const set1 = new Set(changes1);
+      const set2 = new Set(changes2);
+      const intersection = new Set([...set1].filter(x => set2.has(x)));
+      const union = new Set([...set1, ...set2]);
+      
+      const similarity = intersection.size / union.size;
+      return similarity >= threshold;
+    } catch (error) {
+      console.warn('Cache similarity validation error:', error.message);
+      return false;
+    }
+  }
+
+  /**
+   * Get cache statistics that includes both memory and persistent cache
+   */
+  getStats() {
+    const memoryStats = this.memoryCache.getStats();
+    
+    return {
+      memory: {
+        keys: memoryStats.keys,
+        hits: memoryStats.hits,
+        misses: memoryStats.misses,
+        hitRate: memoryStats.hits + memoryStats.misses > 0 
+          ? (memoryStats.hits / (memoryStats.hits + memoryStats.misses)) * 100 
+          : 0
+      },
+      persistent: {
+        directory: this.cacheDir,
+        fileCount: 0, // Placeholder - would require counting cache files
+        size: 0       // Placeholder - would require calculating cache size
+      },
+      totalSize: memoryStats.keys + this.getPersistentCacheCount()
+    };
+  }
+
+  /**
+   * Get count of persistent cache files
+   */
+  async getPersistentCacheCount() {
+    try {
+      if (!fs.existsSync(this.cacheDir)) {
+        return 0;
+      }
+      const files = await fs.readdir(this.cacheDir);
+      return files.filter(f => f.endsWith('.json')).length;
+    } catch (error) {
+      return 0;
+    }
+  }
+
+  /**
+   * Find similar cache key
+   */
+  async findSimilarKey(targetDiff, threshold = 0.7) {
+    const keys = this.memoryCache.keys();
+    
+    for (const key of keys) {
+      const cached = this.memoryCache.get(key);
+      if (cached && cached.diff) {
+        if (this.validateSemanticSimilarity(targetDiff, cached.diff, threshold)) {
+          return key;
+        }
+      }
+    }
+    
+    // Also check persistent cache
+    if (fs.existsSync(this.cacheDir)) {
+      const files = await fs.readdir(this.cacheDir);
+      const cacheFiles = files.filter(f => f.endsWith('.json'));
+      
+      for (const file of cacheFiles) {
+        const filePath = path.join(this.cacheDir, file);
+        try {
+          const cacheData = await fs.readJson(filePath);
+          if (cacheData.diff && this.validateSemanticSimilarity(targetDiff, cacheData.diff, threshold)) {
+            return file.replace('.json', '');
+          }
+        } catch (error) {
+          // Skip corrupted files
+          continue;
+        }
+      }
+    }
+    
+    return null;
+  }
+
+  /**
+   * Find similar cached entries
+   */
+  async findSimilar(diff, threshold = 0.7) {
+    const similarKey = await this.findSimilarKey(diff, threshold);
+    if (similarKey) {
+      const cached = this.memoryCache.get(similarKey);
+      if (cached) {
+        return cached.messages;
+      }
+    }
+    
+    return null;
+  }
 }
 
 module.exports = CacheManager;

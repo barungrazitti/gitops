@@ -89,7 +89,7 @@ describe('ConfigManager - Corrected Coverage', () => {
     it('should extract provider-specific config', async () => {
       const config = {
         apiKey: 'test-key',
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
         temperature: 0.7
       };
       

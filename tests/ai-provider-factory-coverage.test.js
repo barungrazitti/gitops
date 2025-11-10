@@ -92,7 +92,7 @@ describe('AIProviderFactory - Additional Coverage', () => {
     it('should extract provider-specific config from full config', () => {
       const fullConfig = {
         'groq.apiKey': 'test-key',
-        'groq.model': 'mixtral-8x7b-32768',
+        'groq.model': 'llama-3.1-8b-instant',
         'groq.temperature': 0.7,
         'ollama.url': 'http://localhost:11434',
         'ollama.model': 'llama2',
@@ -105,7 +105,7 @@ describe('AIProviderFactory - Additional Coverage', () => {
 
       expect(groqConfig).toEqual({
         apiKey: 'test-key',
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
         temperature: 0.7
       });
     });
@@ -208,7 +208,7 @@ describe('AIProviderFactory - Additional Coverage', () => {
 
       const groqProvider = providers.find(p => p.name === 'groq');
       expect(groqProvider.models).toEqual([
-        'mixtral-8x7b-32768',
+        'llama-3.1-8b-instant',
         'llama2-70b-4096',
         'gemma-7b-it',
         'llama3-8b-8192',

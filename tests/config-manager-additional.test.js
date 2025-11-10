@@ -86,7 +86,7 @@ describe('ConfigManager - Additional Coverage', () => {
     it('should validate groq config', () => {
       const validGroqConfig = {
         apiKey: 'gsk_test_key',
-        model: 'mixtral-8x7b-32768'
+        model: 'llama-3.1-8b-instant'
       };
 
       const result = configManager.validateConfig('groq', validGroqConfig);
@@ -359,7 +359,7 @@ describe('ConfigManager - Additional Coverage', () => {
       
       expect(defaults).toHaveProperty('groq');
       expect(defaults).toHaveProperty('ollama');
-      expect(defaults.groq.model).toBe('mixtral-8x7b-32768');
+      expect(defaults.groq.model).toBe('llama-3.1-8b-instant');
       expect(defaults.ollama.url).toBe('http://localhost:11434');
     });
 

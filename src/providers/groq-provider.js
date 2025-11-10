@@ -453,6 +453,84 @@ class GroqProvider extends BaseProvider {
       },
     ];
   }
+
+  /**
+   * Build the request object for Groq API
+   */
+  buildRequest(prompt, options = {}, config = {}) {
+    return {
+      model: options.model || config.model || this.model,
+      messages: [
+        {
+          role: 'system',
+          content: options.systemPrompt || 'You are an expert software developer who helps generate concise, meaningful commit messages.'
+        },
+        {
+          role: 'user',
+          content: prompt
+        }
+      ],
+      temperature: options.temperature ?? config.temperature ?? this.temperature,
+      max_tokens: options.maxTokens ?? config.maxTokens ?? this.maxTokens,
+      timeout: options.timeout ?? config.timeout ?? this.timeout,
+    };
+  }
+
+  /**
+   * Parse the response from Groq API
+   */
+  parseResponse(response) {
+    if (!response || !response.choices || !Array.isArray(response.choices)) {
+      throw new Error('Invalid response format from Groq API');
+    }
+
+    if (response.choices.length === 0) {
+      throw new Error('No choices returned from Groq API');
+    }
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('No message content in Groq response');
+    }
+
+    // Split content by newlines and clean up
+    const messages = content
+      .split('\n')
+      .map(msg => msg.trim())
+      .filter(msg => msg.length > 0);
+
+    return messages;
+  }
+
+  /**
+   * Make direct API request to Groq
+   */
+  async makeDirectAPIRequest(endpoint, params = {}) {
+    try {
+      const config = await this.getConfig();
+      const response = await this.sendHTTPRequest(
+        `${this.baseURL}${endpoint}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          ...params
+        }
+      );
+      return response;
+    } catch (error) {
+      throw new Error(`Groq direct API request failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Cleanup resources
+   */
+  cleanup() {
+    this.client = null;
+  }
 }
 
 module.exports = GroqProvider;

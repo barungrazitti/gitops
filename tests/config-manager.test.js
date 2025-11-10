@@ -243,7 +243,7 @@ describe('ConfigManager', () => {
       const config = await configManager.getProviderConfig('groq');
       
       expect(config.apiKey).toBe('test-key');
-      expect(config.model).toBe('mixtral-8x7b-32768');
+      expect(config.model).toBe('llama-3.1-8b-instant');
       expect(config.maxTokens).toBe(150);
       expect(config.temperature).toBe(0.7);
     });

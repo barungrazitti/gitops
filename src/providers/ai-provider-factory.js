@@ -149,6 +149,34 @@ class AIProviderFactory {
   }
 
   /**
+   * Set provider-specific configuration
+   */
+  static async setProviderConfig(providerName, config) {
+    if (!providerName) {
+      throw new Error('Provider name is required');
+    }
+
+    if (!config || typeof config !== 'object') {
+      return; // Nothing to set
+    }
+
+    const availableProviders = this.getAvailableProviders();
+    const providerInfo = availableProviders.find(p => p.name === providerName.toLowerCase());
+
+    if (!providerInfo) {
+      throw new Error(`Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`);
+    }
+
+    const configManager = require('../core/config-manager');
+    const manager = new configManager();
+    
+    // Set provider-specific configs
+    for (const [key, value] of Object.entries(config)) {
+      await manager.set(`${providerName}.${key}`, value);
+    }
+  }
+
+  /**
    * Get available models for all providers
    */
   static async getAllAvailableModels(configs = {}) {

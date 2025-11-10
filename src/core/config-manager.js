@@ -347,17 +347,32 @@ class ConfigManager {
           'mistral:7b-instruct',
           'deepseek-r1:8b',
         ];
-        providerConfig.model = ollamaModels.includes(config.model)
+        providerConfig.model = ollamaModels.includes(config.model || '')
           ? config.model
           : 'qwen2.5-coder:latest';
         providerConfig.baseURL = 'http://localhost:11434';
         break;
       }
+      default:
+        // For unknown providers, use basic config
+        providerConfig.model = config.model || 'default-model';
+        break;
       }
 
       return providerConfig;
     } catch (error) {
       throw new Error(`Failed to get provider configuration: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all configuration
+   */
+  async getAll() {
+    try {
+      return this.config.store;
+    } catch (error) {
+      throw new Error(`Failed to get all configuration: ${error.message}`);
     }
   }
 
@@ -378,6 +393,79 @@ class ConfigManager {
     }
 
     return true;
+  }
+
+  /**
+   * Validate provider configuration
+   */
+  async validateProviderConfig(provider, config = {}) {
+    if (!provider) {
+      throw new Error('Provider name is required');
+    }
+
+    const availableProviders = ['groq', 'ollama'];
+    if (!availableProviders.includes(provider.toLowerCase())) {
+      return {
+        valid: false,
+        errors: [`Unknown provider: ${provider}`]
+      };
+    }
+
+    const errors = [];
+
+    switch (provider.toLowerCase()) {
+      case 'groq':
+        if (!config.apiKey) {
+          errors.push('API key is required');
+        }
+        break;
+      case 'ollama':
+        // Ollama doesn't require API key but may need other validations
+        if (config.url && !this.isValidUrl(config.url)) {
+          errors.push('Invalid URL format for Ollama');
+        }
+        break;
+    }
+
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+  
+  /**
+   * Helper function to validate URL format
+   */
+  isValidUrl(string) {
+    try {
+      new URL(string);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /**
+   * Merge configuration objects
+   */
+  mergeConfig(base, override) {
+    if (!base && !override) return {};
+    if (!base) return override;
+    if (!override) return base;
+
+    const result = { ...base };
+    
+    for (const [key, value] of Object.entries(override)) {
+      if (value !== undefined && value !== null) {
+        if (typeof value === 'object' && value !== null && !Array.isArray(value) && typeof result[key] === 'object' && result[key] !== null) {
+          result[key] = this.mergeConfig(result[key], value);
+        } else {
+          result[key] = value;
+        }
+      }
+    }
+
+    return result;
   }
 }
 

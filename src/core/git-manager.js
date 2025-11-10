@@ -382,6 +382,37 @@ class GitManager {
       throw new Error(`Failed to reset staged changes: ${error.message}`);
     }
   }
+
+  /**
+   * Get repository root path
+   */
+  async getRepositoryRoot() {
+    try {
+      const root = await this.git.revparse(['--show-toplevel']);
+      return root.trim();
+    } catch (error) {
+      throw new Error(`Failed to get repository root: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get list of all changed files (staged and unstaged)
+   */
+  async getAllChangedFiles() {
+    try {
+      const status = await this.git.status();
+      const allChanged = [
+        ...status.staged,
+        ...status.modified,
+        ...status.not_added,
+        ...status.deleted,
+        ...status.created
+      ];
+      return [...new Set(allChanged)]; // Remove duplicates
+    } catch (error) {
+      throw new Error(`Failed to get all changed files: ${error.message}`);
+    }
+  }
 }
 
 module.exports = GitManager;

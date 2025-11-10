@@ -161,7 +161,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue('ollama');
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue('ollama');
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -174,7 +174,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue('invalid');
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue('invalid');
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -187,7 +187,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue(null);
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue(null);
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -202,7 +202,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockImplementation(() => {
+      jest.spyOn(ConfigManager.prototype, 'get').mockImplementation(() => {
         throw new Error('Config error');
       });
 
@@ -217,7 +217,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue(undefined);
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue(undefined);
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -230,7 +230,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue('');
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue('');
 
       const defaultProvider = AIProviderFactory.getDefaultProvider();
 
@@ -245,7 +245,9 @@ describe('AIProviderFactory - Fixed', () => {
       };
       GroqProvider.mockImplementation(() => mockProvider);
 
-      const result = await AIProviderFactory.validateProvider('groq', mockProvider);
+      const result = await AIProviderFactory.validateProvider('groq', {
+        apiKey: 'test-key'
+      });
 
       expect(result).toBe(true);
       expect(mockProvider.validate).toHaveBeenCalledWith({
@@ -259,7 +261,9 @@ describe('AIProviderFactory - Fixed', () => {
       };
       GroqProvider.mockImplementation(() => mockProvider);
 
-      await expect(AIProviderFactory.validateProvider('groq', mockProvider))
+      await expect(AIProviderFactory.validateProvider('groq', {
+        apiKey: 'invalid-key'
+      }))
         .rejects.toThrow('Invalid API key');
     });
 
@@ -279,7 +283,7 @@ describe('AIProviderFactory - Fixed', () => {
       GroqProvider.mockImplementation(() => mockProvider);
       const customConfig = { apiKey: 'custom-key', model: 'custom-model' };
 
-      const result = await AIProviderFactory.validateProvider('groq', mockProvider, customConfig);
+      const result = await AIProviderFactory.validateProvider('groq', customConfig);
 
       expect(result).toBe(true);
       expect(mockProvider.validate).toHaveBeenCalledWith(customConfig);
@@ -310,21 +314,21 @@ describe('AIProviderFactory - Fixed', () => {
       jest.doMock('../src/core/config-manager', () => ({
         get: jest.fn().mockReturnValue({
           'groq.apiKey': 'test-key',
-          'groq.model': 'mixtral-8x7b-32768'
+          'groq.model': 'llama-3.1-8b-instant'
         })
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({
         'groq.apiKey': 'test-key',
-        'groq.model': 'mixtral-8x7b-32768'
+        'groq.model': 'llama-3.1-8b-instant'
       });
 
       const config = AIProviderFactory.getProviderConfig('groq');
 
       expect(config).toEqual({
         apiKey: 'test-key',
-        model: 'mixtral-8x7b-32768'
+        model: 'llama-3.1-8b-instant'
       });
     });
 
@@ -337,7 +341,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({
         'ollama.url': 'http://localhost:11434',
         'ollama.model': 'llama2'
       });
@@ -358,7 +362,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockImplementation(() => {
+      jest.spyOn(ConfigManager.prototype, 'get').mockImplementation(() => {
         throw new Error('Configuration error');
       });
 
@@ -374,7 +378,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({
         'other.setting': 'value'
       });
 
@@ -389,7 +393,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockReturnValue({});
+      jest.spyOn(ConfigManager.prototype, 'get').mockReturnValue({});
 
       const config = AIProviderFactory.getProviderConfig('groq');
 
@@ -406,7 +410,7 @@ describe('AIProviderFactory - Fixed', () => {
       }));
 
       const { ConfigManager } = require('../src/core/config-manager');
-      ConfigManager.get = jest.fn().mockImplementation(() => {
+      jest.spyOn(ConfigManager.prototype, 'get').mockImplementation(() => {
         throw new TypeError('Cannot read property of undefined');
       });
 
@@ -495,11 +499,11 @@ describe('AIProviderFactory - Fixed', () => {
         description: 'Fast inference models',
         requiresApiKey: true,
         models: [
-          'mixtral-8x7b-32768',
-          'llama2-70b-4096',
-          'gemma-7b-it',
-          'llama3-8b-8192',
-          'llama3-70b-8192',
+          'llama-3.1-8b-instant',
+          'llama-3.3-70b-versatile',
+          'openai/gpt-oss-20b',
+          'qwen/qwen3-32b',
+          'meta-llama/llama-4-scout-17b-16e-instruct',
         ]
       });
 

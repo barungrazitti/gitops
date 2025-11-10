@@ -313,6 +313,30 @@ class OllamaProvider extends BaseProvider {
 
     super.handleError(error, providerName);
   }
+
+  /**
+   * Get available models for Ollama
+   */
+  async getAvailableModels() {
+    try {
+      const config = await this.getConfig();
+      // Return default models for Ollama
+      return [
+        { id: 'deepseek-v3.1:671b-cloud', name: 'DeepSeek V3.1 671B Cloud', description: 'Large model for complex code generation' },
+        { id: 'qwen3-coder:480b-cloud', name: 'Qwen3 Coder 480B Cloud', description: 'Qwen model for coding tasks' },
+        { id: 'qwen2.5-coder:latest', name: 'Qwen 2.5 Coder Latest', description: 'Latest Qwen model for coding' },
+        { id: 'mistral:7b-instruct', name: 'Mistral 7B Instruct', description: 'Fast and efficient model' },
+        { id: 'deepseek-r1:8b', name: 'DeepSeek R1 8B', description: 'Smaller model for simpler tasks' }
+      ];
+    } catch (error) {
+      console.warn('Failed to get Ollama models:', error.message);
+      // Return default models if API call fails
+      return [
+        { id: 'qwen2.5-coder:latest', name: 'Qwen 2.5 Coder', description: 'Default Ollama model' },
+        { id: 'mistral:7b-instruct', name: 'Mistral 7B', description: 'Alternative Ollama model' }
+      ];
+    }
+  }
 }
 
 module.exports = OllamaProvider;

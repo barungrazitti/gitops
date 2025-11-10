@@ -929,7 +929,7 @@ describe('Utils - Target 90% Coverage', () => {
       it('should accept valid config object', () => {
         const config = {
           apiKey: 'sk-123456',
-          model: 'mixtral-8x7b-32768',
+          model: 'llama-3.1-8b-instant',
           temperature: 0.7,
           maxTokens: 150
         };
@@ -941,7 +941,7 @@ describe('Utils - Target 90% Coverage', () => {
 
       it('should reject missing required fields', () => {
         const config = {
-          model: 'mixtral-8x7b-32768'
+          model: 'llama-3.1-8b-instant'
           // Missing apiKey
         };
 

@@ -146,7 +146,7 @@ describe('AIProviderFactory - Comprehensive Coverage', () => {
         description: 'Fast inference models',
         requiresApiKey: true,
         models: [
-          'mixtral-8x7b-32768',
+          'llama-3.1-8b-instant',
           'llama2-70b-4096',
           'gemma-7b-it',
           'llama3-8b-8192',
@@ -407,7 +407,7 @@ describe('AIProviderFactory - Comprehensive Coverage', () => {
     it('should get groq provider config', () => {
       const configData = {
         'groq.apiKey': 'test-key',
-        'groq.model': 'mixtral-8x7b-32768'
+        'groq.model': 'llama-3.1-8b-instant'
       };
       mockConfigManager.get.mockReturnValue(configData);
 
@@ -415,7 +415,7 @@ describe('AIProviderFactory - Comprehensive Coverage', () => {
 
       expect(config).toEqual({
         apiKey: 'test-key',
-        model: 'mixtral-8x7b-32768'
+        model: 'llama-3.1-8b-instant'
       });
       expect(mockConfigManager.get).toHaveBeenCalled();
     });

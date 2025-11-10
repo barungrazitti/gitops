@@ -65,7 +65,7 @@ class AICommitGenerator {
       if (mergedOptions.cache !== false) {
         spinner.text = 'Checking cache...';
         // Only cache exact matches to avoid complexity
-        messages = await this.cacheManager.get(diff);
+        messages = await this.cacheManager.getValidated(diff);
         if (messages && messages.length > 0) {
           await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
         } else {
@@ -93,7 +93,7 @@ class AICommitGenerator {
 
         // Cache results (simple exact match)
         if (mergedOptions.cache !== false) {
-          await this.cacheManager.set(diff, messages);
+          await this.cacheManager.setValidated(diff, messages);
         }
       }
 

@@ -44,7 +44,7 @@ describe('GroqProvider - Base Provider Integration', () => {
     provider = new GroqProvider();
     jest.spyOn(provider, 'getConfig').mockResolvedValue({
       apiKey: 'test-api-key',
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-8b-instant',
       temperature: 0.7,
       timeout: 30000,
       maxTokens: 150
@@ -391,7 +391,7 @@ describe('GroqProvider - Base Provider Integration', () => {
 
       expect(config).toEqual({
         apiKey: 'test-api-key',
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
         temperature: 0.7,
         timeout: 30000,
         maxTokens: 150
@@ -614,7 +614,7 @@ describe('GroqProvider - Base Provider Integration', () => {
 
       expect(mockGroq.chat.completions.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'mixtral-8x7b-32768'
+          model: 'llama-3.1-8b-instant'
         })
       );
     });

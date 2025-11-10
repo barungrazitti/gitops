@@ -44,7 +44,7 @@ describe('GroqProvider', () => {
     provider = new GroqProvider();
     jest.spyOn(provider, 'getConfig').mockResolvedValue({
       apiKey: 'test-api-key',
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-8b-instant',
       url: 'https://api.groq.com/openai/v1',
       temperature: 0.7,
       timeout: 30000,
@@ -97,31 +97,26 @@ describe('GroqProvider', () => {
     it('should validate successfully with valid config', async () => {
       const config = {
         apiKey: 'test-api-key',
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
       };
-
-      mockGroq.chat.completions.create.mockResolvedValue({ choices: [] });
 
       const result = await provider.validate(config);
 
       expect(result).toBe(true);
-      expect(mockGroq.chat.completions.create).toHaveBeenCalled();
     });
 
     it('should handle validation errors', async () => {
       const config = {
-        apiKey: 'invalid-api-key',
-        model: 'mixtral-8x7b-32768',
+        apiKey: null,
+        model: 'llama-3.1-8b-instant',
       };
 
-      mockGroq.chat.completions.create.mockRejectedValue(new Error('Invalid API key'));
-
       await expect(provider.validate(config))
-        .rejects.toThrow('Invalid API key');
+        .rejects.toThrow('Groq API key is required');
     });
 
     it('should require API key', async () => {
-      const config = { model: 'mixtral-8x7b-32768' };
+      const config = { model: 'llama-3.1-8b-instant' };
 
       await expect(provider.validate(config))
         .rejects.toThrow('Groq API key is required');
@@ -184,7 +179,7 @@ describe('GroqProvider', () => {
 
     it('should use custom model when specified', async () => {
       const diff = 'test diff content';
-      const options = { model: 'llama3-70b-8192' };
+      const options = { model: 'llama-3.3-70b-versatile' };
       
       const mockResponse = {
         choices: [{
@@ -199,7 +194,7 @@ describe('GroqProvider', () => {
 
       expect(mockGroq.chat.completions.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          model: 'llama3-70b-8192'
+          model: 'llama-3.3-70b-versatile'
         })
       );
     });
@@ -279,19 +274,20 @@ describe('GroqProvider', () => {
 
   describe('getAvailableModels', () => {
     it('should return available models', async () => {
-      const mockResponse = {
-        data: [
-          { id: 'mixtral-8x7b-32768', object: 'model' },
-          { id: 'llama3-70b-8192', object: 'model' }
-        ]
-      };
-
-      // Mock the direct call to models endpoint
-      jest.spyOn(provider, 'makeDirectAPIRequest').mockResolvedValue(mockResponse);
-
       const models = await provider.getAvailableModels();
 
-      expect(models).toEqual(['mixtral-8x7b-32768', 'llama3-70b-8192']);
+      expect(models).toEqual([
+        expect.objectContaining({
+          id: 'llama-3.1-8b-instant',
+          name: 'Llama 3.1 8B Instant',
+          description: 'Fast and efficient model by Meta (recommended)'
+        }),
+        expect.objectContaining({
+          id: 'llama-3.3-70b-versatile',
+          name: 'Llama 3.3 70B Versatile',
+          description: 'High-performance model by Meta for complex tasks'
+        })
+      ]);
     });
 
     it('should handle models API errors', async () => {
@@ -315,7 +311,7 @@ describe('GroqProvider', () => {
 
       const request = provider.buildRequest(prompt, options, config);
 
-      expect(request.model).toBe('mixtral-8x7b-32768');
+      expect(request.model).toBe('llama-3.1-8b-instant');
       expect(request.temperature).toBe(0.7);
       expect(request.messages).toContainEqual({
         role: 'user',

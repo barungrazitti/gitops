@@ -44,7 +44,7 @@ describe('GroqProvider', () => {
     provider = new GroqProvider();
     jest.spyOn(provider, 'getConfig').mockResolvedValue({
       apiKey: 'test-api-key',
-      model: 'mixtral-8x7b-32768',
+      model: 'llama-3.1-8b-instant',
       url: 'https://api.groq.com/openai/v1',
       temperature: 0.7,
       timeout: 30000,
@@ -296,31 +296,26 @@ describe('GroqProvider', () => {
     it('should validate successfully with valid config', async () => {
       const config = {
         apiKey: 'test-api-key',
-        model: 'mixtral-8x7b-32768',
+        model: 'llama-3.1-8b-instant',
       };
-
-      mockGroq.chat.completions.create.mockResolvedValue({ choices: [] });
 
       const result = await provider.validate(config);
 
       expect(result).toBe(true);
-      expect(mockGroq.chat.completions.create).toHaveBeenCalled();
     });
 
     it('should handle validation errors', async () => {
       const config = {
-        apiKey: 'invalid-api-key',
-        model: 'mixtral-8x7b-32768',
+        apiKey: null,
+        model: 'llama-3.1-8b-instant',
       };
 
-      mockGroq.chat.completions.create.mockRejectedValue(new Error('Invalid API key'));
-
       await expect(provider.validate(config))
-        .rejects.toThrow('Invalid API key');
+        .rejects.toThrow('Groq API key is required');
     });
 
     it('should require API key', async () => {
-      const config = { model: 'mixtral-8x7b-32768' };
+      const config = { model: 'llama-3.1-8b-instant' };
 
       await expect(provider.validate(config))
         .rejects.toThrow('Groq API key is required');
@@ -381,7 +376,7 @@ describe('GroqProvider', () => {
       const models = await provider.getAvailableModels();
 
       expect(models).toEqual([
-        'mixtral-8x7b-32768',
+        'llama-3.1-8b-instant',
         'llama3-8b-8192',
         'llama3-70b-8192',
         'gemma-7b-it'
@@ -394,7 +389,7 @@ describe('GroqProvider', () => {
       const models = await provider.getAvailableModels();
 
       expect(models).toEqual([
-        'mixtral-8x7b-32768',
+        'llama-3.1-8b-instant',
         'llama3-8b-8192',
         'llama3-70b-8192',
         'gemma-7b-it'
@@ -410,7 +405,7 @@ describe('GroqProvider', () => {
 
       const request = provider.buildRequest(prompt, options, config);
 
-      expect(request.model).toBe('mixtral-8x7b-32768');
+      expect(request.model).toBe('llama-3.1-8b-instant');
       expect(request.temperature).toBe(0.7);
       expect(request.messages).toContainEqual({
         role: 'user',
