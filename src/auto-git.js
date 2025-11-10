@@ -335,9 +335,24 @@ class AutoGit {
         this.spinner.succeed('Already up to date');
       }
     } catch (error) {
+      if (error.message.includes('Not possible to fast-forward')) {
+        this.spinner.text = 'Local branch has diverged. Attempting to rebase...';
+        try {
+          await this.git.pull(['--rebase']);
+          this.spinner.succeed('Successfully rebased and pulled changes');
+        } catch (rebaseError) {
+          this.spinner.fail('Rebase failed');
+          const status = await this.git.status();
+          if (status.conflicted.length > 0) {
+            throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
+          }
+          throw new Error(`Failed to rebase: ${rebaseError.message}`);
+        }
+        return; 
+      }
+
       this.spinner.fail('Failed to pull changes');
       
-      // If it's not a conflict error we handled, offer to skip
       if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
         console.log(chalk.yellow(`\nPull failed: ${error.message}`));
 
@@ -352,7 +367,7 @@ class AutoGit {
 
         if (skipPull) {
           console.log(chalk.yellow('⚠️  Skipping pull, pushing local changes only'));
-          return; // Continue without pulling
+          return; 
         }
       }
       
