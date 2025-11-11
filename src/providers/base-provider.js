@@ -416,6 +416,8 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       databaseChanges:
         /^\+.*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)\s+(TABLE|INDEX|DATABASE)/gm,
       configChanges: /^\+.*(?:process\.env|config\.|\.env|ENV\[)/gm,
+      wordpress_hooks:
+        /^\+.*add_action\s*\(\s*['"]([^'"]+)['"]|^\+.*add_filter\s*\(\s*['"]([^'"]+)['"]|^\+.*add_shortcode\s*\(\s*['"]([^'"]+)['"]/gm,
     };
 
     // Extract semantic changes
@@ -447,7 +449,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       }
     }
 
-    // Enhanced area patterns
+    // Enhanced area patterns with more comprehensive WordPress detection
     const patterns = {
       authentication: /auth|login|user|session|jwt|passport|password|token/i,
       'api endpoints':
@@ -463,7 +465,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       'error handling': /error|exception|try|catch|throw|validation|sanitize/i,
       performance: /performance|optimize|cache|lazy|memo|async|await|promise/i,
       security: /security|sanitize|validate|escape|encrypt|hash|bcrypt|crypto/i,
-      wordpress: /wordpress|wp-|add_action|add_filter|wp_enqueue|wp_localize/i,
+      wordpress: /wordpress|wp_config|wp-|add_action|add_filter|add_shortcode|wp_enqueue|wp_localize|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php|style\.css|index\.php|single\.php|page\.php|category\.php|tag\.php|archive\.php|search\.php|404\.php|comments\.php|header\.php|footer\.php|sidebar\.php/i,
       typescript: /interface|type\s+\w+|enum|namespace|declare/i,
     };
 
@@ -473,7 +475,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       }
     }
 
-    // Enhanced likely purpose detection
+    // Enhanced likely purpose detection with more comprehensive WordPress detection
     const purposeDetection = [
       {
         patterns: [/authentication|login|user|session|jwt/i],
@@ -496,8 +498,8 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         purpose: 'test coverage or test logic change',
       },
       {
-        patterns: [/wordpress.*hook|wp.*filter|add_action/i],
-        purpose: 'WordPress hook or filter modification',
+        patterns: [/wordpress.*hook|wp.*filter|add_action|add_filter|add_shortcode|wp_enqueue|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php/i],
+        purpose: 'WordPress functionality modification',
       },
       {
         patterns: [/typescript.*interface|type.*definition/i],
@@ -893,6 +895,9 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
       testChanges: [],
       configChanges: [],
       breakingChanges: [],
+      wordpressHooks: [],
+      wordpressChanges: [],
+      wordpressTemplateChanges: [],
     };
     
     const lines = diff.split('\n');
@@ -932,6 +937,25 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         // Match potential breaking changes
         if (/\b(?:removed|deleted|breaking|BREAKING)\b/.test(content)) {
           semanticChanges.breakingChanges.push(content.trim());
+        }
+        
+        // Match WordPress-specific changes
+        if (content.includes('add_action') || content.includes('add_filter') || content.includes('add_shortcode')) {
+          const wpHookMatch = content.match(/(?:add_action|add_filter|add_shortcode)\s*\(\s*['"`]([^'"`]+)['"`]/);
+          if (wpHookMatch) {
+            semanticChanges.wordpressHooks = semanticChanges.wordpressHooks || [];
+            semanticChanges.wordpressHooks.push(wpHookMatch[1]);
+          }
+        }
+
+        if (content.includes('wp_enqueue') || content.includes('wp_localize_script') || content.includes('wp_localize')) {
+          semanticChanges.wordpressChanges = semanticChanges.wordpressChanges || [];
+          semanticChanges.wordpressChanges.push(content.trim());
+        }
+
+        if (content.includes('get_template_part') || content.includes('get_header') || content.includes('get_footer') || content.includes('get_sidebar')) {
+          semanticChanges.wordpressTemplateChanges = semanticChanges.wordpressTemplateChanges || [];
+          semanticChanges.wordpressTemplateChanges.push(content.trim());
         }
       }
     }

@@ -16,6 +16,9 @@ const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
 const fs = require('fs-extra');
+const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
+const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
+const PerformanceUtils = require('./utils/performance-utils');
 
 class AICommitGenerator {
   constructor() {
@@ -27,6 +30,7 @@ class AICommitGenerator {
     this.statsManager = new StatsManager();
     this.hookManager = new HookManager();
     this.activityLogger = new ActivityLogger();
+    this.efficientPromptBuilder = new EfficientPromptBuilder();
   }
 
   /**
@@ -520,12 +524,10 @@ class AICommitGenerator {
   }
 
   /**
-   * Build prompt using base provider logic
+   * Build prompt using efficient prompt builder
    */
   buildPrompt(diff, options) {
-    const BaseProvider = require('./providers/base-provider');
-    const tempProvider = new BaseProvider();
-    return tempProvider.buildPrompt(diff, options);
+    return this.efficientPromptBuilder.buildPrompt(diff, options);
   }
 
   /**
@@ -733,18 +735,18 @@ class AICommitGenerator {
     const MAX_DIFF_SIZE = 15000; // 15K chars max for single prompt
     const CHUNK_SIZE = 8000; // 8K chars for chunks
     const MAX_CONTEXT_LINES = 50; // Max context lines per chunk
-    
+
     const diffSize = diff.length;
-    
+
     // Check if this is a plugin/dependency update that should avoid chunking
     const isPluginUpdate = this.detectPluginUpdate(diff);
-    
+
     // Strategy 1: Use full diff if under limit OR if plugin update (even if large)
     if (diffSize <= MAX_DIFF_SIZE || isPluginUpdate) {
-      const reasoning = isPluginUpdate 
+      const reasoning = isPluginUpdate
         ? 'Plugin/dependency update detected, avoiding chunking for better context'
         : 'Diff size manageable, using full content';
-      
+
       return {
         strategy: 'full',
         data: diff,
@@ -758,7 +760,7 @@ class AICommitGenerator {
         }
       };
     }
-    
+
     // Strategy 2: Chunk large diffs intelligently
     const lines = diff.split('\n');
     const chunks = [];
@@ -766,24 +768,24 @@ class AICommitGenerator {
     let currentSize = 0;
     let inContext = false;
     let contextBuffer = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const lineSize = line.length + 1; // +1 for newline
-      
+
       // Detect diff headers and file boundaries
-      const isFileHeader = line.startsWith('diff --git') || 
+      const isFileHeader = line.startsWith('diff --git') ||
                            line.startsWith('index ') ||
                            line.startsWith('---') ||
                            line.startsWith('+++');
-      
+
       const isContextLine = line.startsWith(' ') || line.startsWith('');
       const isCodeLine = line.startsWith('+') || line.startsWith('-');
-      
+
       // Start new chunk if size limit reached and we're at a good boundary
-      if (currentSize + lineSize > CHUNK_SIZE && 
+      if (currentSize + lineSize > CHUNK_SIZE &&
           (isFileHeader || (inContext && contextBuffer.length >= MAX_CONTEXT_LINES))) {
-        
+
         // Add current chunk to list
         chunks.push({
           content: currentChunk.join('\n'),
@@ -791,18 +793,18 @@ class AICommitGenerator {
           lines: currentChunk.length,
           context: this.extractChunkContext(currentChunk.join('\n'))
         });
-        
+
         // Reset for next chunk, but carry some context
         currentChunk = [...contextBuffer.slice(-10)]; // Keep last 10 context lines
         currentSize = currentChunk.join('\n').length + 1;
         contextBuffer = [];
         inContext = false;
       }
-      
+
       // Add line to current chunk
       currentChunk.push(line);
       currentSize += lineSize;
-      
+
       // Track context for intelligent boundaries
       if (isContextLine) {
         contextBuffer.push(line);
@@ -810,13 +812,13 @@ class AICommitGenerator {
       } else if (isCodeLine) {
         inContext = false;
       }
-      
+
       // Reset context buffer at file boundaries
       if (isFileHeader) {
         contextBuffer = [];
       }
     }
-    
+
     // Add final chunk
     if (currentChunk.length > 0) {
       chunks.push({
@@ -826,7 +828,7 @@ class AICommitGenerator {
         context: this.extractChunkContext(currentChunk.join('\n'))
       });
     }
-    
+
     return {
       strategy: 'chunked',
       data: chunks,

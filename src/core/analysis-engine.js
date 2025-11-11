@@ -5,6 +5,7 @@
 const GitManager = require('./git-manager');
 const fs = require('fs-extra');
 const path = require('path');
+const ProjectTypeDetector = require('../utils/project-type-detector');
 
 class AnalysisEngine {
   constructor() {
@@ -138,13 +139,13 @@ class AnalysisEngine {
       types: /type|interface|dto|entity|model/i,
       deps: /package|npm|yarn|dependency|requirement/i,
       perf: /performance|optimize|cache|lazy|memo/i,
-      // WordPress-specific patterns
-      wordpress: /wp-content|wp-includes|wp-admin|wordpress|wp-|\.php$/i,
-      plugins: /plugins?\/[^/]+|wp-content\/plugins/i,
-      themes: /themes?\/[^/]+|wp-content\/themes/i,
-      core: /wp-includes|wp-admin|wordpress\/wp-|\/wp-[^/]+\.php$/i,
+      // WordPress-specific patterns with higher priority
+      wordpress: /wp-config\.php|wp-content|wp-includes|wp-admin|wordpress|\.php$/i,
+      plugins: /wp-content\/plugins|wp-plugins|plugins\//i,
+      themes: /wp-content\/themes|wp-themes|themes\//i,
+      core: /wp-includes|wp-admin|wp-[^/]*\.php$/i,
       posts: /posts?|article|blog|content/i,
-      pages: /pages?|template|page-[^/]*\.php/i,
+      pages: /pages?|template|page-[^/]*\.php|front-page\.php|home\.php|single\.php|archive\.php|category\.php|tag\.php/i,
       media: /media|uploads|images?|assets?\/uploads/i,
       widgets: /widgets?|sidebar|footer|header/i,
       customizer: /customizer|customize|theme-options/i,
@@ -165,19 +166,19 @@ class AnalysisEngine {
       }
     });
 
-    // Enhanced scope prioritization for WordPress
+    // Enhanced scope prioritization with WordPress taking higher priority
     const prioritizedScopes = [
-      'wordpress',
-      'plugins',
-      'themes',
-      'core',
-      'posts',
-      'pages',
-      'media',
-      'widgets',
-      'customizer',
-      'woocommerce',
-      'api',
+      'wordpress',    // Top priority - WordPress-specific
+      'core',         // WordPress core
+      'themes',       // WordPress themes
+      'plugins',      // WordPress plugins
+      'woocommerce',  // WordPress e-commerce
+      'posts',        // WordPress content
+      'pages',        // WordPress pages
+      'media',        // WordPress media
+      'widgets',      // WordPress widgets
+      'customizer',   // WordPress customizer
+      'api',          // Standard scopes follow
       'ui',
       'auth',
       'db',
@@ -192,12 +193,21 @@ class AnalysisEngine {
       'perf',
     ];
 
-    // Sort by count first, then by priority
+    // Sort by count first for WordPress-related scopes, then by priority
     const sortedScopes = Object.entries(scopeCounts).sort((a, b) => {
-      // First sort by count (descending)
+      // First check if either scope is WordPress-related
+      const isAWordpress = prioritizedScopes.slice(0, 8).includes(a[0]); // WordPress top priorities
+      const isBWordpress = prioritizedScopes.slice(0, 8).includes(b[0]); // WordPress top priorities
+      
+      // If one is WordPress-related and the other isn't, prioritize WordPress
+      if (isAWordpress && !isBWordpress) return -1;
+      if (!isAWordpress && isBWordpress) return 1;
+      
+      // If both are WordPress-related or both are not, sort by count first
       if (b[1] !== a[1]) {
         return b[1] - a[1];
       }
+      
       // Then sort by priority
       const aPriority = prioritizedScopes.indexOf(a[0]);
       const bPriority = prioritizedScopes.indexOf(b[0]);
@@ -206,16 +216,20 @@ class AnalysisEngine {
 
     const topScope = sortedScopes[0];
 
-    // If WordPress is detected but not the top scope, check if we should prioritize it
-    if (scopeCounts.wordpress && topScope && topScope[0] !== 'wordpress') {
-      const wordpressFiles = files.filter((file) =>
-        /wp-content|wp-includes|wp-admin|wp-config\.php/i.test(file)
-      );
+    // If WordPress-related files are detected, prioritize them
+    const wordpressRelatedScopes = ['wordpress', 'themes', 'plugins', 'core', 'woocommerce'];
+    const hasWordpressFiles = files.some(file => 
+      /wp-content|wp-includes|wp-admin|wp-config\.php|\.php$/i.test(file)
+    );
 
-      // If more than half the files are WordPress-related, prioritize WordPress scope
-      if (wordpressFiles.length > files.length / 2) {
-        return 'wordpress';
-      }
+    // If WordPress files exist and top scope is WordPress-related, return it
+    if (hasWordpressFiles && topScope && wordpressRelatedScopes.includes(topScope[0])) {
+      return topScope[0];
+    }
+
+    // If WordPress files exist but no specific WordPress scope was found, return 'wordpress' as general
+    if (hasWordpressFiles && (!topScope || !wordpressRelatedScopes.includes(topScope[0]))) {
+      return 'wordpress';
     }
 
     return topScope ? topScope[0] : 'general';
@@ -347,31 +361,60 @@ class AnalysisEngine {
    * Analyze PHP files for semantic context
    */
   async analyzePHPFile(content, context) {
-    // Function detection
-    const functionMatches = content.match(/function\s+(\w+)/g);
+    // Function detection with better pattern
+    const functionMatches = content.match(/function\s+([a-zA-Z_][a-zA-Z0-9_]*)/g);
     if (functionMatches) {
-      context.functions.push(
-        ...functionMatches.map((m) => m.replace('function ', '').trim())
-      );
+      const functionNames = functionMatches.map((m) => m.replace('function ', '').trim());
+      context.functions.push(...functionNames);
     }
 
     // Class detection
-    const classMatches = content.match(/class\s+(\w+)/g);
+    const classMatches = content.match(/class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g);
     if (classMatches) {
-      context.classes.push(
-        ...classMatches.map((m) => m.replace('class ', '').trim())
-      );
+      const classNames = classMatches.map((m) => m.replace('class ', '').trim());
+      context.classes.push(...classNames);
     }
 
-    // WordPress hook detection
-    const hookMatches = content.match(
-      /(?:add_action|add_filter)\s*\(\s*['"]([^'"]+)['"]/g
-    );
-    if (hookMatches) {
+    // WordPress hook detection with broader patterns
+    const actionMatches = content.match(/add_action\s*\(\s*['"][^'"]+['"]/g);
+    const filterMatches = content.match(/add_filter\s*\(\s*['"][^'"]+['"]/g);
+    const shortcodeMatches = content.match(/add_shortcode\s*\(\s*['"][^'"]+['"]/g);
+    const actionMatchesFull = content.match(/add_action\s*\(\s*['"]([^'"]+)['"]/g);
+    const filterMatchesFull = content.match(/add_filter\s*\(\s*['"]([^'"]+)['"]/g);
+    const shortcodeMatchesFull = content.match(/add_shortcode\s*\(\s*['"]([^'"]+)['"]/g);
+
+    if (actionMatches || filterMatches || shortcodeMatches) {
       context.wordpress_hooks = context.wordpress_hooks || [];
-      context.wordpress_hooks.push(
-        ...hookMatches.map((m) => m.match(/['"]([^'"]+)['"]/)[1])
+      if (actionMatchesFull) {
+        const actions = actionMatchesFull.map(m => m.match(/['"]([^'"]+)['"]/)[1]);
+        context.wordpress_hooks.push(...actions);
+      }
+      if (filterMatchesFull) {
+        const filters = filterMatchesFull.map(m => m.match(/['"]([^'"]+)['"]/)[1]);
+        context.wordpress_hooks.push(...filters);
+      }
+      if (shortcodeMatchesFull) {
+        const shortcodes = shortcodeMatchesFull.map(m => m.match(/['"]([^'"]+)['"]/)[1]);
+        context.wordpress_hooks.push(...shortcodes);
+      }
+    }
+
+    // WordPress function detection
+    const wpFunctionMatches = content.match(/(?:wp_|get_|is_|the_|do_|apply_|current_)\w+/g);
+    if (wpFunctionMatches) {
+      const wpFunctions = wpFunctionMatches.filter(func => 
+        !['function', 'if', 'else', 'for', 'while', 'return'].includes(func) &&
+        !func.includes('(') // Avoid matches that include parentheses
       );
+      context.wordpress_functions = context.wordpress_functions || [];
+      context.wordpress_functions.push(...wpFunctions);
+    }
+
+    // WordPress template detection
+    const templateMatches = content.match(/(?:get_template_part|get_header|get_footer|get_sidebar|load_template)\s*\(/g);
+    if (templateMatches) {
+      context.wordpress_templates = context.wordpress_templates || [];
+      context.wordpress_templates.push(...templateMatches);
     }
   }
 
@@ -525,115 +568,8 @@ class AnalysisEngine {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
 
-      const indicators = {
-        nodejs: ['package.json', 'node_modules'],
-        python: [
-          'requirements.txt',
-          'setup.py',
-          'pyproject.toml',
-          '__pycache__',
-        ],
-        java: ['pom.xml', 'build.gradle', 'src/main/java'],
-        react: ['package.json'], // Will check package.json content
-        vue: ['package.json'], // Will check package.json content
-        angular: ['angular.json', 'package.json'],
-        dotnet: ['*.csproj', '*.sln', 'Program.cs'],
-        php: ['composer.json', 'index.php'],
-        ruby: ['Gemfile', 'Rakefile'],
-        go: ['go.mod', 'main.go'],
-        rust: ['Cargo.toml', 'src/main.rs'],
-        docker: ['Dockerfile', 'docker-compose.yml'],
-        wordpress: ['wp-config.php', 'wp-content', 'wp-includes', 'wp-admin'],
-      };
-
-      const detectedTypes = [];
-
-      for (const [type, files] of Object.entries(indicators)) {
-        for (const file of files) {
-          const filePath = path.join(repoRoot, file);
-          if (await fs.pathExists(filePath)) {
-            detectedTypes.push(type);
-            break;
-          }
-        }
-      }
-
-      // Special handling for JavaScript frameworks
-      if (detectedTypes.includes('nodejs')) {
-        const packageJsonPath = path.join(repoRoot, 'package.json');
-        if (await fs.pathExists(packageJsonPath)) {
-          try {
-            const packageJson = await fs.readJson(packageJsonPath);
-            const deps = {
-              ...packageJson.dependencies,
-              ...packageJson.devDependencies,
-            };
-
-            if (deps.react || deps['@types/react']) {
-              detectedTypes.push('react');
-            }
-            if (deps.vue || deps['@vue/cli']) {
-              detectedTypes.push('vue');
-            }
-            if (deps['@angular/core']) {
-              detectedTypes.push('angular');
-            }
-            if (deps.next || deps['next.js']) {
-              detectedTypes.push('nextjs');
-            }
-            if (deps.express || deps.fastify || deps.koa) {
-              detectedTypes.push('backend');
-            }
-          } catch (error) {
-            // Ignore package.json parsing errors
-          }
-        }
-      }
-
-      // Special handling for WordPress
-      if (detectedTypes.includes('wordpress')) {
-        // Check for WordPress-specific indicators
-        const wpContentPath = path.join(repoRoot, 'wp-content');
-        if (await fs.pathExists(wpContentPath)) {
-          const hasPlugins = await fs.pathExists(
-            path.join(wpContentPath, 'plugins')
-          );
-          const hasThemes = await fs.pathExists(
-            path.join(wpContentPath, 'themes')
-          );
-
-          if (hasPlugins) {
-            detectedTypes.push('wordpress-plugins');
-          }
-          if (hasThemes) {
-            detectedTypes.push('wordpress-themes');
-          }
-        }
-
-        // Check for common WordPress files
-        const wpConfigPath = path.join(repoRoot, 'wp-config.php');
-        if (await fs.pathExists(wpConfigPath)) {
-          try {
-            const wpConfigContent = await fs.readFile(wpConfigPath, 'utf8');
-            if (
-              wpConfigContent.includes('WP_DEBUG') ||
-              wpConfigContent.includes('DB_NAME')
-            ) {
-              detectedTypes.push('wordpress-core');
-            }
-          } catch (error) {
-            // Ignore file reading errors
-          }
-        }
-      }
-
-      return {
-        types: [...new Set(detectedTypes)], // Remove duplicates
-        primary: detectedTypes[0] || 'unknown',
-        isMonorepo: await this.detectMonorepo(repoRoot),
-        hasTests: await this.hasTestFiles(repoRoot),
-        hasCI: await this.hasCIConfig(repoRoot),
-      };
+      // Use the enhanced project type detector
+      return await ProjectTypeDetector.detectProjectType(repoRoot);
     } catch (error) {
       console.warn('Project type detection failed:', error.message);
       return {
@@ -642,6 +578,7 @@ class AnalysisEngine {
         isMonorepo: false,
         hasTests: false,
         hasCI: false,
+        wordpress: null,
       };
     }
   }
