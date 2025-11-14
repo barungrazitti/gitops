@@ -75,12 +75,7 @@ class GroqProvider extends BaseProvider {
             temperature: config.temperature || 0.3,
           });
 
-          const content = response.choices[0]?.message?.content;
-          if (!content) {
-            throw new Error('No response content from Groq');
-          }
-
-          const messages = this.parseResponse(content);
+          const messages = this.parseResponse(response);
           return messages.filter((msg) => this.validateCommitMessage(msg));
         }, { provider: 'groq' });
       });
@@ -209,12 +204,7 @@ class GroqProvider extends BaseProvider {
               temperature: config.temperature || 0.3,
             });
 
-            const content = response.choices[0]?.message?.content;
-            if (!content) {
-              throw new Error('No response content from Groq');
-            }
-
-            const messages = this.parseResponse(content);
+            const messages = this.parseResponse(response);
             return messages.filter((msg) => this.validateCommitMessage(msg));
           } catch (error) {
             // Handle rate limiting specifically

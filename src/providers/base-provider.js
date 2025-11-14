@@ -395,6 +395,7 @@ Generate ${options.count || 3} commit messages that accurately reflect the speci
         apiChanges: [],
         databaseChanges: [],
         configChanges: [],
+        wordpress_hooks: [],
       },
     };
 
