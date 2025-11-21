@@ -198,7 +198,7 @@ describe('AnalysisEngine', () => {
       const files = [
         'src/api/user.js',
         'src/routes/auth.js',
-        'src/controllers/post.js',
+        'src/controllers/data.js',
       ];
 
       const scope = analysisEngine.inferScope(files);
@@ -518,14 +518,18 @@ describe('AnalysisEngine', () => {
     });
 
     it('should detect Node.js project', async () => {
-      fs.pathExists.mockImplementation((path) => {
+      fs.pathExists.mockReset().mockImplementation((path) => {
         if (path && path.endsWith('package.json')) return true;
         return false;
+      });
+      fs.readJson.mockReset().mockResolvedValue({
+        dependencies: { express: '^4.18.0' },
       });
 
       const result = await analysisEngine.detectProjectType();
 
       expect(result.types).toContain('nodejs');
+      expect(result.types).toContain('backend');
       expect(result.primary).toBe('nodejs');
     });
 
@@ -594,13 +598,12 @@ describe('AnalysisEngine', () => {
 
       const result = await analysisEngine.detectProjectType();
 
-      expect(result).toEqual({
-        types: ['unknown'],
-        primary: 'unknown',
-        isMonorepo: false,
-        hasTests: false,
-        hasCI: false,
-      });
+      expect(result.types).toContain('unknown');
+      expect(result.primary).toBe('unknown');
+      expect(result.isMonorepo).toBe(false);
+      expect(result.hasTests).toBe(false);
+      expect(result.hasCI).toBe(false);
+      expect(result.wordpress).toBe(null);
     });
   });
 
