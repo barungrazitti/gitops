@@ -14,14 +14,7 @@
     "prompt\twith\ttabs": "value",
     "prompt\u0000with\null": "value"
   },
-  "excludeFiles": [
-    "*.log",
-    "*.tmp",
-    "node_modules/**",
-    ".git/**",
-    "dist/**",
-    "build/**"
-  ],
+  "excludeFiles": [],
   "testValidation": {
     "enabled": false,
     "autoFix": true,
@@ -44,25 +37,10 @@
     "formatTimeout": 30000,
     "autoSetupConfigs": true
   },
-  "commitTypes": [
-    "feat",
-    "fix",
-    "docs",
-    "style",
-    "refactor",
-    "perf",
-    "test",
-    "chore",
-    "ci",
-    "build"
-  ],
+  "commitTypes": [],
   "scopes": [],
-  "templates": {
-    "conventional": "{type}({scope}): {description}",
-    "simple": "{description}",
-    "detailed": "{type}({scope}): {description}\n\n{body}"
-  },
+  "templates": {},
   "apiKey": null,
-  "model": null,
+  "model": "deepseek-v3.1:671b-cloud",
   "proxy": null
 }

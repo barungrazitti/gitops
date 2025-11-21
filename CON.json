@@ -62,7 +62,7 @@
     "simple": "{description}",
     "detailed": "{type}({scope}): {description}\n\n{body}"
   },
-  "apiKey": "test-key",
+  "apiKey": null,
   "model": null,
   "proxy": null
 }
