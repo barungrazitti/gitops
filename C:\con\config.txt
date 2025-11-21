@@ -1,0 +1,68 @@
+{
+  "defaultProvider": "groq",
+  "conventionalCommits": false,
+  "language": "en",
+  "messageCount": 3,
+  "maxTokens": 150,
+  "temperature": 0.7,
+  "cache": true,
+  "cacheExpiry": 86400000,
+  "timeout": 120000,
+  "retries": 3,
+  "customPrompts": {
+    "prompt\nwith\nnewlines": "value",
+    "prompt\twith\ttabs": "value",
+    "prompt\u0000with\null": "value"
+  },
+  "excludeFiles": [
+    "*.log",
+    "*.tmp",
+    "node_modules/**",
+    ".git/**",
+    "dist/**",
+    "build/**"
+  ],
+  "testValidation": {
+    "enabled": false,
+    "autoFix": true,
+    "testCommand": "npm run test:quick",
+    "lintCommand": "npm run lint",
+    "formatCommand": "npm run format",
+    "aiProvider": "ollama",
+    "confirmFixes": true,
+    "timeout": 120000,
+    "pushAfterValidation": false
+  },
+  "codeFormatting": {
+    "enabled": false,
+    "useAdvancedFormatting": true,
+    "phpTools": true,
+    "htmlTools": true,
+    "cssTools": true,
+    "jsTools": true,
+    "prettierConfig": null,
+    "formatTimeout": 30000,
+    "autoSetupConfigs": true
+  },
+  "commitTypes": [
+    "feat",
+    "fix",
+    "docs",
+    "style",
+    "refactor",
+    "perf",
+    "test",
+    "chore",
+    "ci",
+    "build"
+  ],
+  "scopes": [],
+  "templates": {
+    "conventional": "{type}({scope}): {description}",
+    "simple": "{description}",
+    "detailed": "{type}({scope}): {description}\n\n{body}"
+  },
+  "apiKey": null,
+  "model": null,
+  "proxy": null
+}
