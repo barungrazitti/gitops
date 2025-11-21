@@ -507,11 +507,26 @@ class AICommitGenerator {
       /\b(add|update|fix|change|modify|remove)\s+(functionality|features?|code|files?)\b/i,
       /\b(new|additional|extra)\s+(stuff|things|items)\b/i,
       /\b(general|misc|various|multiple)\s+(changes|updates|fixes)\b/i,
+      /^\s*(improvements?|bug fix|updates?|refactor)\s*$/i,
     ];
 
     genericPatterns.forEach((pattern) => {
       if (pattern.test(message)) {
-        score -= 5;
+        score -= 20;
+      }
+    });
+
+    // BANNED patterns - instant low score
+    const bannedPatterns = [
+      /^\s*update\s*$/i,
+      /^\s*fix\s*$/i,
+      /^\s*commit\s*$/i,
+      /^\s*changes\s*$/i,
+    ];
+
+    bannedPatterns.forEach((pattern) => {
+      if (pattern.test(message)) {
+        score = -100;
       }
     });
 

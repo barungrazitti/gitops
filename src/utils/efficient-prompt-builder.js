@@ -23,6 +23,11 @@ class EfficientPromptBuilder {
       chunkContext
     } = options;
 
+    // Handle null/undefined diff
+    if (!diff) {
+      diff = '';
+    }
+
     // Analyze diff for change type and impact
     const changeAnalysis = this.analyzeDiffForSpecialization(diff);
     const impactAnalysis = this.analyzeChangeImpact(diff, context);
@@ -214,6 +219,11 @@ ${this.buildPrompt(diff, options)}`;
       dependency: false,
       scope: 'internal'
     };
+
+    // Handle null/undefined diff input
+    if (!diff) {
+      return impact;
+    }
 
     const lowerDiff = diff.toLowerCase();
 
@@ -408,6 +418,11 @@ ${this.buildPrompt(diff, options)}`;
       keywords: []
     };
 
+    // Handle null/undefined/empty diff input
+    if (!diff) {
+      return analysis;
+    }
+
     // Look for specific patterns that indicate change type
     const patterns = {
       test: {
@@ -443,16 +458,16 @@ ${this.buildPrompt(diff, options)}`;
     // Count occurrences of pattern keywords in the diff
     const lowerDiff = diff.toLowerCase();
     let maxScore = 0;
-    
+
     for (const [type, pattern] of Object.entries(patterns)) {
       let score = 0;
-      
+
       // Score based on regex matches
       const matches = lowerDiff.match(pattern.regex);
       if (matches) {
         score += matches.length * 2;
       }
-      
+
       // Score based on keyword occurrences
       for (const keyword of pattern.keywords) {
         const keywordMatches = lowerDiff.match(new RegExp(`\\b${keyword}\\b`, 'gi'));
@@ -460,7 +475,7 @@ ${this.buildPrompt(diff, options)}`;
           score += keywordMatches.length;
         }
       }
-      
+
       if (score > maxScore) {
         maxScore = score;
         analysis.type = type;

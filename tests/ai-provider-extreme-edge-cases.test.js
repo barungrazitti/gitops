@@ -76,36 +76,28 @@ describe('AI Provider Extreme Edge Cases', () => {
       });
 
       it('should handle null diff input', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle null input' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle null input']);
 
         const result = await provider.generateCommitMessages(null);
         expect(result).toContain('feat: handle null input');
       });
 
       it('should handle undefined diff input', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle undefined input' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle undefined input']);
 
         const result = await provider.generateCommitMessages(undefined);
         expect(result).toContain('feat: handle undefined input');
       });
 
       it('should handle empty string diff', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle empty diff' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle empty diff']);
 
         const result = await provider.generateCommitMessages('');
         expect(result).toContain('feat: handle empty diff');
       });
 
       it('should handle whitespace-only diff', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle whitespace diff' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle whitespace diff']);
 
         const result = await provider.generateCommitMessages('   \n\t  ');
         expect(result).toContain('feat: handle whitespace diff');
@@ -125,10 +117,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle extremely long single line diff', async () => {
         const longLine = '+' + 'a'.repeat(100000);
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle extremely long line' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle extremely long line']);
 
         const result = await provider.generateCommitMessages(longLine);
         expect(result).toContain('feat: handle extremely long line');
@@ -136,10 +126,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle diff with many short lines', async () => {
         const manyLines = Array(10000).fill('+line').join('\n');
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle many lines' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle many lines']);
 
         const result = await provider.generateCommitMessages(manyLines);
         expect(result).toContain('feat: handle many lines');
@@ -147,10 +135,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle diff with special characters', async () => {
         const specialChars = '+!@#$%^&*()_+-=[]{}|;:,.<>?~`'.repeat(1000);
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle special chars' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle special chars']);
 
         const result = await provider.generateCommitMessages(specialChars);
         expect(result).toContain('feat: handle special chars');
@@ -158,10 +144,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle diff with Unicode characters', async () => {
         const unicode = '+🚀 🎉 🎊 🎈 🎁 🎂 🍰 🎪 🎭 🎨'.repeat(1000);
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle unicode' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle unicode']);
 
         const result = await provider.generateCommitMessages(unicode);
         expect(result).toContain('feat: handle unicode');
@@ -181,10 +165,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle diff without proper headers', async () => {
         const malformedDiff = '+some code\n-more code\n+even more code';
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle malformed diff' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle malformed diff']);
 
         const result = await provider.generateCommitMessages(malformedDiff);
         expect(result).toContain('feat: handle malformed diff');
@@ -192,10 +174,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle diff with invalid git format', async () => {
         const invalidDiff = 'invalid git diff format\n+some changes';
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle invalid format' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle invalid format']);
 
         const result = await provider.generateCommitMessages(invalidDiff);
         expect(result).toContain('feat: handle invalid format');
@@ -203,10 +183,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle diff with binary file indicators', async () => {
         const binaryDiff = 'Binary files a/image.png and b/image.png differ\n+some code';
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle binary files' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle binary files']);
 
         const result = await provider.generateCommitMessages(binaryDiff);
         expect(result).toContain('feat: handle binary files');
@@ -229,9 +207,7 @@ describe('AI Provider Extreme Edge Cases', () => {
           timeout: -1000
         });
 
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle negative timeout' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle negative timeout']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: handle negative timeout');
@@ -244,9 +220,7 @@ describe('AI Provider Extreme Edge Cases', () => {
           timeout: Number.MAX_SAFE_INTEGER
         });
 
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle large timeout' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle large timeout']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: handle large timeout');
@@ -259,9 +233,7 @@ describe('AI Provider Extreme Edge Cases', () => {
           maxTokens: 0
         });
 
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle zero tokens' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle zero tokens']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: handle zero tokens');
@@ -274,9 +246,7 @@ describe('AI Provider Extreme Edge Cases', () => {
           temperature: -1.0
         });
 
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle negative temp' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle negative temp']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: handle negative temp');
@@ -289,9 +259,7 @@ describe('AI Provider Extreme Edge Cases', () => {
           temperature: 2.0
         });
 
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: handle high temp' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: handle high temp']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: handle high temp');
@@ -438,55 +406,28 @@ describe('AI Provider Extreme Edge Cases', () => {
       });
 
       it('should handle response with nested objects', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{
-            message: { 
-              content: JSON.stringify({
-                commit: 'feat: nested object response',
-                metadata: { confidence: 0.95 }
-              })
-            }
-          }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: nested object response']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result[0]).toContain('feat: nested object response');
       });
 
       it('should handle response with HTML content', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{
-            message: { 
-              content: '<div>feat: html response</div><script>alert("xss")</script>'
-            }
-          }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['<div>feat: html response</div>']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result[0]).toContain('<div>feat: html response</div>');
       });
 
       it('should handle response with JavaScript code', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{
-            message: { 
-              content: 'console.log("feat: js response"); function test() { return "success"; }'
-            }
-          }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['console.log("feat: js response");']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result[0]).toContain('console.log("feat: js response");');
       });
 
       it('should handle response with SQL injection attempts', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{
-            message: { 
-              content: "feat: sql response'; DROP TABLE commits; --"
-            }
-          }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(["feat: sql response'; DROP TABLE commits; --"]);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result[0]).toContain("feat: sql response'; DROP TABLE commits; --");
@@ -505,40 +446,14 @@ describe('AI Provider Extreme Edge Cases', () => {
       });
 
       it('should handle incomplete streaming response', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{
-            message: { 
-              content: 'feat: incomplete response'
-            }
-          }],
-          usage: {
-            prompt_tokens: 100,
-            completion_tokens: 50,
-            total_tokens: 150
-          }
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: incomplete response']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: incomplete response');
       });
 
       it('should handle response with usage metadata', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{
-            message: { 
-              content: 'feat: response with metadata'
-            }
-          }],
-          usage: {
-            prompt_tokens: 200,
-            completion_tokens: 100,
-            total_tokens: 300
-          },
-          model: 'llama-3.1-8b-instant',
-          id: 'chatcmpl-123',
-          object: 'chat.completion',
-          created: Date.now()
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: response with metadata']);
 
         const result = await provider.generateCommitMessages('test diff');
         expect(result).toContain('feat: response with metadata');
@@ -560,10 +475,8 @@ describe('AI Provider Extreme Edge Cases', () => {
 
       it('should handle processing many large diffs sequentially', async () => {
         const largeDiff = 'a'.repeat(50000);
-        
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: large diff processed' } }]
-        });
+
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: large diff processed']);
 
         // Process 10 large diffs sequentially
         for (let i = 0; i < 10; i++) {
@@ -575,12 +488,10 @@ describe('AI Provider Extreme Edge Cases', () => {
       });
 
       it('should handle rapid successive requests', async () => {
-        mockCircuitBreaker.execute.mockResolvedValue({
-          choices: [{ message: { content: 'feat: rapid request' } }]
-        });
+        mockCircuitBreaker.execute.mockResolvedValue(['feat: rapid request']);
 
         // Make 100 rapid requests
-        const promises = Array(100).fill(null).map((_, i) => 
+        const promises = Array(100).fill(null).map((_, i) =>
           provider.generateCommitMessages(`test diff ${i}`)
         );
 
