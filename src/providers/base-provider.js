@@ -457,12 +457,30 @@ class BaseProvider {
    * Parse AI response into commit messages
    */
   parseResponse(response) {
-    if (typeof response !== 'string') {
+    let content;
+
+    // Handle different response formats
+    if (typeof response === 'string') {
+      // Direct string response
+      content = response;
+    } else if (response && typeof response === 'object') {
+      // Handle Groq response format (with choices)
+      if (response.choices && Array.isArray(response.choices) && response.choices.length > 0) {
+        content = response.choices[0]?.message?.content;
+      } else {
+        // If it's an object but not the expected Groq format
+        content = response.content || JSON.stringify(response);
+      }
+    } else {
       throw new Error('Invalid response from AI provider');
     }
 
+    if (typeof content !== 'string') {
+      throw new Error('Invalid response content from AI provider');
+    }
+
     // Split by lines and clean up
-    const messages = response
+    const messages = content
       .split('\n')
       .map(
         (line) =>

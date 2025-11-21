@@ -438,17 +438,37 @@ describe('AICommitGenerator', () => {
       expect(specificScore).toBeGreaterThan(genericScore);
     });
 
-    it('should reward proper length', () => {
-      const tooShort = 'fix';
-      const goodLength = 'feat: add authentication middleware';
-      const tooLong = 'feat: ' + 'a'.repeat(200);
+    it('should heavily penalize new generic patterns', () => {
+      const generic1 = 'improvements';
+      const generic2 = 'bug fix';
+      const generic3 = 'updates';
+      const specific = 'refactor: improve performance of the rendering engine';
 
-      const shortScore = generator.scoreCommitMessage(tooShort);
-      const goodScore = generator.scoreCommitMessage(goodLength);
-      const longScore = generator.scoreCommitMessage(tooLong);
+      const generic1Score = generator.scoreCommitMessage(generic1);
+      const generic2Score = generator.scoreCommitMessage(generic2);
+      const generic3Score = generator.scoreCommitMessage(generic3);
+      const specificScore = generator.scoreCommitMessage(specific);
 
-      expect(goodScore).toBeGreaterThan(shortScore);
-      expect(goodScore).toBeGreaterThan(longScore);
+      expect(specificScore).toBeGreaterThan(generic1Score);
+      expect(specificScore).toBeGreaterThan(generic2Score);
+      expect(specificScore).toBeGreaterThan(generic3Score);
+    });
+
+    it('should return a very low score for banned patterns', () => {
+      const banned1 = 'update';
+      const banned2 = 'fix';
+      const banned3 = 'commit';
+      const banned4 = 'changes';
+
+      const banned1Score = generator.scoreCommitMessage(banned1);
+      const banned2Score = generator.scoreCommitMessage(banned2);
+      const banned3Score = generator.scoreCommitMessage(banned3);
+      const banned4Score = generator.scoreCommitMessage(banned4);
+
+      expect(banned1Score).toBe(-100);
+      expect(banned2Score).toBe(-100);
+      expect(banned3Score).toBe(-100);
+      expect(banned4Score).toBe(-100);
     });
   });
 
