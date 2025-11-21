@@ -609,6 +609,263 @@ class MessageFormatter {
 
     return suggestions;
   }
+
+  /**
+   * Validate if response is a valid commit message (not explanatory text)
+   */
+  isValidCommitMessage(message) {
+    if (!message || typeof message !== 'string') {
+      return false;
+    }
+
+    const trimmed = message.trim();
+    
+    // Reject empty messages
+    if (trimmed.length === 0) {
+      return false;
+    }
+
+    // Reject obviously non-commit messages
+    const invalidPatterns = [
+      // Explanatory phrases
+      /^(here's|here is|this is|the following|below is|above is)/i,
+      /^(a|an|the)\s+\w+\s+(commit|message|change|update)/i,
+      /^(breakdown|explanation|description|summary|overview)/i,
+      /^(what|how|why|when|where)\s+(does|do|is|are|was|were)/i,
+      // Generic educational phrases
+      /^(this code|the code|javascript code|php code|python code)/i,
+      /^(has been|have been|was|were)\s+(modularized|refactored|updated|changed)/i,
+      // Questions and incomplete thoughts
+      /\?$/,
+      /^(here's|here is|this is)\s+(a|the)\s+breakdown/i,
+      // Non-imperative explanations
+      /^(the|this)\s+(code|function|method|class)/i,
+      // Generic template responses
+      /^generate\s+\d+\s+(commit|conventional)/i,
+      // Colon-ended explanations (like the problematic examples)
+      /:$/,
+      // Very long single sentences (likely explanations)
+      /^.{100,}$/,
+    ];
+
+    // Check if message matches any invalid pattern
+    for (const pattern of invalidPatterns) {
+      if (pattern.test(trimmed)) {
+        return false;
+      }
+    }
+
+    // Check for minimum commit message characteristics
+    const validPatterns = [
+      // Conventional commit format
+      /^(\w+)(\(.+\))?: .+/,
+      // Imperative mood (Add, Fix, Remove, etc.)
+      /^(add|fix|remove|update|create|delete|implement|refactor|optimize|improve|enhance|modify|adjust|correct|prevent|handle|resolve|merge|split|extract|consolidate|rename|reorder|revert|bump|upgrade|downgrade|disable|enable|migrate|convert|transform|simplify|streamline|standardize|normalize|validate|verify|test|document|format|lint|clean|cleanup|prepare|restore|backup|archive|deploy|release|publish|distribute|install|uninstall|configure|setup|initialize|reset|clear|empty|flush|refresh|reload|rebuild|recompile|retest|reverify|revalidate|recheck|review|audit|analyze|monitor|track|log|debug|trace|profile|benchmark|measure|calculate|compute|process|handle|manage|control|coordinate|synchronize|automate|schedule|queue|prioritize|organize|structure|restructure|reorganize|rearrange|reposition|relocate|move|copy|clone|duplicate|replicate|mirror|sync|align|center|justify|indent|outdent|wrap|unwrap|fold|unfold|expand|collapse|show|hide|display|reveal|conceal|mask|filter|sort|search|find|locate|identify|detect|recognize|classify|categorize|group|ungroup|merge|split|divide|separate|combine|join|connect|disconnect|link|unlink|attach|detach|bind|unbind|map|unmap|assign|unassign|allocate|deallocate|reserve|release|lock|unlock|secure|unsecure|protect|unprotect|encrypt|decrypt|encode|decode|compress|decompress|zip|unzip|pack|unpack|load|unload|import|export|transfer|transmit|receive|send|deliver|distribute|route|redirect|forward|backward|rewind|fast|slow|pause|resume|start|stop|begin|end|finish|complete|incomplete|partial|full|total|overall|final|initial|first|last|next|previous|current|old|new|latest|recent|past|future|temporary|permanent|fixed|variable|static|dynamic|public|private|protected|internal|external|global|local|universal|specific|general|common|rare|unique|standard|custom|default|alternative|optional|required|mandatory|optional|extra|additional|missing|removed|added|changed|modified|updated|upgraded|downgraded|improved|degraded|enhanced|reduced|increased|optimized|deoptimized)s+/i,
+      // Simple descriptive messages
+      /^\w+\s+\w+.*\w+(s|ed|ing)?\s+\w+/,
+    ];
+
+    // Check if message looks like a commit message
+    let isValid = false;
+    for (const pattern of validPatterns) {
+      if (pattern.test(trimmed)) {
+        isValid = true;
+        break;
+      }
+    }
+
+    // Additional heuristic: should contain action words and be reasonably concise
+    if (!isValid) {
+      const words = trimmed.toLowerCase().split(/\s+/);
+      const actionWords = [
+        'add', 'fix', 'remove', 'update', 'create', 'delete', 'implement', 
+        'refactor', 'optimize', 'improve', 'enhance', 'modify', 'adjust', 
+        'correct', 'prevent', 'handle', 'resolve', 'merge', 'split', 
+        'extract', 'consolidate', 'rename', 'reorder', 'revert', 'bump', 
+        'upgrade', 'disable', 'enable', 'migrate', 'convert', 'transform'
+      ];
+      
+      const hasActionWord = words.some(word => actionWords.includes(word));
+      const reasonableLength = trimmed.length >= 10 && trimmed.length <= 200;
+      
+      isValid = hasActionWord && reasonableLength;
+    }
+
+    return isValid;
+  }
+
+  /**
+   * Get detailed validation result for commit message
+   */
+  getCommitMessageValidation(message) {
+    const result = {
+      isValid: false,
+      isExplanatory: false,
+      isGeneric: false,
+      issues: [],
+      suggestions: []
+    };
+
+    if (!message || typeof message !== 'string') {
+      result.issues.push('Message is required and must be a string');
+      return result;
+    }
+
+    const trimmed = message.trim();
+    
+    // Check for explanatory patterns
+    const explanatoryPatterns = [
+      /^(here's|here is|this is|the following|below is|above is)/i,
+      /^(breakdown|explanation|description|summary|overview)/i,
+      /^(what|how|why|when|where)\s+(does|do|is|are|was|were)/i,
+      /^(this code|the code|javascript code|php code|python code)/i,
+      /^(here's|here is|this is)\s+(a|the)\s+breakdown/i,
+    ];
+
+    for (const pattern of explanatoryPatterns) {
+      if (pattern.test(trimmed)) {
+        result.isExplanatory = true;
+        result.issues.push('Message appears to be explanatory text, not a commit message');
+        break;
+      }
+    }
+
+    // Check for generic patterns
+    const genericPatterns = [
+      /^(has been|have been|was|were)\s+(modularized|refactored|updated|changed)/i,
+      /^(the|this)\s+(code|function|method|class)/i,
+      /:$/,
+      /^.{100,}$/, // Very long single sentences
+    ];
+
+    for (const pattern of genericPatterns) {
+      if (pattern.test(trimmed)) {
+        result.isGeneric = true;
+        result.issues.push('Message is too generic or incomplete');
+        break;
+      }
+    }
+
+    // Final validation
+    result.isValid = this.isValidCommitMessage(message);
+
+    if (!result.isValid) {
+      result.suggestions.push('Use imperative mood: "Add feature" instead of "Added feature"');
+      result.suggestions.push('Be specific about what changed: "fix(auth): resolve login timeout"');
+      result.suggestions.push('Keep it concise and focused on the change');
+    }
+
+    return result;
+  }
+
+  /**
+   * Calculate relevance score for commit message (0-100)
+   */
+  calculateRelevanceScore(message) {
+    let score = 50; // Base score
+
+    const trimmed = message.toLowerCase().trim();
+
+    // Bonus for conventional format
+    if (/^\w+\(\w+\):/.test(message)) {
+      score += 15;
+    }
+
+    // Bonus for clear action words
+    const actionWords = ['add', 'fix', 'remove', 'update', 'improve', 'enhance', 'optimize', 'refactor'];
+    if (actionWords.some(word => trimmed.includes(word))) {
+      score += 10;
+    }
+
+    // Bonus for specific scope
+    if (/\((auth|api|ui|db|config|theme|plugin|utils|test)\)/.test(message)) {
+      score += 10;
+    }
+
+    // Penalty for vague terms
+    const vagueTerms = ['update', 'change', 'modify', 'improve'];
+    const vagueCount = vagueTerms.filter(term => trimmed.includes(term)).length;
+    score -= vagueCount * 5;
+
+    // Penalty for overly technical
+    const technicalTerms = ['function', 'signature', 'logic', 'handler', 'implementation'];
+    const technicalCount = technicalTerms.filter(term => trimmed.includes(term)).length;
+    score -= technicalCount * 3;
+
+    // Penalty for file-specific scopes
+    if (/\.js:|\.php:|\.css:|\.html:/.test(message)) {
+      score -= 10;
+    }
+
+    // Penalty for generic plugin/theme updates
+    if (/^(plugin|theme|elementor)\s+(update|upgrade)/.test(trimmed)) {
+      score -= 15;
+    }
+
+    // Bonus for business value indicators
+    const businessTerms = ['user', 'customer', 'security', 'performance', 'feature', 'experience'];
+    if (businessTerms.some(term => trimmed.includes(term))) {
+      score += 8;
+    }
+
+    // Ensure score is within bounds
+    return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * Get improved commit message suggestions based on context
+   */
+  getImprovedMessageSuggestions(originalMessage, context = {}) {
+    const suggestions = [];
+    const validation = this.getCommitMessageValidation(originalMessage);
+
+    if (validation.relevanceScore > 70) {
+      return suggestions; // Already good enough
+    }
+
+    // Analyze original message to understand intent
+    const lowerMessage = originalMessage.toLowerCase();
+
+    // Handle generic plugin/theme updates
+    if (/^(plugin|theme|elementor)\s+(update|upgrade)/.test(lowerMessage)) {
+      if (context.files?.wordpress?.plugins?.length > 0) {
+        const plugin = context.files.wordpress.plugins[0];
+        suggestions.push(`chore(${plugin}): update to latest version`);
+      } else if (context.files?.wordpress?.themes?.length > 0) {
+        const theme = context.files.wordpress.themes[0];
+        suggestions.push(`chore(${theme}): update theme files`);
+      }
+    }
+
+    // Handle generic DB updates
+    if (/db\s+(creds?|credentials?|config)\s+update/i.test(lowerMessage)) {
+      suggestions.push('config(database): update connection credentials');
+      suggestions.push('chore(security): rotate database credentials');
+    }
+
+    // Handle overly technical messages
+    if (validation.isTooTechnical) {
+      if (lowerMessage.includes('placeholder')) {
+        suggestions.push('feat(forms): add dynamic placeholder text for better UX');
+      }
+      if (lowerMessage.includes('sticky')) {
+        suggestions.push('feat(ui): implement sticky sidebar for better navigation');
+      }
+      if (lowerMessage.includes('cookie')) {
+        suggestions.push('feat(privacy): implement cookie consent banner');
+      }
+    }
+
+    // Handle vague style updates
+    if (/^style:\s+(update|fix|change)\s+styles?$/i.test(lowerMessage)) {
+      suggestions.push('style(ui): improve component styling and layout');
+      if (context.files?.fileTypes?.css > 0) {
+        suggestions.push('style(css): optimize responsive design and spacing');
+      }
+    }
+
+    return suggestions;
+  }
 }
 
 module.exports = MessageFormatter;
