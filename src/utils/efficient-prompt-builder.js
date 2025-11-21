@@ -20,7 +20,10 @@ class EfficientPromptBuilder {
       language = 'en',
       chunkIndex,
       totalChunks,
-      chunkContext
+      chunkContext,
+      enhancedPrompt,
+      promptInstructions,
+      strictValidation
     } = options;
 
     // Handle null/undefined diff
@@ -32,17 +35,40 @@ class EfficientPromptBuilder {
     const changeAnalysis = this.analyzeDiffForSpecialization(diff);
     const impactAnalysis = this.analyzeChangeImpact(diff, context);
 
+    // Detect problematic cases (large WordPress files, etc.)
+    const isProblematicCase = this.detectProblematicCase(diff, context);
+    const isWordPressFile = this.isWordPressFile(diff, context);
+
     // Build concise, focused prompt
     let prompt = `Generate ${count} precise commit messages for this git diff.`;
 
+    // Add enhanced instructions for problematic cases
+    if (enhancedPrompt || isProblematicCase) {
+      prompt += this.buildEnhancedInstructions(isProblematicCase, isWordPressFile, promptInstructions);
+    }
+
+    // Add relevance-focused instructions
+    prompt += `\n\nRELEVANCE REQUIREMENTS:
+- Focus on BUSINESS VALUE and USER IMPACT
+- Use functional scopes (auth, ui, api, theme) not file names
+- Be specific about WHAT changed, not implementation details
+- Avoid technical jargon unless necessary
+- Consider: "What does this enable for users?"`;
+    
+
     // Add change-specific guidance
     prompt += this.buildChangeSpecificGuidance(changeAnalysis, impactAnalysis);
+
+    // Add WordPress-specific guidance if detected
+    if (isWordPressFile) {
+      prompt += this.buildWordPressGuidance(diff, context);
+    }
 
     // Add conventional commit format if requested
     if (conventional) {
       prompt += `\n\nFormat: type(scope): description
 Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
-Scope: be specific (api, ui, auth, db, config, utils, test)`;
+Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
     }
 
     // Add most relevant context (prioritized)
@@ -62,6 +88,18 @@ Scope: be specific (api, ui, auth, db, config, utils, test)`;
     // Add dynamic examples based on context
     prompt += `\n\nExamples: ${this.generateContextualExamples(context, changeAnalysis, conventional)}`;
 
+    // Add strict validation warnings if enabled
+    if (strictValidation) {
+      prompt += `\n\n⚠️  STRICT VALIDATION ENABLED:
+- Output ONLY commit messages (no explanations)
+- No explanatory phrases like "Here's", "This is", "The following"
+- No generic descriptions like "code has been modularized"
+- Each message must be actionable and specific
+- Focus on USER VALUE, not implementation details
+- Avoid file-specific scopes like "file.js:" - use functional scopes
+- Be specific about WHAT changed, not HOW it was implemented`;
+    }
+
     prompt += `\n\n\`\`\`diff
 ${diff}
 \`\`\`
@@ -70,38 +108,240 @@ ${count} messages, one per line:`;
 
     // Compress if still too long
     if (prompt.length > this.maxPromptLength) {
-      prompt = this.compressPrompt(prompt, diff, count, conventional);
+      prompt = this.compressPrompt(prompt, diff, count, conventional, isWordPressFile);
     }
 
     return prompt;
   }
 
   /**
+   * Detect problematic cases that need special handling
+   */
+  detectProblematicCase(diff, context) {
+    if (!diff) return false;
+
+    // Large diff detection
+    const isLargeDiff = diff.length > 15000;
+    
+    // WordPress theme file detection
+    const isWordPressTheme = /functions\.php|style\.css|index\.php|header\.php|footer\.php|sidebar\.php|wp-content\/themes/.test(diff);
+    
+    // Mixed language detection (PHP + HTML + JS)
+    const hasMixedLanguages = /<\?php/.test(diff) && /<[^>]+>/.test(diff) && /function|var|let|const/.test(diff);
+    
+    // Repetitive pattern detection (like banner arrays)
+    const hasRepetitivePatterns = /(array|data)\s*=\s*\[.*?\]/s.test(diff) && 
+                                 (diff.match(/['"][^'"]*['"]/g) || []).length > 10;
+
+    return isLargeDiff || isWordPressTheme || hasMixedLanguages || hasRepetitivePatterns;
+  }
+
+  /**
+   * Check if this is a WordPress file
+   */
+  isWordPressFile(diff, context) {
+    if (!diff) return false;
+
+    const wordpressPatterns = [
+      /functions\.php/,
+      /wp-content\/themes/,
+      /wp-content\/plugins/,
+      /add_action\s*\(/,
+      /add_filter\s*\(/,
+      /add_shortcode\s*\(/,
+      /wp_enqueue_script\s*\(/,
+      /wp_enqueue_style\s*\(/,
+      /get_template_part\s*\(/,
+      /the_content\s*\(/,
+      /wp_head\s*\(/,
+      /wp_footer\s*\(/,
+      /get_option\s*\(/,
+      /update_option\s*\(/,
+      /wp_query/,
+      /WP_Query/,
+      /\$wpdb/,
+      /do_action\s*\(/,
+      /apply_filters\s*\(/,
+      /wordpress|wp_/
+    ];
+
+    return wordpressPatterns.some(pattern => pattern.test(diff)) ||
+           context?.project?.primary === 'wordpress' ||
+           context?.files?.wordpress?.isWordPress;
+  }
+
+  /**
+   * Build enhanced instructions for problematic cases
+   */
+  buildEnhancedInstructions(isProblematicCase, isWordPressFile, promptInstructions) {
+    let instructions = '\n\nCRITICAL INSTRUCTIONS:';
+
+    if (promptInstructions) {
+      instructions += `\n${promptInstructions}`;
+    } else {
+      if (isProblematicCase) {
+        instructions += `
+- Focus on the MAIN change, not every detail
+- Look for the primary purpose of the changes
+- Ignore repetitive HTML/template content
+- Focus on functional changes, not formatting`;
+      }
+
+      if (isWordPressFile) {
+        instructions += `
+- This is a WordPress file - focus on functionality changes
+- Look for hook/filter/shortcode changes
+- Focus on PHP logic, not HTML output
+- Identify theme/plugin modifications`;
+      }
+    }
+
+    return instructions;
+  }
+
+  /**
+   * Build WordPress-specific guidance
+   */
+  buildWordPressGuidance(diff, context) {
+    let guidance = '\n\nWordPress-Specific Focus:';
+
+    // Detect specific WordPress changes
+    const wpChanges = [];
+
+    if (/add_action|add_filter|add_shortcode/.test(diff)) {
+      wpChanges.push('hooks/shortcodes');
+    }
+
+    if (/wp_enqueue_script|wp_enqueue_style/.test(diff)) {
+      wpChanges.push('asset loading');
+    }
+
+    if (/get_template_part|get_header|get_footer|get_sidebar/.test(diff)) {
+      wpChanges.push('template structure');
+    }
+
+    if (/\$wpdb|WP_Query|get_posts|wp_get_posts/.test(diff)) {
+      wpChanges.push('database queries');
+    }
+
+    if (/functions\.php/.test(diff)) {
+      wpChanges.push('theme functions');
+    }
+
+    if (wpChanges.length > 0) {
+      guidance += ` ${wpChanges.join(', ')}`;
+    } else {
+      guidance += ' general WordPress functionality';
+    }
+
+    return guidance;
+  }
+
+  /**
    * Compress prompt while preserving essential information
    */
-  compressPrompt(prompt, diff, count, conventional) {
+  compressPrompt(prompt, diff, count, conventional, isWordPressFile = false) {
     // Start with minimal essential requirements
-    let compressed = `Generate ${count} concise commit messages for the following git diff.
+    let compressed = `Generate ${count} concise commit messages for following git diff.
 
 REQUIREMENTS:
 - Be specific about actual changes
 - Use imperative voice ("Add", "Fix", "Remove")
 - Max 72 characters per message
-- No generic terms like "changes", "updates"`;
+- No generic terms like "changes", "updates"
+- Output ONLY commit messages, no explanations`;
+
+    if (isWordPressFile) {
+      compressed += `
+- Focus on WordPress functionality changes
+- Look for hook/filter/shortcode modifications`;
+    }
 
     if (conventional) {
       compressed += `
 - Use conventional format: type(scope): description`;
     }
 
+    // Smart diff truncation for WordPress files
+    let processedDiff = diff;
+    if (diff.length > this.maxPromptLength * 0.6) {
+      if (isWordPressFile) {
+        processedDiff = this.truncateWordPressDiff(diff);
+      } else {
+        processedDiff = this.truncateDiff(diff);
+      }
+    }
+
     compressed += `
 \`\`\`diff
-${diff.length > this.maxPromptLength * 0.6 ? this.truncateDiff(diff) : diff}
+${processedDiff}
 \`\`\`
 
 ${count} messages, each on its own line:`;
 
     return compressed;
+  }
+
+  /**
+   * Truncate WordPress diff intelligently
+   */
+  truncateWordPressDiff(diff) {
+    const lines = diff.split('\n');
+    const result = [];
+    let inImportantSection = false;
+    let skipCount = 0;
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Always keep headers
+      if (line.startsWith('diff --git') || 
+          line.startsWith('index') || 
+          line.startsWith('---') || 
+          line.startsWith('+++') || 
+          line.startsWith('@@')) {
+        result.push(line);
+        continue;
+      }
+      
+      // PHP function changes are important
+      if (line.startsWith('+') && /function\s+\w+|add_action|add_filter|add_shortcode/.test(line)) {
+        inImportantSection = true;
+        result.push(line);
+        continue;
+      }
+      
+      // Keep some context around important sections
+      if (inImportantSection) {
+        result.push(line);
+        // Reset after a few lines of context
+        if (line.startsWith(' ') && skipCount++ > 5) {
+          inImportantSection = false;
+          skipCount = 0;
+        }
+        continue;
+      }
+      
+      // Skip repetitive HTML/template content
+      if (line.startsWith('+') && /<div|<span|<p|<h[1-6]|class=|id=/.test(line)) {
+        // Only keep every 3rd HTML line to reduce noise
+        if (Math.random() < 0.3) {
+          result.push(line);
+        }
+        continue;
+      }
+      
+      // Keep other changes but limit total
+      if (result.length < 300) {
+        result.push(line);
+      }
+    }
+    
+    if (result.length < lines.length) {
+      result.push(`... (${lines.length - result.length} lines truncated for WordPress theme file) ...`);
+    }
+    
+    return result.join('\n');
   }
 
   /**

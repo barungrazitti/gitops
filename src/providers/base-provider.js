@@ -468,7 +468,7 @@ class BaseProvider {
       if (response.choices && Array.isArray(response.choices) && response.choices.length > 0) {
         content = response.choices[0]?.message?.content;
       } else {
-        // If it's an object but not the expected Groq format
+        // If it's an object but not expected Groq format
         content = response.content || JSON.stringify(response);
       }
     } else {
@@ -499,6 +499,230 @@ class BaseProvider {
     }
 
     return messages;
+  }
+
+  /**
+   * Generate commit messages with intelligent retry and validation
+   */
+  async generateCommitMessagesWithValidation(diff, options = {}) {
+    const MessageFormatter = require('../core/message-formatter');
+    const messageFormatter = new MessageFormatter();
+    
+    let lastError;
+    const maxRetries = options.maxRetries || 2;
+    const enableFallback = options.enableFallback !== false;
+    
+    // Try with current provider first
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Generate messages
+        const messages = await this.generateCommitMessages(diff, {
+          ...options,
+          attempt: attempt
+        });
+        
+        // Validate each message and score relevance
+        const validMessages = [];
+        const invalidMessages = [];
+        const messageScores = [];
+        
+        for (const message of messages) {
+          const validation = messageFormatter.getCommitMessageValidation(message);
+          const relevanceScore = messageFormatter.calculateRelevanceScore(message);
+          
+          messageScores.push({
+            message,
+            validation,
+            relevanceScore
+          });
+          
+          if (validation.isValid && relevanceScore >= 60) {
+            validMessages.push(message);
+          } else {
+            invalidMessages.push({
+              message,
+              issues: validation.issues,
+              isExplanatory: validation.isExplanatory,
+              isGeneric: validation.isGeneric,
+              relevanceScore
+            });
+          }
+        }
+        
+        // Sort messages by relevance score (highest first)
+        messageScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
+        
+        // If no valid messages, try to improve the best ones
+        if (validMessages.length === 0 && messageScores.length > 0) {
+          const bestMessage = messageScores[0];
+          if (bestMessage.relevanceScore >= 40) {
+            // Try to get suggestions for improvement
+            const suggestions = messageFormatter.getImprovedMessageSuggestions(bestMessage.message, options.context);
+            if (suggestions.length > 0) {
+              validMessages.push(suggestions[0]); // Use the best suggestion
+            }
+          }
+        }
+        
+        // If we have valid messages, return them
+        if (validMessages.length > 0) {
+          // Log successful validation
+          if (this.activityLogger) {
+            await this.activityLogger.info('commit_message_validation', {
+              provider: this.name,
+              attempt: attempt,
+              validMessages: validMessages.length,
+              invalidMessages: invalidMessages.length,
+              totalMessages: messages.length
+            });
+          }
+          
+          return validMessages;
+        }
+        
+        // If all messages are invalid, log and prepare for retry
+        const errorDetails = {
+          provider: this.name,
+          attempt: attempt,
+          invalidMessages: invalidMessages,
+          allExplanatory: invalidMessages.every(m => m.isExplanatory),
+          allGeneric: invalidMessages.every(m => m.isGeneric)
+        };
+        
+        // Log validation failure
+        if (this.activityLogger) {
+          await this.activityLogger.warn('commit_message_validation_failed', errorDetails);
+        }
+        
+        // Create error for retry logic
+        const error = new Error(`All generated commit messages are invalid: ${invalidMessages.map(m => m.issues.join('; ')).join(' | ')}`);
+        error.validationDetails = errorDetails;
+        throw error;
+        
+      } catch (error) {
+        lastError = error;
+        
+        // Don't retry on authentication or permission errors
+        if (error.message.includes('Authentication') || error.message.includes('permission') || error.message.includes('401') || error.message.includes('403')) {
+          throw error;
+        }
+        
+        // Log retry attempt
+        if (this.activityLogger) {
+          await this.activityLogger.debug('commit_generation_retry', {
+            provider: this.name,
+            attempt: attempt,
+            maxRetries: maxRetries,
+            error: error.message,
+            willRetry: attempt < maxRetries
+          });
+        }
+        
+        // If this is the last attempt for this provider, break
+        if (attempt === maxRetries) {
+          break;
+        }
+        
+        // Wait before retry with exponential backoff
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+    
+    // If we get here, all retries failed
+    if (enableFallback && this.name !== 'groq') {
+      // Try fallback to Groq
+      try {
+        if (this.activityLogger) {
+          await this.activityLogger.info('fallback_to_groq', {
+            originalProvider: this.name,
+            originalError: lastError.message,
+            attempts: maxRetries
+          });
+        }
+        
+        const GroqProvider = require('./groq-provider');
+        const groqProvider = new GroqProvider();
+        
+        // Copy activity logger if available
+        if (this.activityLogger) {
+          groqProvider.activityLogger = this.activityLogger;
+        }
+        
+        // Try with Groq (single attempt to avoid infinite loops)
+        return await groqProvider.generateCommitMessagesWithValidation(diff, {
+          ...options,
+          maxRetries: 1,
+          enableFallback: false, // Prevent infinite fallback loops
+          isFallback: true
+        });
+        
+      } catch (fallbackError) {
+        if (this.activityLogger) {
+          await this.activityLogger.error('fallback_to_groq_failed', {
+            originalProvider: this.name,
+            originalError: lastError.message,
+            fallbackError: fallbackError.message
+          });
+        }
+        
+        // Combine errors for better context
+        const combinedError = new Error(`Primary provider (${this.name}) failed after ${maxRetries} attempts: ${lastError.message}. Fallback to Groq also failed: ${fallbackError.message}`);
+        combinedError.originalError = lastError;
+        combinedError.fallbackError = fallbackError;
+        throw combinedError;
+      }
+    }
+    
+    // No fallback or fallback failed, throw the last error
+    throw lastError;
+  }
+
+  /**
+   * Generate commit messages with enhanced prompt for problematic cases
+   */
+  async generateCommitMessagesWithEnhancedPrompt(diff, options = {}) {
+    const originalOptions = { ...options };
+    
+    // If this is a retry or fallback, use enhanced prompt
+    if (options.attempt > 1 || options.isFallback) {
+      options.enhancedPrompt = true;
+      options.strictValidation = true;
+      
+      // Add specific instructions for problematic cases
+      if (options.validationDetails?.allExplanatory) {
+        options.promptInstructions = `
+CRITICAL: Generate ONLY commit messages, not explanations.
+DO NOT start with "Here's", "This is", "The following", etc.
+DO NOT provide breakdowns or explanations.
+Output ONLY the commit message itself.
+
+Examples of GOOD responses:
+- fix(auth): resolve login timeout issue
+- refactor(theme): improve topbar shortcode structure
+- feat(api): add user authentication endpoint
+
+Examples of BAD responses:
+- Here's a breakdown of what the code does:
+- The JavaScript code has been modularized...
+- This change updates the following:
+`;
+      } else if (options.validationDetails?.allGeneric) {
+        options.promptInstructions = `
+CRITICAL: Be SPECIFIC about what changed.
+Avoid generic terms like "modularized", "updated", "changed".
+Use concrete, actionable descriptions.
+
+Instead of: "The code has been modularized"
+Use: "refactor(utils): extract validation logic into separate functions"
+
+Instead of: "Update the configuration"
+Use: "config: update database connection settings for production"
+`;
+      }
+    }
+    
+    return await this.generateCommitMessages(diff, options);
   }
 
   /**
