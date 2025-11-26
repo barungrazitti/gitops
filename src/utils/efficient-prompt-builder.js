@@ -40,7 +40,7 @@ class EfficientPromptBuilder {
     const isWordPressFile = this.isWordPressFile(diff, context);
 
     // Build concise, focused prompt
-    let prompt = `Generate ${count} precise commit messages for this git diff.`;
+    let prompt = `Generate ${count} precise commit messages for this git diff. OUTPUT ONLY COMMIT MESSAGES - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
 
     // Add enhanced instructions for problematic cases
     if (enhancedPrompt || isProblematicCase) {
@@ -62,6 +62,11 @@ class EfficientPromptBuilder {
     // Add WordPress-specific guidance if detected
     if (isWordPressFile) {
       prompt += this.buildWordPressGuidance(diff, context);
+      // Add extra warning for WordPress files
+      prompt += `\n\nCRITICAL WordPress WARNING: 
+- DO NOT output deployment instructions or testing warnings
+- ONLY generate commit messages describing the code changes
+- IGNORE any impulse to add safety warnings or review instructions`;
     }
 
     // Add conventional commit format if requested
@@ -91,18 +96,21 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
     // Add strict validation warnings if enabled
     if (strictValidation) {
       prompt += `\n\n⚠️  STRICT VALIDATION ENABLED:
-- Output ONLY commit messages (no explanations)
-- No explanatory phrases like "Here's", "This is", "The following"
-- No generic descriptions like "code has been modularized"
-- Each message must be actionable and specific
-- Focus on USER VALUE, not implementation details
-- Avoid file-specific scopes like "file.js:" - use functional scopes
-- Be specific about WHAT changed, not HOW it was implemented`;
+ - Output ONLY commit messages (no explanations)
+ - No explanatory phrases like "Here's", "This is", "The following"
+ - No generic descriptions like "code has been modularized"
+ - Each message must be actionable and specific
+ - Focus on USER VALUE, not implementation details
+ - Avoid file-specific scopes like "file.js:" - use functional scopes
+ - Be specific about WHAT changed, not HOW it was implemented
+ - NEVER output warnings, instructions, or deployment advice`;
     }
 
     prompt += `\n\n\`\`\`diff
 ${diff}
 \`\`\`
+
+REMEMBER: OUTPUT ONLY COMMIT MESSAGES. NO WARNINGS. NO INSTRUCTIONS. NO DEPLOYMENT ADVICE.
 
 ${count} messages, one per line:`;
 
@@ -245,16 +253,18 @@ ${count} messages, one per line:`;
     let compressed = `Generate ${count} concise commit messages for following git diff.
 
 REQUIREMENTS:
-- Be specific about actual changes
-- Use imperative voice ("Add", "Fix", "Remove")
-- Max 72 characters per message
-- No generic terms like "changes", "updates"
-- Output ONLY commit messages, no explanations`;
+ - Be specific about actual changes
+ - Use imperative voice ("Add", "Fix", "Remove")
+ - Max 72 characters per message
+ - No generic terms like "changes", "updates"
+ - Output ONLY commit messages, no explanations
+ - NEVER output warnings, instructions, or deployment advice`;
 
     if (isWordPressFile) {
       compressed += `
-- Focus on WordPress functionality changes
-- Look for hook/filter/shortcode modifications`;
+ - Focus on WordPress functionality changes
+ - Look for hook/filter/shortcode modifications
+ - NEVER output warnings about WordPress theme files`;
     }
 
     if (conventional) {

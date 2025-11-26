@@ -28,7 +28,7 @@ class OllamaProvider extends BaseProvider {
     const model = options.model || config.model || 'qwen2.5-coder:latest';
 
     // Add context isolation to prevent hallucination
-    const isolatedPrompt = `IMPORTANT: Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
+    const isolatedPrompt = `CRITICAL: Output ONLY commit messages. No instructions, warnings, or explanations. Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
 
     return await this.withRetry(async () => {
       return await this.circuitBreaker.execute(async () => {
