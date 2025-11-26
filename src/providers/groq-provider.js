@@ -64,7 +64,7 @@ class GroqProvider extends BaseProvider {
             messages: [
               {
                 role: 'system',
-                content: 'You are an expert software developer who writes clear, concise commit messages. IMPORTANT: Only analyze the provided diff, do not reference any previous commits or external context.',
+                content: 'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.',
               },
               {
                 role: 'user',
