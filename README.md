@@ -6,6 +6,15 @@ A Node.js tool that generates intelligent commit messages using Groq or Ollama A
 
 > **One command to rule them all:** `aic` - Complete git workflow automation 🚀
 
+**Quick Start:**
+```bash
+git clone https://github.com/barungrazitti/gitops.git
+cd gitops
+./install.sh
+aic setup
+aic "initial commit"
+```
+
 ## 📦 Installation
 
 ### Prerequisites
@@ -31,7 +40,7 @@ npm install
 ```bash
 # Create symlink in local bin (no sudo needed)
 mkdir -p ~/.local/bin
-ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
+ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 source ~/.zshrc
 
@@ -55,6 +64,11 @@ aic setup
 # If symlink/global install fails
 npx aic --version
 npx aic setup
+```
+
+### Setup
+```bash
+aic setup
 ```
 
 **⚠️ Known Issue**: If `npm link` fails with permission errors, you may see `zsh: command not found` when running `aic`. This happens when an existing global package has wrong permissions.
@@ -180,12 +194,225 @@ aicommit config --set excludeFiles="*.log,dist/**"
 aicommit config --set proxy="http://proxy.company.com:8080"
 ```
 
+## 🔧 Troubleshooting
+
+### Common Installation Issues
+
+#### Command Not Found: `aic`
+```bash
+# Error: zsh: command not found: aic
+# Solution: Check if symlink exists and PATH is updated
+
+# 1. Verify symlink exists
+ls -la ~/.local/bin/aic
+
+# 2. If missing, recreate it
+mkdir -p ~/.local/bin
+ln -sf "/path/to/your/gitops/bin/aic.js" ~/.local/bin/aic
+
+# 3. Update PATH (add to ~/.zshrc or ~/.bashrc)
+export PATH="$HOME/.local/bin:$PATH"
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+#### Permission Denied Errors
+```bash
+# Error: EACCES: permission denied
+# Solution: Use local symlink instead of global install
+
+# Instead of: npm install -g . (requires sudo)
+# Use: Local symlink method (no sudo needed)
+mkdir -p ~/.local/bin
+ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
+```
+
+#### Node.js Version Compatibility
+```bash
+# Error: inquirer.prompt is not a function
+# Solution: Check Node.js version (requires v18+)
+
+node --version  # Should be v18.x or higher
+
+# If using Node.js v25+, the tool uses readline prompts instead of inquirer
+# This is normal and expected behavior
+```
+
+### Common Usage Issues
+
+#### "No staged changes found" Error
+```bash
+# Error: No staged changes found. Please stage your changes first.
+# Solution: Use `aic` (auto-stages) or stage manually
+
+# Option 1: Use auto-workflow (recommended)
+aic  # Automatically stages all changes
+
+# Option 2: Stage manually then use aicommit
+git add .
+aicommit
+
+# Option 3: Stage specific files
+git add src/ package.json
+aicommit
+```
+
+#### Git Push Permission Errors
+```bash
+# Error: Permission to repo.git denied to user
+# Solution: Check git configuration and repository access
+
+# 1. Check current git user
+git config --global user.name
+git config --global user.email
+
+# 2. Check remote URL
+git remote -v
+
+# 3. Use --no-push flag if you only want local commits
+aic --no-push
+```
+
+#### AI Provider Connection Issues
+
+**Groq API Issues:**
+```bash
+# Error: Invalid Groq API key
+# Solution: Re-run setup with correct key
+
+aic setup
+# Choose Groq, enter valid API key from console.groq.com/keys
+```
+
+**Ollama Connection Issues:**
+```bash
+# Error: Failed to connect to Ollama
+# Solution: Ensure Ollama is running
+
+# Start Ollama
+ollama serve
+
+# Test connection
+curl http://localhost:11434/api/tags
+
+# Install a model if needed
+ollama pull deepseek-coder
+```
+
+### Performance Issues
+
+#### Slow Response Times
+```bash
+# If AI generation is slow, try:
+
+# 1. Switch providers
+aic config --set provider=ollama  # Local (faster)
+# or
+aic config --set provider=groq    # Cloud (consistent)
+
+# 2. Reduce message count
+aic --count 1  # Generate fewer options
+
+# 3. Use specific model
+aic --model mixtral-8x7b  # Faster model
+```
+
+#### Large Repository Issues
+```bash
+# For large diffs, the tool automatically:
+# - Detects plugin/dependency updates (avoids chunking)
+# - Intelligently chunks large changes
+# - Preserves semantic context
+
+# Monitor the process:
+aic --dry-run  # See what will be done
+```
+
+### Debug Mode
+
+#### Enable Verbose Logging
+```bash
+# Enable detailed logging for debugging
+export DEBUG=1
+aic  # Shows detailed step-by-step process
+
+# Check activity logs
+aic stats --analyze  # Review recent activity
+aic stats --export   # Export logs for analysis
+```
+
+#### Reset Configuration
+```bash
+# If configuration is corrupted:
+aic config --reset  # Reset to defaults
+aic setup          # Reconfigure from scratch
+```
+
+### Edge Cases
+
+#### Empty Repository
+```bash
+# In new repositories with no commits:
+git init
+aic  # Will create initial commit automatically
+```
+
+#### Merge Conflicts
+```bash
+# During merge conflicts, aic offers:
+# 1. AI-powered resolution (recommended)
+# 2. Keep current changes (theirs)
+# 3. Use incoming changes (mine)
+# 4. Manual resolution guidance
+# 5. Cancel operation
+
+# Choose option 1 for intelligent AI merging
+```
+
+#### Network Issues
+```bash
+# If network is down:
+# 1. Use Ollama (local AI) instead of Groq
+aic config --set provider=ollama
+
+# 2. Skip pull/push operations
+aic --skip-pull --no-push  # Local commit only
+```
+
+#### Multiple Git Identities
+```bash
+# For work/personal repository separation:
+# Configure per-repository settings
+cd /path/to/work-repo
+aic config --set apiKey=work-api-key
+
+cd /path/to/personal-repo  
+aic config --set apiKey=personal-api-key
+```
+
+### Getting Help
+
+```bash
+# Get help for any command
+aic --help
+aic setup --help
+aic config --help
+
+# Check version
+aic --version
+
+# View current configuration
+aic config --list
+
+# Analyze recent activity for issues
+aic stats --analyze --days 7
+```
+
 ## 🛠️ Development
 
 ```bash
 # Clone and develop
 git clone https://github.com/barungrazitti/gitops.git
-cd ai-commit-generator
+cd gitops
 npm install
 npm run dev
 
