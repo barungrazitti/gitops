@@ -21,6 +21,21 @@ npm install
 npm link
 ```
 
+**⚠️ Known Issue**: If `npm link` fails with permission errors, you may see `zsh: command not found` when running `aic`. This happens when an existing global package has wrong permissions.
+
+**Solutions**:
+1. **Quick fix** - Add project directory to your PATH by adding this line to your `.zshrc`:
+   ```bash
+   export PATH="/Users/barun.tayenjam/Documents/Code/git-ops:$PATH"
+   ```
+   Then restart your terminal.
+
+2. **Proper fix** - Clean up the existing global package:
+   ```bash
+   sudo rm -rf /Users/barun.tayenjam/.nvm/versions/node/v22.14.0/lib/node_modules/ai-commit-generator
+   npm link
+   ```
+
 ### Setup
 ```bash
 aic setup
