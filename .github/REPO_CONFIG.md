@@ -29,10 +29,9 @@ JavaScript
 ## README Badge Suggestions
 
 ```markdown
-![Version](https://img.shields.io/github/package-json/v/baruntayenjam/ai-commit-generator)
-![License](https://img.shields.io/github/license/baruntayenjam/ai-commit-generator)
+![Version](https://img.shields.io/github/package-json/v/barungrazitti/gitops)
+![License](https://img.shields.io/github/license/barungrazitti/gitops)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![NPM Downloads](https://img.shields.io/npm/dt/ai-commit-generator)
 ```
 
 ## Social Preview
