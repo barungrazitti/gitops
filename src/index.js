@@ -157,75 +157,63 @@ class AICommitGenerator {
    * Interactive message selection
    */
   async selectMessage(messages) {
-    const choices = [
-      ...messages.map((msg, index) => ({
-        name: `${index + 1}. ${msg}`,
-        value: msg,
-        short: `Message ${index + 1}`,
-      })),
-      {
-        name: chalk.gray('🔄 Regenerate messages'),
-        value: 'regenerate',
-      },
-      {
-        name: chalk.gray('✏️  Write custom message'),
-        value: 'custom',
-      },
-      {
-        name: chalk.gray('❌ Cancel'),
-        value: 'cancel',
-      },
-    ];
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
 
-    const { selectedMessage } = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'selectedMessage',
-        message: 'Select a commit message:',
-        choices,
-        pageSize: 10,
-      },
-    ]);
+    const question = (prompt) => new Promise(resolve => {
+      rl.question(prompt, resolve);
+    });
 
-    if (selectedMessage === 'cancel') {
-      console.log(chalk.yellow('Commit cancelled.'));
-      return null;
-    }
-
-    if (selectedMessage === 'regenerate') {
-      console.log(chalk.yellow('Regenerating commit messages...'));
-      // Regenerate with same options
-      const regeneratedMessages = await this.generateWithSequentialFallback(diff, {
-        context,
-        count: parseInt(mergedOptions.count) || 3,
-        type: mergedOptions.type,
-        language: mergedOptions.language || 'en',
-        conventional: mergedOptions.conventional || config.conventionalCommits,
-        preferredProvider: mergedOptions.provider || config.defaultProvider,
+    try {
+      console.log(chalk.cyan('\n📝 Generated commit messages:'));
+      messages.forEach((msg, index) => {
+        console.log(chalk.green(`${index + 1}. ${msg}`));
       });
       
-      // Show regenerated messages
-      const { regenerate } = await this.selectMessage(regeneratedMessages, { 
-        allowRegenerate: false, 
-        title: 'Select from regenerated messages:' 
-      });
-      return regenerate;
-    }
+      console.log(chalk.gray(`${messages.length + 1}. 🔄 Regenerate messages`));
+      console.log(chalk.gray(`${messages.length + 2}. ✏️  Write custom message`));
+      console.log(chalk.gray(`${messages.length + 3}. ❌ Cancel`));
 
-    if (selectedMessage === 'custom') {
-      const { customMessage } = await inquirer.prompt([
-        {
-          type: 'input',
-          name: 'customMessage',
-          message: 'Enter your custom commit message:',
-          validate: (input) =>
-            input.trim().length > 0 || 'Message cannot be empty',
-        },
-      ]);
-      return customMessage;
-    }
+      const choice = await question(`\nSelect option (1-${messages.length + 3}, default: 1): `);
+      const choiceNum = parseInt(choice) || 1;
 
-    return selectedMessage;
+      if (choiceNum === messages.length + 3) {
+        console.log(chalk.yellow('Commit cancelled.'));
+        return null;
+      }
+
+      if (choiceNum === messages.length + 1) {
+        console.log(chalk.yellow('Regenerating commit messages...'));
+        rl.close();
+        // Return special value to trigger regeneration
+        return 'regenerate';
+      }
+
+      if (choiceNum === messages.length + 2) {
+        const customMessage = await question('Enter your custom commit message: ');
+        if (!customMessage.trim()) {
+          console.log(chalk.red('Message cannot be empty'));
+          return null;
+        }
+        rl.close();
+        return customMessage.trim();
+      }
+
+      if (choiceNum >= 1 && choiceNum <= messages.length) {
+        rl.close();
+        return messages[choiceNum - 1];
+      }
+
+      console.log(chalk.red('Invalid choice'));
+      rl.close();
+      return null;
+    } catch (error) {
+      rl.close();
+      throw error;
+    }
   }
 
   /**
@@ -257,57 +245,65 @@ class AICommitGenerator {
   async setup() {
     console.log(chalk.cyan('🚀 AI Commit Generator Setup Wizard\n'));
 
-    const answers = await inquirer.prompt([
-      {
-        type: 'list',
-        name: 'provider',
-        message: 'Select your preferred AI provider:',
-        choices: [
-          { name: 'Groq (Fast Cloud)', value: 'groq' },
-          { name: 'Ollama (Local)', value: 'ollama' },
-        ],
-      },
-      {
-        type: 'password',
-        name: 'apiKey',
-        message: 'Enter your API key:',
-        when: (answers) => answers.provider !== 'ollama',
-        validate: (input) => input.trim().length > 0 || 'API key is required',
-      },
-      {
-        type: 'confirm',
-        name: 'conventionalCommits',
-        message: 'Use conventional commit format?',
-        default: true,
-      },
-      {
-        type: 'list',
-        name: 'language',
-        message: 'Select commit message language:',
-        choices: [
-          { name: 'English', value: 'en' },
-          { name: 'Spanish', value: 'es' },
-          { name: 'French', value: 'fr' },
-          { name: 'German', value: 'de' },
-          { name: 'Chinese', value: 'zh' },
-          { name: 'Japanese', value: 'ja' },
-        ],
-        default: 'en',
-      },
-    ]);
-
-    // Save configuration
-    await this.configManager.setMultiple({
-      defaultProvider: answers.provider,
-      apiKey: answers.apiKey,
-      conventionalCommits: answers.conventionalCommits,
-      language: answers.language,
+    // Simple command-line setup (compatible with Node.js v25)
+    const readline = require('readline');
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
     });
 
-    console.log(chalk.green('\n✅ Setup completed successfully!'));
-    console.log(
-      chalk.cyan('You can now use "aicommit" to generate commit messages.')
-    );
+    const question = (prompt) => new Promise(resolve => {
+      rl.question(prompt, resolve);
+    });
+
+    try {
+      console.log('Select your preferred AI provider:');
+      console.log('1. Groq (Fast Cloud)');
+      console.log('2. Ollama (Local)');
+      
+      const providerChoice = await question('Enter choice (1-2, default: 1): ');
+      const provider = providerChoice === '2' ? 'ollama' : 'groq';
+
+      let apiKey = '';
+      if (provider !== 'ollama') {
+        apiKey = await question('Enter your Groq API key: ');
+        if (!apiKey.trim()) {
+          console.log(chalk.red('❌ API key is required for Groq'));
+          rl.close();
+          return;
+        }
+      }
+
+      const conventionalChoice = await question('Use conventional commit format? (Y/n, default: Y): ');
+      const conventionalCommits = conventionalChoice.toLowerCase() !== 'n';
+
+      console.log('Select commit message language:');
+      console.log('1. English');
+      console.log('2. Spanish');
+      console.log('3. French');
+      console.log('4. German');
+      console.log('5. Chinese');
+      console.log('6. Japanese');
+      
+      const langChoice = await question('Enter choice (1-6, default: 1): ');
+      const languages = { '1': 'en', '2': 'es', '3': 'fr', '4': 'de', '5': 'zh', '6': 'ja' };
+      const language = languages[langChoice] || 'en';
+
+      // Save configuration
+      await this.configManager.setMultiple({
+        defaultProvider: provider,
+        apiKey: apiKey,
+        conventionalCommits: conventionalCommits,
+        language: language,
+      });
+
+      console.log(chalk.green('\n✅ Setup completed successfully!'));
+      console.log(chalk.cyan('You can now use "aic" to generate commit messages.'));
+    } catch (error) {
+      console.error(chalk.red('Setup failed:'), error.message);
+    } finally {
+      rl.close();
+    }
   }
 
   /**
