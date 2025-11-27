@@ -1,7 +1,7 @@
 {
-  "name": "ai-commit-generator",
+  "name": "gitops",
   "description": "🤖 Automate your git workflow with AI-powered commit messages",
-  "homepage": "https://github.com/baruntayenjam/ai-commit-generator#readme",
+  "homepage": "https://github.com/barungrazitti/gitops#readme",
   "topics": [
     "ai-commit",
     "git-automation", 

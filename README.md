@@ -15,7 +15,7 @@ A Node.js tool that generates intelligent commit messages using Groq or Ollama A
 
 ### Clone and Install
 ```bash
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
+git clone https://github.com/barungrazitti/gitops.git
 cd ai-commit-generator
 npm install
 npm link
@@ -133,7 +133,7 @@ aicommit config --set proxy="http://proxy.company.com:8080"
 
 ```bash
 # Clone and develop
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
+git clone https://github.com/barungrazitti/gitops.git
 cd ai-commit-generator
 npm install
 npm run dev
@@ -149,7 +149,7 @@ MIT License - see [LICENSE](LICENSE) file
 
 ## 👨‍💻 Author
 
-Created by [Barun Tayenjam](https://github.com/baruntayenjam)
+Created by [Barun Tayenjam](https://github.com/barungrazitti)
 
 ## 🙏 Acknowledgments
 
@@ -160,4 +160,4 @@ Inspired by:
 
 ---
 
-Made with ❤️ by [Barun Tayenjam](https://github.com/baruntayenjam)
+Made with ❤️ by [Barun Tayenjam](https://github.com/barungrazitti)
