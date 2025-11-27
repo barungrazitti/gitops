@@ -13,7 +13,7 @@ AI Commit Message Generator is your intelligent git companion that writes perfec
 ### 🎯 Why Choose This Tool?
 
 - **🧠 Smart Context**: Analyzes your actual code changes, not just file names
-- **🎨 Multiple AI Models**: Choose from GPT-4, Claude, Gemini, Groq, and more
+- **🎨 Local AI Models**: Choose from Ollama local models or cloud providers like Groq
 - **📝 Conventional Commits**: Automatically follows conventional commit standards
 - **⚡ Lightning Fast**: One command does everything - stage, commit, push
 - **🔧 Highly Configurable**: Customize prompts, providers, and workflows
@@ -52,18 +52,21 @@ We're excited to announce the first stable release of AI Commit Message Generato
 - Team style adaptation
 - Proxy support for enterprise environments
 
-## 🚀 **NEW: Super Simple Workflow**
+## 🚀 Simple Workflow
 
-**Just type `aic` and let AI handle your entire git workflow!**
+**Clone, install, and let AI handle your entire git workflow!**
 
 ```bash
-# Install
-npm install -g ai-commit-generator
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm link
 
 # Setup (one time)
 aic setup
 
-# Use anywhere - does everything automatically:
+# Use the full automation command - does everything automatically:
 aic
 ```
 
@@ -77,47 +80,125 @@ aic
 6. 🔧 Auto-resolves conflicts
 7. ⬆️ Pushes to remote
 
-**[👉 See Simple Workflow Guide](SIMPLE_WORKFLOW.md)**
+**Alternative: Generate commit messages only**
 
-## 🚀 Features
+If you prefer to generate commit messages without the full automation:
 
-### ✨ Core Features
+```bash
+# First stage your changes manually
+git add .
 
-- **Multi-AI Provider Support**: OpenAI, Anthropic Claude, Google Gemini, Mistral, Cohere, Groq, Ollama
-- **Context-Aware Generation**: Analyzes staged changes via `git diff` with **semantic code analysis**
-- **Repository Learning**: Learns from commit history to match team style
-- **Conventional Commits**: Full support for conventional commit format
-- **Interactive Selection**: Multiple message suggestions with user selection
-- **Git Hook Integration**: Seamless integration with `prepare-commit-msg` hook
-- **Smart Caching**: Cache similar diffs to reduce API calls
-- **Multi-language Support**: Localization for commit messages
-- **🧠 NEW: Semantic Analysis**: Extracts functions, classes, components for ultra-specific commit messages
-- **🤖 NEW: AI Merge Resolution**: Intelligent conflict resolution with AI assistance
+# Generate AI commit message
+aicommit
+```
 
-### 🔧 Advanced Features
+## 🚀 **Available Commands**
 
-- **Team Style Adaptation**: Automatically adapt to project-specific commit patterns
-- **File-specific Analysis**: Analyze changes per file for better context
-- **Statistics & Analytics**: Track usage and AI provider performance
-- **Proxy Support**: HTTP/HTTPS proxy configuration for enterprise environments
-- **🧠 Enhanced Semantic Context**: JavaScript/TypeScript/PHP/Python function and class detection
-- **🤖 AI-Assisted Merge Conflicts**: Automatic resolution with fallback to AI assistance
-- **⚡ Smart Diff Processing**: Prioritized line selection for better AI understanding
-- **📊 Multi-language Support**: React components, WordPress hooks, API endpoints detection
+The tool provides two main command-line interfaces:
+
+### `aic` - Full Git Automation
+
+Complete git workflow automation in one command.
+
+```bash
+# Auto stage, commit, pull, resolve, push
+aic
+
+# With custom message
+aic "fix: resolve login issue"
+
+# Skip pull step
+aic --skip-pull
+
+# Don't push after commit
+aic --no-push
+
+# Dry run
+aic --dry-run
+
+# Setup AI provider
+aic setup
+
+# Configuration
+aic config --list
+aic config --set provider=ollama
+
+# Statistics
+aic stats
+aic stats --analyze
+```
 
 ## 📦 Installation
 
-### Global Installation (Recommended)
+### Prerequisites
+
+- **Node.js** (v18 or higher) - [Download Node.js](https://nodejs.org/)
+- **Git** - [Download Git](https://git-scm.com/)
+- Either a **Groq API key** OR **Ollama** installed locally
+
+### Installation via GitHub Clone
 
 ```bash
-npm install -g ai-commit-generator
+# Clone the repository
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+
+# Navigate to the project directory
+cd ai-commit-generator
+
+# Install dependencies
+npm install
+
+# Link globally for command line usage
+npm link
+
+# Setup your AI provider
+aic setup
 ```
 
-### Local Installation
+### Platform-Specific Instructions
 
+**macOS:**
 ```bash
-npm install ai-commit-generator
-npx aicommit setup
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm link
+```
+
+**Windows (PowerShell):**
+```powershell
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+npm link
+```
+
+**Linux:**
+
+**Ubuntu/Debian:**
+```bash
+# Install Node.js if not present
+sudo apt update && sudo apt install nodejs npm
+
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+sudo npm link
+```
+
+**CentOS/RHEL/Fedora:**
+```bash
+# Install Node.js if not present
+sudo dnf install nodejs npm
+
+# Clone and install
+git clone https://github.com/baruntayenjam/ai-commit-generator.git
+cd ai-commit-generator
+npm install
+sudo npm link
 ```
 
 ## 🛠️ Setup
@@ -125,58 +206,75 @@ npx aicommit setup
 Run the interactive setup wizard to configure your preferred AI provider:
 
 ```bash
+# For npm installation
+aic setup
+
+# Or for clone installation
 aicommit setup
 ```
 
 This will guide you through:
 
-- Selecting an AI provider
-- Configuring API keys
+- Selecting an AI provider (Groq or Ollama)
+- Configuring API keys (except for Ollama which works locally)
 - Setting commit message preferences
 - Choosing language and format options
 
+### Verify Installation
+
+```bash
+# Check installation status
+aic --version
+
+# View current configuration
+aic config --list
+
+# Show git and AI configuration
+aic status
+```
+
 ## 🎯 Usage
 
-### Installation
+### Quick Start
 
 ```bash
-npm install -g ai-commit-generator
-```
-
-### Setup (One Time)
-
-```bash
-aic setup
-```
-
-### Basic Usage
-
-```bash
-# One command does everything:
+# Full automation command - does everything:
 aic
 
 # With custom message:
 aic "fix: resolve login issue"
 
-# Quick commits:
-aic quick feat
+# Dry run to see what would happen:
+aic --dry-run
 ```
 
-**What `aic` does:**
+**For commit message generation only:**
 
-1. 🔍 Checks repository & changes
-2. 📦 Stages all changes
-3. 🤖 Generates AI commit message
-4. 💾 Commits changes
-5. ⬇️ Pulls latest changes
-6. 🔧 Auto-resolves conflicts
-7. ⬆️ Pushes to remote
+```bash
+# First stage your changes
+git add .
+
+# Generate AI commit message
+aicommit
+
+# With specific options
+aicommit --provider ollama --count 5 --type feat
+```
 
 ### Check Status
 
 ```bash
-aic status    # Show git and AI configuration
-aic --help    # Show all commands
+# Show git and AI configuration
+aic status
+aicommit config --list
+
+# Show all available commands
+aic --help
+aicommit --help
+
+# Show version information
+aic --version
+aicommit --version
 ```
 
 ### Interactive Mode
@@ -188,67 +286,55 @@ When you run `aicommit` without a message, it enters interactive mode, which pre
 - **Write custom message:** Choose this option to write your own commit message from scratch.
 - **Cancel:** Exit the interactive mode without making a commit.
 
-**📖 Quick Start:** [QUICK_START.md](QUICK_START.md) - Get running in 3 minutes
+**📚 Documentation:**
+- [AGENT.md](AGENT.md) - Development and contribution guidelines
 
-**📚 Installation Guides:**
-- [INSTALLATION.md](INSTALLATION.md) - Complete installation guide (npm & clone)
-- [CLONE_INSTALLATION.md](CLONE_INSTALLATION.md) - Install by cloning repository
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Enterprise deployment strategies
-- [EXAMPLES.md](EXAMPLES.md) - Usage examples and advanced features
+### `aicommit` - Commit Message Generation
 
-### Command Options
+Generate AI commit messages for already staged changes.
 
 ```bash
-# Generate with specific provider
-aicommit --provider openai
+# Generate commit messages (default)
+aicommit
 
-# Generate specific number of messages
+# With specific provider
+aicommit --provider groq
+aicommit --provider ollama
+
+# Number of messages to generate
 aicommit --count 5
 
-# Use conventional commit format
+# With specific options
+aicommit --type feat --language es
 aicommit --conventional
-
-# Dry run (see messages without committing)
 aicommit --dry-run
 
-# Specify commit type
-aicommit --type feat
+# Configuration management
+aicommit config --list
+aicommit config --set provider=ollama
+aicommit config --get provider
 
-# Use different language
-aicommit --language es
-```
+# Statistics
+aicommit stats
+aicommit stats --reset
 
-### Git Hook Integration
-
-Install the git hook to automatically generate commit messages:
-
-```bash
-# Install hook
+# Git hooks
 aicommit hook --install
-
-# Uninstall hook
 aicommit hook --uninstall
+
+# Interactive setup
+aicommit setup
 ```
 
 ## 🤖 Supported AI Providers
 
 | Provider          | Models                         | API Key Required | Local |
 | ----------------- | ------------------------------ | ---------------- | ----- |
-| **OpenAI**        | GPT-3.5, GPT-4                 | ✅               | ❌    |
-| **Anthropic**     | Claude 3 (Haiku, Sonnet, Opus) | ✅               | ❌    |
-| **Google Gemini** | Gemini Pro                     | ✅               | ❌    |
-| **Mistral**       | Tiny, Small, Medium, Large     | ✅               | ❌    |
-| **Cohere**        | Command, Command Light         | ✅               | ❌    |
 | **Groq**          | Mixtral, Llama 2, Gemma        | ✅               | ❌    |
 | **Ollama**        | Any local model                | ❌               | ✅    |
 
 ### Getting API Keys
 
-- **OpenAI**: [platform.openai.com](https://platform.openai.com/api-keys)
-- **Anthropic**: [console.anthropic.com](https://console.anthropic.com/)
-- **Google Gemini**: [makersuite.google.com](https://makersuite.google.com/app/apikey)
-- **Mistral**: [console.mistral.ai](https://console.mistral.ai/)
-- **Cohere**: [dashboard.cohere.ai](https://dashboard.cohere.ai/api-keys)
 - **Groq**: [console.groq.com](https://console.groq.com/keys)
 - **Ollama**: [ollama.ai](https://ollama.ai/) (local installation)
 
@@ -256,12 +342,14 @@ aicommit hook --uninstall
 
 ### Configuration Commands
 
+Both `aic` and `aicommit` use the same configuration:
+
 ```bash
 # View current configuration
 aicommit config --list
 
 # Set configuration value
-aicommit config --set provider=anthropic
+aicommit config --set provider=ollama
 
 # Get specific value
 aicommit config --get provider
@@ -274,8 +362,8 @@ aicommit config --reset
 
 | Option                | Description                    | Default  |
 | --------------------- | ------------------------------ | -------- |
-| `defaultProvider`     | AI provider to use             | `openai` |
-| `apiKey`              | API key for the provider       | `null`   |
+| `defaultProvider`     | AI provider to use (groq or ollama) | `groq`  |
+| `apiKey`              | API key for Groq provider            | `null`   |
 | `conventionalCommits` | Use conventional commit format | `true`   |
 | `language`            | Commit message language        | `en`     |
 | `messageCount`        | Number of messages to generate | `3`      |
@@ -289,13 +377,45 @@ View usage statistics and performance metrics:
 
 ```bash
 # Show statistics
+aic stats
 aicommit stats
 
+# Analyze recent activity logs
+aic stats --analyze
+
+# Export activity logs
+aic stats --export --format csv
+
 # Reset statistics
+aic stats --reset
 aicommit stats --reset
 ```
 
 ## 🔧 Advanced Usage
+
+### Full Automation with `aic`
+
+The `aic` command provides complete git workflow automation:
+
+```bash
+# Standard automation
+aic
+
+# With manual message
+aic "feat: add user authentication"
+
+# Skip pulling before push
+aic --skip-pull
+
+# Don't push after committing
+aic --no-push
+
+# Force run even with no changes
+aic --force
+
+# See what would happen
+aic --dry-run
+```
 
 ### Custom Prompts
 
@@ -321,65 +441,7 @@ Configure files to exclude from analysis:
 aicommit config --set excludeFiles="*.log,dist/**,node_modules/**"
 ```
 
-## 📦 Installation
 
-### Quick Installation (3 Commands)
-
-```bash
-# 1. Install Node.js (https://nodejs.org)
-# 2. Clone and install the tool
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
-cd ai-commit-generator
-npm install
-npm link
-
-# 3. Setup your AI provider
-aic setup
-```
-
-### Platform-Specific Installation
-
-**macOS:**
-```bash
-# Clone and install
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
-cd ai-commit-generator
-npm install
-npm link
-```
-
-**Windows:**
-```powershell
-# Clone and install
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
-cd ai-commit-generator
-npm install
-npm link
-```
-
-**Linux:**
-```bash
-# Ubuntu/Debian
-sudo apt update && sudo apt install nodejs npm
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
-cd ai-commit-generator
-npm install
-sudo npm link
-
-# CentOS/RHEL/Fedora
-sudo dnf install nodejs npm
-git clone https://github.com/baruntayenjam/ai-commit-generator.git
-cd ai-commit-generator
-npm install
-sudo npm link
-```
-
-### Enterprise Deployment
-
-For team and enterprise deployment strategies, see:
-- [INSTALLATION.md](INSTALLATION.md) - Complete installation guide for all platforms
-- [CLONE_INSTALLATION.md](CLONE_INSTALLATION.md) - Detailed clone installation guide
-- [DEPLOYMENT.md](DEPLOYMENT.md) - Enterprise deployment strategies and CI/CD integration
 
 ### Development
 
@@ -391,29 +453,25 @@ npm install
 npm run dev
 ```
 
-## 🤝 Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
+### Testing
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-username/ai-commit-generator.git
-cd ai-commit-generator
-
-# Install dependencies
-npm install
-
-# Run in development mode
-npm run dev
-
 # Run tests
 npm test
 
-# Build for production
-npm run build:prod
+# Run tests with coverage
+npm run test:coverage
+
+# Run tests in watch mode
+npm run test:watch
+
+# Run tests with verbose output
+npm run test:verbose
 ```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [AGENT.md](AGENT.md) for development guidelines.
 
 ## 📄 License
 
@@ -433,12 +491,13 @@ Inspired by:
 
 ## 📋 Changelog
 
-### v1.0.0 (2025-10-14) - Initial Stable Release
+### v1.0.0 (2025-01-27) - Initial Stable Release
 
-#### 🎯 Major Features
+#### 🎯 Core Features
 
-- **Multi-AI Provider Support**: Full integration with OpenAI, Anthropic, Gemini, Mistral, Cohere, Groq, and Ollama
-- **Simple Workflow**: One-command `aic` that handles entire git workflow automatically
+- **Dual AI Provider Support**: Integration with Groq (cloud) and Ollama (local) for flexible AI generation
+- **Full Git Automation**: `aic` command handles complete workflow (stage, commit, pull, resolve, push)
+- **Commit Message Generation**: `aicommit` command analyzes staged changes to generate meaningful commit messages
 - **Interactive Mode**: Message selection, regeneration, and custom message options
 - **Git Hook Integration**: Seamless `prepare-commit-msg` hook integration
 
