@@ -64,7 +64,7 @@ async function handleStats(options) {
 // --- CLI Configuration ---
 
 program
-  .name('aicommit')
+  .name('aic')
   .description('AI-powered commit message generator')
   .version(version, '-v, --version', 'display version number');
 

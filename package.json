@@ -4,7 +4,7 @@
   "description": "Automate your git workflow with AI-powered commit messages using Groq or Ollama",
   "main": "src/index.js",
   "bin": {
-    "aicommit": "./bin/aicommit.js"
+    "aic": "./bin/aicommit.js"
   },
   "scripts": {
     "start": "node src/index.js",
