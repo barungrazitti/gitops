@@ -1,7 +1,7 @@
 {
   "name": "ai-commit-generator",
   "version": "1.0.0",
-  "description": "A powerful, context-aware AI commit message generator",
+  "description": "Automate your git workflow with AI-powered commit messages using Groq or Ollama",
   "main": "src/index.js",
   "bin": {
     "aicommit": "./bin/aicommit.js"
@@ -23,7 +23,20 @@
     "ai",
     "automation",
     "cli",
-    "conventional-commits"
+    "conventional-commits",
+    "ollama",
+    "groq",
+    "git-workflow",
+    "developer-tools",
+    "version-control",
+    "llm",
+    "nodejs",
+    "javascript",
+    "cli-tool",
+    "automation-tools",
+    "git-automation",
+    "commit-message",
+    "semantic-commits"
   ],
   "author": {
     "name": "Barun Tayenjam",
