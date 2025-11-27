@@ -13,12 +13,48 @@ A Node.js tool that generates intelligent commit messages using Groq or Ollama A
 - **Git** - [Download](https://git-scm.com/)
 - Groq API key OR Ollama installed locally
 
-### Clone and Install
+### Quick Install (Recommended)
 ```bash
 git clone https://github.com/barungrazitti/gitops.git
-cd ai-commit-generator
+cd gitops
+./install.sh
+```
+
+### Manual Install
+```bash
+git clone https://github.com/barungrazitti/gitops.git
+cd gitops
 npm install
-npm link
+```
+
+#### Option 1: Local Symlink (Recommended)
+```bash
+# Create symlink in local bin (no sudo needed)
+mkdir -p ~/.local/bin
+ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
+source ~/.zshrc
+
+# Test installation
+aic --version
+aic setup
+```
+
+#### Option 2: Global Installation
+```bash
+# Install globally (may require sudo)
+npm install -g .
+
+# Test installation
+aic --version
+aic setup
+```
+
+#### Option 3: Use with npx (Fallback)
+```bash
+# If symlink/global install fails
+npx aic --version
+npx aic setup
 ```
 
 ### Setup
