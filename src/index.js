@@ -535,10 +535,60 @@ class AICommitGenerator {
   }
 
   /**
-   * Build prompt using efficient prompt builder
+   * Detect if diff represents a plugin/dependency update
    */
-  buildPrompt(diff, options) {
-    return this.efficientPromptBuilder.buildPrompt(diff, options);
+  detectPluginUpdate(diff) {
+    // Extract file paths from diff
+    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
+      .map(f => f.replace('+++ b/', '').trim());
+    
+    // Very strict package file list - ONLY core dependency files
+    const corePackageFiles = [
+      'package.json',
+      'composer.json'
+    ];
+    
+    // Check if ALL changed files are core package files AND diff is small
+    const hasOnlyCorePackageFiles = filePaths.length > 0 && 
+      filePaths.length <= 3 && // Max 3 files
+      filePaths.every(file => corePackageFiles.some(pkg => file.endsWith(pkg))) &&
+      diff.length < 10000; // Max 10KB
+    
+    // Check for simple version update patterns in package files
+    const simpleVersionPattern = /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm;
+    const versionLines = (diff.match(simpleVersionPattern) || []).length;
+    const totalLines = diff.split('\n').length;
+    
+    // Only consider it a simple dependency update if:
+    // 1. Only core package files are changed (max 3 files)
+    // 2. Most changes are version updates
+    // 3. Diff size is very small (under 10KB)
+    const isSimpleDependencyUpdate = hasOnlyCorePackageFiles && 
+      versionLines > 0 && 
+      versionLines / totalLines > 0.7 && // 70%+ version updates
+      diff.length < 10000;
+    
+    // WordPress plugin/theme updates must be very specific
+    const wordpressPluginPatterns = [
+      /^wp-content\/plugins\/[^\/]+\/package\.json$/,
+      /^wp-content\/plugins\/[^\/]+\/composer\.json$/,
+      /^wp-content\/themes\/[^\/]+\/package\.json$/,
+      /^wp-content\/themes\/[^\/]+\/composer\.json$/
+    ];
+    
+    const hasWordPressPluginUpdate = filePaths.some(file => 
+      wordpressPluginPatterns.some(pattern => pattern.test(file))
+    );
+    
+    // Additional check: if diff contains any non-package files, it's NOT a plugin update
+    const hasNonPackageFiles = filePaths.some(file => 
+      !corePackageFiles.some(pkg => file.endsWith(pkg)) &&
+      !wordpressPluginPatterns.some(pattern => pattern.test(file))
+    );
+    
+    // Final decision: must be simple dependency update OR WordPress plugin update
+    // AND must not contain other file types
+    return (isSimpleDependencyUpdate || hasWordPressPluginUpdate) && !hasNonPackageFiles;
   }
 
   /**
@@ -752,8 +802,8 @@ class AICommitGenerator {
     // Check if this is a plugin/dependency update that should avoid chunking
     const isPluginUpdate = this.detectPluginUpdate(diff);
 
-    // Strategy 1: Use full diff if under limit OR if plugin update (even if large)
-    if (diffSize <= MAX_DIFF_SIZE || isPluginUpdate) {
+    // Strategy 1: Use full diff if under limit OR if plugin update (but not extremely large)
+    if (diffSize <= MAX_DIFF_SIZE || (isPluginUpdate && diffSize < 100000)) {
       const reasoning = isPluginUpdate
         ? 'Plugin/dependency update detected, avoiding chunking for better context'
         : 'Diff size manageable, using full content';
@@ -770,6 +820,11 @@ class AICommitGenerator {
           pluginUpdate: isPluginUpdate
         }
       };
+    }
+
+    // Safety fallback: if diff is extremely large (>1MB), force chunking regardless of plugin detection
+    if (diffSize > 1000000) {
+      console.log(chalk.yellow(`⚠️  Extremely large diff detected (${Math.round(diffSize/1024/1024)}MB), forcing chunking`));
     }
 
     // Strategy 2: Chunk large diffs intelligently
