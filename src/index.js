@@ -430,7 +430,7 @@ class AICommitGenerator {
   /**
    * Select best commit messages from chunked results
    */
-  selectBestMessages(messages, count = 3) {
+  selectBestMessages(messages, count = 3, diff = null) {
     if (!messages || messages.length === 0) return [];
 
     // Remove duplicates
@@ -439,7 +439,7 @@ class AICommitGenerator {
     // Score messages based on quality factors
     const scored = uniqueMessages.map((msg) => ({
       message: msg,
-      score: this.scoreCommitMessage(msg),
+      score: this.scoreCommitMessage(msg, diff),
     }));
 
     // Sort by score and take best ones
@@ -451,7 +451,7 @@ class AICommitGenerator {
   /**
    * Score a commit message based on quality factors
    */
-  scoreCommitMessage(message) {
+  scoreCommitMessage(message, diff = null) {
     let score = 0;
 
     // Prefer conventional commit format
@@ -531,14 +531,341 @@ class AICommitGenerator {
       score -= 3;
     }
 
+    // RELEVANCE SCORING - only if diff is provided
+    if (diff) {
+      score += this.calculateRelevanceScore(message, diff);
+    }
+
     return score;
   }
 
   /**
-   * Build prompt using efficient prompt builder
+   * Calculate relevance score based on how well the commit message matches the actual diff
    */
-  buildPrompt(diff, options) {
-    return this.efficientPromptBuilder.buildPrompt(diff, options);
+  calculateRelevanceScore(message, diff) {
+    let relevanceScore = 0;
+
+    // Extract key entities from diff (functions, classes, filenames, etc.)
+    const entitiesFromDiff = this.extractEntitiesFromDiff(diff);
+
+    // Extract keywords from commit message
+    const messageKeywords = this.extractKeywordsFromMessage(message);
+
+    // Calculate overlap between diff entities and message
+    const entityOverlap = this.calculateEntityOverlap(entitiesFromDiff, messageKeywords);
+    relevanceScore += entityOverlap * 8; // Weight entity overlap heavily
+
+    // Check if the commit type matches the diff type
+    const typeMatch = this.checkTypeMatch(message, diff);
+    if (typeMatch) {
+      relevanceScore += 5;
+    }
+
+    // Check if the scope matches the file types changed
+    const scopeMatch = this.checkScopeMatch(message, diff);
+    if (scopeMatch) {
+      relevanceScore += 3;
+    }
+
+    // Penalize if message is too generic relative to specific changes
+    if (this.isMessageTooGenericForDiff(message, diff)) {
+      relevanceScore -= 10;
+    }
+
+    return relevanceScore;
+  }
+
+  /**
+   * Extract key entities from diff (functions, classes, filenames, etc.)
+   */
+  extractEntitiesFromDiff(diff) {
+    const entities = {
+      functions: [],
+      classes: [],
+      variables: [],
+      filenames: [],
+      fileTypes: [],
+      methods: []
+    };
+
+    // Extract file names from diff
+    const fileMatches = diff.match(/diff --git a\/(.+?) b\/(.+)/g) || [];
+    for (const match of fileMatches) {
+      const fileMatch = match.match(/diff --git a\/(.+?) b\/(.+)/);
+      if (fileMatch) {
+        const filePath = fileMatch[2];
+        entities.filenames.push(filePath);
+
+        // Extract file type/extension
+        const ext = filePath.split('.').pop();
+        if (ext) entities.fileTypes.push(ext);
+      }
+    }
+
+    // Extract function/class definitions from diff
+    const functionMatches = diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of functionMatches) {
+      const funcName = match.replace(/function\s+|def\s+/, '').trim();
+      if (funcName) entities.functions.push(funcName);
+    }
+
+    const classMatches = diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of classMatches) {
+      const className = match.replace('class\s+', '').replace('class ', '').trim();
+      if (className) entities.classes.push(className);
+    }
+
+    // Extract variable declarations
+    const varMatches = diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of varMatches) {
+      const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
+      if (varName) entities.variables.push(varName);
+    }
+
+    // Extract method definitions in diff
+    const methodMatches = diff.match(/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g) || [];
+    for (const match of methodMatches) {
+      const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
+      if (methodName && !entities.functions.includes(methodName)) {
+        entities.methods.push(methodName);
+      }
+    }
+
+    // Extract import/module statements
+    const importMatches = diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
+    for (const match of importMatches) {
+      const importName = match.replace(/(?:import|from|require)\s*/, '').replace(/['"`].*?['"`]/, '').trim();
+      if (importName) entities.variables.push(importName);
+    }
+
+    return entities;
+  }
+
+  /**
+   * Extract keywords from commit message
+   */
+  extractKeywordsFromMessage(message) {
+    // Remove conventional commit prefix (type(scope):) to focus on content
+    const content = message.replace(/^[a-z]+(\([^)]+\))?:\s*/, '');
+
+    // Extract words that could be relevant
+    const words = content.toLowerCase()
+      .replace(/[^\w\s]/g, ' ')
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !this.isCommonStopWord(word));
+
+    return [...new Set(words)]; // Remove duplicates
+  }
+
+  /**
+   * Check if word is a common stop word that should be ignored
+   */
+  isCommonStopWord(word) {
+    const stopWords = new Set([
+      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
+      'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
+      'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we',
+      'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its',
+      'our', 'their', 'what', 'which', 'who', 'when', 'where', 'why', 'how',
+      'if', 'then', 'else', 'so', 'than', 'too', 'very', 'just', 'now', 'up',
+      'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once'
+    ]);
+
+    return stopWords.has(word.toLowerCase());
+  }
+
+  /**
+   * Calculate overlap between entities from diff and keywords from message
+   */
+  calculateEntityOverlap(entities, messageKeywords) {
+    let overlapCount = 0;
+
+    // Check for function name matches
+    for (const func of entities.functions) {
+      const funcName = func.toLowerCase();
+      if (messageKeywords.some(keyword =>
+        funcName.includes(keyword) || keyword.includes(funcName)
+      )) {
+        overlapCount++;
+      }
+    }
+
+    // Check for class name matches
+    for (const cls of entities.classes) {
+      const className = cls.toLowerCase();
+      if (messageKeywords.some(keyword =>
+        className.includes(keyword) || keyword.includes(className)
+      )) {
+        overlapCount++;
+      }
+    }
+
+    // Check for variable name matches
+    for (const varName of entities.variables) {
+      const varNameLower = varName.toLowerCase();
+      if (messageKeywords.some(keyword =>
+        varNameLower.includes(keyword) || keyword.includes(varNameLower)
+      )) {
+        overlapCount++;
+      }
+    }
+
+    // Check for filename matches
+    for (const file of entities.filenames) {
+      const fileName = file.toLowerCase().replace(/\.[^/.]+$/, ''); // Remove extension
+      const fileNameParts = fileName.split(/[\/\\]/); // Split by path separators
+
+      for (const part of fileNameParts) {
+        if (messageKeywords.some(keyword =>
+          part.includes(keyword) || keyword.includes(part)
+        )) {
+          overlapCount++;
+          break;
+        }
+      }
+    }
+
+    return overlapCount;
+  }
+
+  /**
+   * Check if commit type matches the type of changes in diff
+   */
+  checkTypeMatch(message, diff) {
+    // Extract type from message
+    const typeMatch = message.match(/^([a-z]+)(\(.+\))?:/);
+    if (!typeMatch) return false;
+
+    const changeType = typeMatch[1];
+
+    // Determine what type of changes are in the diff
+    const diffIndicators = {
+      feat: /(\+.*function|\+.*class|\+.*def|\+.*export|\+.*import)/.test(diff),
+      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(diff),
+      docs: /(\+.*\.(md|txt|rst)|\+.*README|\+.*documentation)/i.test(diff),
+      refactor: /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
+      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(diff),
+      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(diff),
+    };
+
+    // Check if the type matches the detected change pattern
+    return diffIndicators[changeType] || false;
+  }
+
+  /**
+   * Check if commit scope matches file types changed
+   */
+  checkScopeMatch(message, diff) {
+    // Extract scope from message
+    const scopeMatch = message.match(/^[a-z]+\(([^)]+)\):/);
+    if (!scopeMatch) return false;
+
+    const scope = scopeMatch[1];
+
+    // Extract file types from diff
+    const fileTypes = this.extractEntitiesFromDiff(diff).fileTypes;
+
+    // Common scope-type mappings
+    const scopeTypeMap = {
+      'api': ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
+      'ui': ['jsx', 'tsx', 'vue', 'html', 'css', 'scss', 'sass', 'less'],
+      'auth': ['js', 'ts', 'py', 'php', 'java', 'go'],
+      'db': ['sql', 'js', 'ts', 'py', 'php'],
+      'config': ['json', 'yaml', 'yml', 'env', 'xml', 'toml', 'conf'],
+      'test': ['test.js', 'spec.js', 'test.ts', 'spec.ts', 'test.py', 'spec.rb'],
+      'docs': ['md', 'txt', 'rst', 'adoc', 'tex'],
+      'build': ['js', 'ts', 'json', 'lock', 'yml', 'yaml', 'sh', 'gradle', 'xml'],
+      'ci': ['yml', 'yaml', 'sh', 'json'],
+      'utils': ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
+      'types': ['ts', 'js', 'py', 'java', 'go'],
+      'perf': ['js', 'ts', 'py', 'java', 'go', 'php'],
+      'deps': ['json', 'lock', 'yml', 'yaml', 'xml', 'txt']
+    };
+
+    if (scopeTypeMap[scope]) {
+      return fileTypes.some(type => scopeTypeMap[scope].includes(type));
+    }
+
+    return false;
+  }
+
+  /**
+   * Check if message is too generic for the specific changes in the diff
+   */
+  isMessageTooGenericForDiff(message, diff) {
+    // If diff contains specific function/class names but message is generic
+    const entities = this.extractEntitiesFromDiff(diff);
+    const hasSpecificEntities = entities.functions.length > 0 ||
+                                entities.classes.length > 0 ||
+                                entities.variables.length > 0;
+
+    const genericTerms = [
+      /\bchanges?\b/i, /\bupdates?\b/i, /\bfixes?\b/i,
+      /\bstuff\b/i, /\bthings?\b/i, /\bvarious\b/i,
+      /\bimprovements?\b/i, /\benhancements?\b/i
+    ];
+
+    const hasGenericTerms = genericTerms.some(regex => regex.test(message));
+
+    return hasSpecificEntities && hasGenericTerms;
+  }
+
+  /**
+   * Detect if diff represents a plugin/dependency update
+   */
+  detectPluginUpdate(diff) {
+    // Extract file paths from diff
+    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
+      .map(f => f.replace('+++ b/', '').trim());
+    
+    // Very strict package file list - ONLY core dependency files
+    const corePackageFiles = [
+      'package.json',
+      'composer.json'
+    ];
+    
+    // Check if ALL changed files are core package files AND diff is small
+    const hasOnlyCorePackageFiles = filePaths.length > 0 && 
+      filePaths.length <= 3 && // Max 3 files
+      filePaths.every(file => corePackageFiles.some(pkg => file.endsWith(pkg))) &&
+      diff.length < 10000; // Max 10KB
+    
+    // Check for simple version update patterns in package files
+    const simpleVersionPattern = /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm;
+    const versionLines = (diff.match(simpleVersionPattern) || []).length;
+    const totalLines = diff.split('\n').length;
+    
+    // Only consider it a simple dependency update if:
+    // 1. Only core package files are changed (max 3 files)
+    // 2. Most changes are version updates
+    // 3. Diff size is very small (under 10KB)
+    const isSimpleDependencyUpdate = hasOnlyCorePackageFiles && 
+      versionLines > 0 && 
+      versionLines / totalLines > 0.7 && // 70%+ version updates
+      diff.length < 10000;
+    
+    // WordPress plugin/theme updates must be very specific
+    const wordpressPluginPatterns = [
+      /^wp-content\/plugins\/[^\/]+\/package\.json$/,
+      /^wp-content\/plugins\/[^\/]+\/composer\.json$/,
+      /^wp-content\/themes\/[^\/]+\/package\.json$/,
+      /^wp-content\/themes\/[^\/]+\/composer\.json$/
+    ];
+    
+    const hasWordPressPluginUpdate = filePaths.some(file => 
+      wordpressPluginPatterns.some(pattern => pattern.test(file))
+    );
+    
+    // Additional check: if diff contains any non-package files, it's NOT a plugin update
+    const hasNonPackageFiles = filePaths.some(file => 
+      !corePackageFiles.some(pkg => file.endsWith(pkg)) &&
+      !wordpressPluginPatterns.some(pattern => pattern.test(file))
+    );
+    
+    // Final decision: must be simple dependency update OR WordPress plugin update
+    // AND must not contain other file types
+    return (isSimpleDependencyUpdate || hasWordPressPluginUpdate) && !hasNonPackageFiles;
   }
 
   /**
@@ -752,8 +1079,8 @@ class AICommitGenerator {
     // Check if this is a plugin/dependency update that should avoid chunking
     const isPluginUpdate = this.detectPluginUpdate(diff);
 
-    // Strategy 1: Use full diff if under limit OR if plugin update (even if large)
-    if (diffSize <= MAX_DIFF_SIZE || isPluginUpdate) {
+    // Strategy 1: Use full diff if under limit OR if plugin update (but not extremely large)
+    if (diffSize <= MAX_DIFF_SIZE || (isPluginUpdate && diffSize < 100000)) {
       const reasoning = isPluginUpdate
         ? 'Plugin/dependency update detected, avoiding chunking for better context'
         : 'Diff size manageable, using full content';
@@ -770,6 +1097,11 @@ class AICommitGenerator {
           pluginUpdate: isPluginUpdate
         }
       };
+    }
+
+    // Safety fallback: if diff is extremely large (>1MB), force chunking regardless of plugin detection
+    if (diffSize > 1000000) {
+      console.log(chalk.yellow(`⚠️  Extremely large diff detected (${Math.round(diffSize/1024/1024)}MB), forcing chunking`));
     }
 
     // Strategy 2: Chunk large diffs intelligently

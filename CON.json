@@ -1,6 +1,6 @@
 {
   "defaultProvider": "groq",
-  "conventionalCommits": false,
+  "conventionalCommits": true,
   "language": "en",
   "messageCount": 3,
   "maxTokens": 150,
@@ -9,11 +9,7 @@
   "cacheExpiry": 86400000,
   "timeout": 120000,
   "retries": 3,
-  "customPrompts": {
-    "prompt\nwith\nnewlines": "value",
-    "prompt\twith\ttabs": "value",
-    "prompt\u0000with\null": "value"
-  },
+  "customPrompts": {},
   "excludeFiles": [
     "*.log",
     "*.tmp",
