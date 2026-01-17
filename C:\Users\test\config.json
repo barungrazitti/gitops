@@ -1,5 +1,7 @@
 {
-  "defaultProvider": "groq",
+  "defaultProvider": "ollama",
+  "apiKey": null,
+  "model": "deepseek-v3.1:671b-cloud",
   "conventionalCommits": false,
   "language": "en",
   "messageCount": 3,
@@ -7,13 +9,10 @@
   "temperature": 0.7,
   "cache": true,
   "cacheExpiry": 86400000,
+  "proxy": null,
   "timeout": 120000,
   "retries": 3,
-  "customPrompts": {
-    "prompt\nwith\nnewlines": "value",
-    "prompt\twith\ttabs": "value",
-    "prompt\u0000with\null": "value"
-  },
+  "customPrompts": {},
   "excludeFiles": [
     "*.log",
     "*.tmp",
@@ -61,8 +60,5 @@
     "conventional": "{type}({scope}): {description}",
     "simple": "{description}",
     "detailed": "{type}({scope}): {description}\n\n{body}"
-  },
-  "apiKey": null,
-  "model": null,
-  "proxy": null
+  }
 }
