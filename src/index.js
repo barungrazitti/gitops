@@ -16,7 +16,6 @@ const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
 const fs = require('fs-extra');
-const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
 const PerformanceUtils = require('./utils/performance-utils');
 
@@ -812,60 +811,62 @@ class AICommitGenerator {
   }
 
   /**
-   * Detect if diff represents a plugin/dependency update
+   * Detect if diff represents a plugin/dependency update (consolidated method)
    */
   detectPluginUpdate(diff) {
     // Extract file paths from diff
     const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
       .map(f => f.replace('+++ b/', '').trim());
-    
-    // Very strict package file list - ONLY core dependency files
-    const corePackageFiles = [
+
+    // Comprehensive package file list
+    const packageFiles = [
       'package.json',
-      'composer.json'
+      'package-lock.json',
+      'yarn.lock',
+      'pnpm-lock.yaml',
+      'composer.json',
+      'composer.lock',
+      'requirements.txt',
+      'Pipfile.lock',
+      'Gemfile.lock',
+      'Cargo.lock',
+      'go.mod',
+      'go.sum',
+      'pom.xml',
+      'build.gradle'
     ];
-    
-    // Check if ALL changed files are core package files AND diff is small
-    const hasOnlyCorePackageFiles = filePaths.length > 0 && 
-      filePaths.length <= 3 && // Max 3 files
-      filePaths.every(file => corePackageFiles.some(pkg => file.endsWith(pkg))) &&
-      diff.length < 10000; // Max 10KB
-    
-    // Check for simple version update patterns in package files
-    const simpleVersionPattern = /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm;
-    const versionLines = (diff.match(simpleVersionPattern) || []).length;
-    const totalLines = diff.split('\n').length;
-    
-    // Only consider it a simple dependency update if:
-    // 1. Only core package files are changed (max 3 files)
-    // 2. Most changes are version updates
-    // 3. Diff size is very small (under 10KB)
-    const isSimpleDependencyUpdate = hasOnlyCorePackageFiles && 
-      versionLines > 0 && 
-      versionLines / totalLines > 0.7 && // 70%+ version updates
-      diff.length < 10000;
-    
-    // WordPress plugin/theme updates must be very specific
-    const wordpressPluginPatterns = [
-      /^wp-content\/plugins\/[^\/]+\/package\.json$/,
-      /^wp-content\/plugins\/[^\/]+\/composer\.json$/,
-      /^wp-content\/themes\/[^\/]+\/package\.json$/,
-      /^wp-content\/themes\/[^\/]+\/composer\.json$/
+
+    // Check for WordPress plugin/theme patterns
+    const wordpressPatterns = [
+      /wp-content\/plugins\//,
+      /wp-content\/themes\//,
+      /plugins\//,
+      /themes\//
     ];
-    
-    const hasWordPressPluginUpdate = filePaths.some(file => 
-      wordpressPluginPatterns.some(pattern => pattern.test(file))
+
+    // Check if this is a WordPress plugin/theme update
+    const hasWordPressUpdate = filePaths.some(file =>
+      wordpressPatterns.some(pattern => pattern.test(file))
     );
-    
-    // Additional check: if diff contains any non-package files, it's NOT a plugin update
-    const hasNonPackageFiles = filePaths.some(file => 
-      !corePackageFiles.some(pkg => file.endsWith(pkg)) &&
-      !wordpressPluginPatterns.some(pattern => pattern.test(file))
+
+    // Check for dependency update patterns in diff content
+    const depPatterns = [
+      /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm, // package.json version updates
+      /^\+.*version\s*[:=]\s*["'][\d][^"']*["']/gm, // version property updates
+      /^\+.*\b(upgraded|updated|downgraded|bumped)\b.*\b(version|dependency|package)\b/gmi,
+      /^\+.*\b(install|require|include)\b.*\b(package|dependency|module|plugin)\b/gmi
+    ];
+
+    const hasDependencyChanges = depPatterns.some(pattern => pattern.test(diff));
+
+    // Also check for large lock files or vendor directories
+    const hasVendorChanges = filePaths.some(file =>
+      /vendor|node_modules|wp-content\/(plugins|themes)/.test(file) &&
+      (file.includes('lock') || file.endsWith('.json') || file.endsWith('.lock'))
     );
-    
-    // Final decision: must be simple dependency update OR WordPress plugin update
-    // AND must not contain other file types
-    return (isSimpleDependencyUpdate || hasWordPressPluginUpdate) && !hasNonPackageFiles;
+
+    return hasWordPressUpdate || hasDependencyChanges || hasVendorChanges ||
+           packageFiles.some(pkg => filePaths.some(f => f.endsWith(pkg)));
   }
 
   /**
@@ -1184,69 +1185,6 @@ class AICommitGenerator {
         reasoning: `Diff too large (${diffSize} chars), intelligently chunked into ${chunks.length} parts with preserved context`
       }
     };
-  }
-  
-  /**
-   * Detect if diff represents a plugin/dependency update
-   */
-  detectPluginUpdate(diff) {
-    // Check for package manager files
-    const packageFiles = [
-      'package.json',
-      'package-lock.json',
-      'yarn.lock',
-      'pnpm-lock.yaml',
-      'composer.json',
-      'composer.lock',
-      'requirements.txt',
-      'Pipfile.lock',
-      'Gemfile.lock',
-      'Cargo.lock',
-      'go.mod',
-      'go.sum',
-      'pom.xml',
-      'build.gradle'
-    ];
-    
-    // Check for WordPress plugin/theme patterns
-    const wordpressPatterns = [
-      /wp-content\/plugins\//,
-      /wp-content\/themes\//,
-      /plugins\//,
-      /themes\//
-    ];
-    
-    // Extract file paths from diff
-    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
-      .map(f => f.replace('+++ b/', '').trim());
-    
-    // Check if any changed files are package managers
-    const hasPackageFiles = filePaths.some(file => 
-      packageFiles.some(pkg => file.endsWith(pkg))
-    );
-    
-    // Check if this is a WordPress plugin/theme update
-    const hasWordPressUpdate = filePaths.some(file => 
-      wordpressPatterns.some(pattern => pattern.test(file))
-    );
-    
-    // Check for dependency update patterns in diff content
-    const depPatterns = [
-      /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm, // package.json version updates
-      /^\+.*version\s*[:=]\s*["'][\d][^"']*["']/gm, // version property updates
-      /^\+.*\b(upgraded|updated|downgraded|bumped)\b.*\b(version|dependency|package)\b/gmi,
-      /^\+.*\b(install|require|include)\b.*\b(package|dependency|module|plugin)\b/gmi
-    ];
-    
-    const hasDependencyChanges = depPatterns.some(pattern => pattern.test(diff));
-    
-    // Also check for large lock files or vendor directories
-    const hasVendorChanges = filePaths.some(file => 
-      /vendor|node_modules|wp-content\/(plugins|themes)/.test(file) &&
-      (file.includes('lock') || file.endsWith('.json') || file.endsWith('.lock'))
-    );
-    
-    return hasPackageFiles || hasWordPressUpdate || hasDependencyChanges || hasVendorChanges;
   }
 
   /**

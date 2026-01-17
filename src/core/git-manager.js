@@ -384,18 +384,6 @@ class GitManager {
   }
 
   /**
-   * Get repository root path
-   */
-  async getRepositoryRoot() {
-    try {
-      const root = await this.git.revparse(['--show-toplevel']);
-      return root.trim();
-    } catch (error) {
-      throw new Error(`Failed to get repository root: ${error.message}`);
-    }
-  }
-
-  /**
    * Get list of all changed files (staged and unstaged)
    */
   async getAllChangedFiles() {

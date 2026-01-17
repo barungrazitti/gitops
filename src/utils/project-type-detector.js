@@ -62,6 +62,12 @@ class ProjectTypeDetector {
               ...packageJson.devDependencies,
             };
 
+            // Debug: Log what we found
+            if (process.env.DEBUG_PROJECT_TYPE) {
+              console.log('DEBUG: package.json deps:', Object.keys(deps));
+              console.log('DEBUG: detectedTypes before:', detectedTypes);
+            }
+
             if (deps.react || deps['@types/react']) {
               detectedTypes.push('react');
             }

@@ -57,28 +57,37 @@ class GroqProvider extends BaseProvider {
       return await this.generateFromChunks(diff, options, maxTokens);
     }
 
-      return await this.withRetry(async () => {
-        return await this.circuitBreaker.execute(async () => {
-          const response = await this.client.chat.completions.create({
-            model: options.model || config.model || 'llama-3.1-8b-instant',
-            messages: [
-              {
-                role: 'system',
-                content: 'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.',
-              },
-              {
-                role: 'user',
-                content: prompt,
-              },
-            ],
-            max_tokens: config.maxTokens || 150,
-            temperature: config.temperature || 0.3,
-          });
+    return await this.withRetry(async () => {
+      return await this.circuitBreaker.execute(async () => {
+        const response = await this.client.chat.completions.create({
+          model: options.model || config.model || 'llama-3.1-8b-instant',
+          messages: [
+            {
+              role: 'system',
+              content: 'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+          max_tokens: config.maxTokens || 150,
+          temperature: config.temperature || 0.3,
+        });
 
-          const messages = this.parseResponse(response);
-          return messages.filter((msg) => this.validateCommitMessage(msg));
-        }, { provider: 'groq' });
-      });
+        const messages = this.parseResponse(response);
+        return messages.filter((msg) => this.validateMessage(msg));
+      }, { provider: 'groq' });
+    });
+  }
+
+  /**
+   * Simple validation for commit messages
+   */
+  validateMessage(message) {
+    if (!message || typeof message !== 'string') return false;
+    const trimmed = message.trim();
+    return trimmed.length >= 10 && trimmed.length <= 200;
   }
 
   /**
@@ -238,16 +247,7 @@ class GroqProvider extends BaseProvider {
   }
 
   /**
-   * Estimate token usage for Groq
-   */
-  estimateTokens(text) {
-    // Rough estimation: 1 token ≈ 4 characters for English text
-    // Be more conservative for Groq due to strict limits
-    return Math.ceil(text.length / 3.5);
-  }
-
-  /**
-   * Chunk diff into smaller pieces
+   * Chunk diff into smaller pieces (uses BaseProvider.estimateTokens)
    */
   chunkDiff(diff, maxTokens) {
     // Prevent infinite chunking with minimum size

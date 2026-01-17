@@ -37,22 +37,31 @@ class BaseProvider {
    * Preprocess diff to make it more AI-friendly while preserving full context
    */
   preprocessDiff(diff) {
+    if (!diff) return '';
+
     // Remove binary file indicators but keep everything else
-    let processed = diff.replace(
-      /^Binary files? .* differ$/gm,
-      '[Binary file modified]'
-    );
+    let processed = diff;
+
+    // Check for binary file lines and replace them
+    const lines = diff.split('\n');
+    const processedLines = lines.map(line => {
+      if (/^Binary files? .* differ$/.test(line)) {
+        return '[Binary file modified]';
+      }
+      return line;
+    });
+
+    processed = processedLines.join('\n');
 
     // Split into lines for intelligent processing
-    const lines = processed.split('\n');
-    const processedLines = [];
+    const processedLines2 = [];
     const importantLines = [];
     const contextLines = [];
     const functionSignatures = [];
 
     // First pass: identify important patterns
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    for (let i = 0; i < processedLines.length; i++) {
+      const line = processedLines[i];
 
       // Always keep diff headers
       if (
@@ -62,7 +71,7 @@ class BaseProvider {
         line.startsWith('+++') ||
         line.startsWith('@@')
       ) {
-        processedLines.push(line);
+        processedLines2.push(line);
         continue;
       }
 
@@ -83,14 +92,14 @@ class BaseProvider {
     }
 
     // Combine lines to preserve full context
-    processedLines.push(...importantLines);
-    processedLines.push(...contextLines.map((line) => ' ' + line));
+    processedLines2.push(...importantLines);
+    processedLines2.push(...contextLines.map((line) => ' ' + line));
 
     // Only limit if extremely large (preserve much more content)
     const maxLines = 1000; // Increased from 250 to 1000
-    if (processedLines.length > maxLines) {
+    if (processedLines2.length > maxLines) {
       // Prioritize keeping headers and changes, limit context
-      const headers = processedLines.filter(
+      const headers = processedLines2.filter(
         (line) =>
           line.startsWith('diff --git') ||
           line.startsWith('index ') ||
@@ -99,11 +108,11 @@ class BaseProvider {
           line.startsWith('@@')
       );
 
-      const changes = processedLines.filter(
+      const changes = processedLines2.filter(
         (line) => line.startsWith('+') || line.startsWith('-')
       );
 
-      const context = processedLines.filter(
+      const context = processedLines2.filter(
         (line) =>
           !line.startsWith('diff --git') &&
           !line.startsWith('index ') &&
@@ -111,7 +120,8 @@ class BaseProvider {
           !line.startsWith('+++') &&
           !line.startsWith('@@') &&
           !line.startsWith('+') &&
-          !line.startsWith('-')
+          !line.startsWith('-') &&
+          !line.startsWith('[Binary')
       );
 
       // Keep all headers, all changes, and as much context as possible
@@ -122,20 +132,7 @@ class BaseProvider {
       ];
 
       processed = finalLines.join('\n') + '\n... (diff truncated for size)';
-    } else {
-      processed = processedLines.join('\n');
     }
-
-    // Handle very long lines more intelligently
-    processed = processed.replace(/^.{500,}$/gm, (match) => {
-      if (match.includes('import') || match.includes('require')) {
-        return match.substring(0, 200) + '... [import statement truncated]';
-      }
-      if (match.includes('function') || match.includes('class')) {
-        return match.substring(0, 250) + '... [function/class truncated]';
-      }
-      return '[Long line truncated]';
-    });
 
     return processed;
   }
@@ -757,31 +754,19 @@ Use: "config: update database connection settings for production"
   }
 
   /**
-   * Validate commit message format
+   * Simple validation for commit messages (for backward compatibility)
+   */
+  validateMessage(message) {
+    if (!message || typeof message !== 'string') return false;
+    const trimmed = message.trim();
+    return trimmed.length >= 10 && trimmed.length <= 200;
+  }
+
+  /**
+   * Validate commit message format (alias for backward compatibility)
    */
   validateCommitMessage(message) {
-    if (!message || typeof message !== 'string') {
-      return false;
-    }
-
-    const trimmed = message.trim();
-
-    // Basic validation
-    if (trimmed.length < 10 || trimmed.length > 200) {
-      return false;
-    }
-
-    // Should not contain newlines in title
-    if (trimmed.includes('\n') && trimmed.indexOf('\n') < 50) {
-      return false;
-    }
-
-    // Should not start with special characters
-    if (/^[^\w]/.test(trimmed)) {
-      return false;
-    }
-
-    return true;
+    return this.validateMessage(message);
   }
 
   /**
@@ -831,6 +816,19 @@ Use: "config: update database connection settings for production"
   }
 
   /**
+   * Get provider configuration
+   */
+  async getConfig() {
+    try {
+      const config = await this.configManager.getProviderConfig(this.name);
+      return config || {};
+    } catch (error) {
+      console.warn(`Failed to get config for ${this.name}:`, error.message);
+      return {};
+    }
+  }
+
+  /**
    * Chunk diff into smaller pieces
    */
   chunkDiff(diff, maxTokens = 4000) {
@@ -873,14 +871,11 @@ Use: "config: update database connection settings for production"
   }
 
   /**
-   * Estimate token count in text
+   * Estimate token count in text (uses PerformanceUtils)
    */
   estimateTokens(text) {
-    if (!text) return 0;
-    
-    // Rough estimation: 1 token ≈ 4 characters for English text
-    // Be more conservative for Groq due to strict limits
-    return Math.ceil(text.length / 3.5);
+    const PerformanceUtils = require('../utils/performance-utils');
+    return PerformanceUtils.estimateTokens(text);
   }
 
   /**
@@ -1058,33 +1053,6 @@ Use: "config: update database connection settings for production"
     } else {
       return 'general modification';
     }
-  }
-
-  /**
-   * Preprocess diff before sending to AI
-   */
-  preprocessDiff(diff) {
-    // Remove binary file indicators
-    let processed = diff.replace(
-      /^Binary files? .* differ$/gm,
-      '[Binary file modified]'
-    );
-
-    // Remove timestamps and other noise that might confuse the AI
-    processed = processed.replace(/index [a-f0-9]+\.\.[a-f0-9]+ [0-7]+/gm, 'index [hash]..[hash] [mode]');
-    
-    // Truncate very long lines to prevent token flooding
-    const lines = processed.split('\n');
-    const maxLineLength = 200;
-    const truncatedLines = lines.map(line => {
-      if (line.length > maxLineLength && 
-          (line.startsWith('+') || line.startsWith('-') || line.startsWith(' '))) {
-        return line.substring(0, maxLineLength) + '... [truncated]';
-      }
-      return line;
-    });
-    
-    return truncatedLines.join('\n');
   }
 
   /**

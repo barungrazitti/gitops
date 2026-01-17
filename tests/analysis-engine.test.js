@@ -22,21 +22,28 @@ describe('AnalysisEngine', () => {
   let analysisEngine;
   let mockGitManager;
 
-  beforeEach(() => {
-    jest.clearAllMocks();
-    
-    // Setup mock git manager
-    mockGitManager = {
-      getRepositoryInfo: jest.fn(),
-      getCommitPatterns: jest.fn(),
-      getStagedFiles: jest.fn(),
-      getFileStats: jest.fn(),
-      getRepositoryRoot: jest.fn(),
-    };
-    GitManager.mockImplementation(() => mockGitManager);
+    beforeEach(() => {
+      jest.clearAllMocks();
 
-    analysisEngine = new AnalysisEngine();
-  });
+      // Setup mock git manager
+      mockGitManager = {
+        getRepositoryInfo: jest.fn(),
+        getCommitPatterns: jest.fn(),
+        getStagedFiles: jest.fn(),
+        getFileStats: jest.fn(),
+        getRepositoryRoot: jest.fn(),
+      };
+      GitManager.mockImplementation(() => mockGitManager);
+
+      analysisEngine = new AnalysisEngine();
+
+      // Reset all fs mocks explicitly
+      fs.pathExists.mockReset();
+      fs.readJson.mockReset().mockResolvedValue({});
+      fs.readdir.mockReset().mockResolvedValue([]);
+      fs.readFile.mockReset();
+      fs.stat.mockReset();
+    });
 
   describe('constructor', () => {
     it('should initialize with GitManager instance', () => {
@@ -511,20 +518,50 @@ describe('AnalysisEngine', () => {
     const mockRepoRoot = '/test/repo';
 
     beforeEach(() => {
-      mockGitManager.getRepositoryRoot.mockResolvedValue(mockRepoRoot);
-      // Reset mocks with proper implementation
-      fs.pathExists.mockImplementation(() => false);
-      fs.readJson.mockImplementation(() => ({}));
+      // Explicitly reset all fs mocks for this describe block
+      fs.pathExists.mockReset().mockResolvedValue(false);
+      fs.readJson.mockReset().mockResolvedValue({});
+      fs.readdir.mockReset().mockResolvedValue([]);
+      fs.stat.mockReset();
+      fs.readFile.mockReset();
+
+      // Reset mockGitManager for this describe block
+      mockGitManager.getRepositoryRoot.mockReset().mockResolvedValue(mockRepoRoot);
     });
 
     it('should detect Node.js project', async () => {
-      fs.pathExists.mockReset().mockImplementation((path) => {
+      jest.clearAllMocks();
+      fs.readJson.mockReset();
+
+      const packageData = {
+        dependencies: { express: '^4.18.0' },
+      };
+
+      fs.pathExists.mockImplementation((path) => {
         if (path && path.endsWith('package.json')) return true;
         return false;
       });
-      fs.readJson.mockReset().mockResolvedValue({
-        dependencies: { express: '^4.18.0' },
-      });
+      fs.readJson.mockResolvedValue(packageData);
+
+      const result = await analysisEngine.detectProjectType();
+
+      expect(result.types).toContain('nodejs');
+      expect(result.types).toContain('backend');
+      expect(result.primary).toBe('nodejs');
+    });
+      fs.readJson.mockResolvedValue(packageData);
+
+      const result = await analysisEngine.detectProjectType();
+
+      console.log('DEBUG - Expected package data:', JSON.stringify(packageData));
+      console.log('DEBUG - Detected types:', JSON.stringify(result.types));
+      console.log('DEBUG - Primary type:', result.primary);
+
+      expect(result.types).toContain('nodejs');
+      expect(result.types).toContain('backend');
+      expect(result.primary).toBe('nodejs');
+    });
+      fs.readJson.mockResolvedValue(packageData);
 
       const result = await analysisEngine.detectProjectType();
 
@@ -534,11 +571,11 @@ describe('AnalysisEngine', () => {
     });
 
     it('should detect React project from package.json', async () => {
-      fs.pathExists.mockImplementation((path) => {
+      fs.pathExists.mockReset().mockImplementation((path) => {
         if (path && path.endsWith('package.json')) return true;
         return false;
       });
-      fs.readJson.mockResolvedValue({
+      fs.readJson.mockReset().mockResolvedValue({
         dependencies: { react: '^18.0.0' },
       });
 

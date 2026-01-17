@@ -10,6 +10,7 @@ const GroqProvider = require('../src/providers/groq-provider');
 const ConfigManager = require('../src/core/config-manager');
 const CircuitBreaker = require('../src/core/circuit-breaker');
 const Groq = require('groq-sdk');
+const fs = require('fs');
 
 describe('GroqProvider', () => {
   let provider;

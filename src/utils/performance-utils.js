@@ -6,21 +6,21 @@ class PerformanceUtils {
   /**
    * High-performance token estimation for AI models
    * More accurate than simple character counting
+   * Uses 3.5-4 chars per token as conservative estimate
    */
   static estimateTokens(text) {
     if (!text) return 0;
-    
-    // For English text, a more accurate estimation
-    // Average tokens per word is about 0.75-1.25 depending on the text
+
+    // Method 1: Character-based (most reliable for mixed content)
+    const charBased = Math.ceil(text.length / 3.75);
+
+    // Method 2: Word-based for text content
     const words = text.split(/\s+/).filter(word => word.length > 0);
-    const avgTokensPerWord = 0.9; // Conservative estimate for mixed content
-    
-    // For code content, tokens are typically longer
-    if (this.isCodeContent(text)) {
-      return Math.ceil(words.length * 1.1);
-    }
-    
-    return Math.ceil(words.length * avgTokensPerWord);
+    const avgTokensPerWord = this.isCodeContent(text) ? 1.1 : 0.9;
+    const wordBased = Math.ceil(words.length * avgTokensPerWord);
+
+    // Use the more conservative (higher) estimate
+    return Math.max(charBased, wordBased);
   }
 
   /**

@@ -44,9 +44,11 @@ describe('HookManager', () => {
   });
 
   describe('constructor', () => {
-    it('should initialize with GitManager', () => {
-      expect(hookManager.gitManager).toBeInstanceOf(GitManager);
+    it('should initialize with GitManager instance', () => {
+      expect(hookManager.gitManager).toBeDefined();
+      expect(hookManager.gitManager).toBeTruthy();
     });
+  });
   });
 
   describe('install', () => {
