@@ -139,6 +139,12 @@ temp/
 # Local config files (for development)
 *.local.json
 config.json
+CON.json
 
 # FIT files
 *.fit
+
+# Windows paths that shouldn't exist in repo (test artifacts)
+C:/
+C:\\con\\
+C:\\Users\\
