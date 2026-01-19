@@ -127,9 +127,13 @@ config/production.json
 tmp/
 temp/
 .aider*
+tmp_code_*
 
 # AI Commit Generator specific
 .aic-logs/
+
+# Crush data (unrelated to project)
+.crush/
 
 # Binary files
 *.exe
