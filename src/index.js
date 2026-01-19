@@ -1026,7 +1026,7 @@ class AICommitGenerator {
     */
   manageDiffForAI(diff, options = {}) {
     const diffSize = diff.length;
-    const MAX_SAFE_SIZE = 400000; // ~100K tokens after prompt overhead, fits in Groq's 128K limit
+    const MAX_SAFE_SIZE = 15000; // ~4000 tokens, safe for all models including 6K TPM limits
 
     // Truncate very large diffs to fit within AI model limits
     if (diffSize > MAX_SAFE_SIZE) {
