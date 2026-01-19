@@ -1,8 +1,12 @@
 # 🤖 AI Commit Generator
 
+![Version](https://img.shields.io/github/package-json/v/barungrazitti/gitops)
+![License](https://img.shields.io/github/license/barungrazitti/gitops)
+![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
+
 **Automate your git workflow with AI-powered commit messages**
 
-A Node.js tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). Features full git automation with sequential provider fallback.
+A Node.js CLI tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). Features full git automation with sequential provider fallback.
 
 > **One command to rule them all:** `aic` - Complete git workflow automation 🚀
 
@@ -18,11 +22,10 @@ aic
 
 ## ✨ Features
 
-- **🚀 Fast** - Full diff sent in single prompt (no chunking)
-- **🔄 Sequential Fallback** - Groq first, Ollama if Groq fails (no parallel)
-- **📦 Large Diff Support** - Auto-truncates at 15KB to fit AI limits
+- **🚀 Fast** - Groq-first with Ollama fallback (sequential, no parallel overhead)
+- **📦 Smart Diff Handling** - Auto-truncates at 15KB to fit AI token limits
 - **🔧 Simple Config** - Just set your provider and API key
-- **🤖 Auto Git** - Stage, commit, pull, and push in one command
+- **🤖 Auto Git** - Stage, commit, pull, resolve conflicts, and push in one command
 
 ## 📦 Installation
 
@@ -112,8 +115,7 @@ aic config --reset
 
 1. **Preferred Provider First** - Tries your configured provider (default: Groq)
 2. **Sequential Fallback** - If primary fails, tries backup (no parallel)
-3. **Full Diff** - Sends entire diff in one prompt (no chunking)
-4. **Auto-Truncation** - Diffs >15KB are truncated to fit token limits
+3. **Smart Diff Handling** - Sends diff with auto-truncation at 15KB to fit token limits
 
 ### Setup
 
@@ -175,27 +177,19 @@ ollama serve
 curl http://localhost:11434/api/tags
 ```
 
-### Large Diff Handling
+### Large Diffs
 
-The tool handles large diffs automatically:
-- **<15KB**: Full diff sent (fastest)
-- **>15KB**: Truncated to 15KB with warning
-- **Truncation Reason**: Fits within AI model token limits (Groq's 6K TPM limit)
-
-For very large changes (WordPress updates, complete rewrites):
-- Some context may be lost due to truncation
-- Still generates valid commit messages
-- Check `aic --dry-run` to see diff size before committing
+For diffs >15KB, content is truncated to fit AI token limits. Use `aic --dry-run` to check diff size.
 
 ### Debug Mode
+
 ```bash
 # Enable verbose logging
 export DEBUG=1
 aic
 
 # Reset configuration if corrupted
-aic config --reset
-aic setup
+aic config --reset && aic setup
 ```
 
 ## 🛠️ Development
@@ -206,12 +200,6 @@ cd gitops
 npm install
 npm test
 ```
-
-### Testing Commands
-
-- `npm test` - Run full Jest test suite
-- `npx jest tests/aicommit-cli.test.js` - Run single test file
-- `npm run test:coverage` - Jest with coverage report
 
 ### Code Structure
 
@@ -225,22 +213,6 @@ bin/
 ├── aic.js          # Main CLI entry
 └── aicommit.js     # Commit message generator CLI
 tests/              # Test files
-```
-
-## 📊 Statistics
-
-```bash
-# View stats
-aic stats
-
-# Analyze activity
-aic stats --analyze
-
-# Export logs
-aic stats --export --format csv
-
-# Reset stats
-aic stats --reset
 ```
 
 ## 📄 License
