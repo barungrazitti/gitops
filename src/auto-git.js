@@ -208,11 +208,12 @@ class AutoGit {
       }
 
       // Use the main AI commit generator with sequential fallback
+      const config = await this.aiCommit.configManager.getAll();
       const messages = await this.aiCommit.generateWithSequentialFallback(diff, {
         context,
         count: 1, // Only need one message for auto-commit
         conventional: true,
-        provider: options?.provider || 'ollama',
+        preferredProvider: config.defaultProvider || 'groq',
       });
 
       this.spinner.succeed('AI commit message generated');

@@ -9,7 +9,11 @@
   "cacheExpiry": 86400000,
   "timeout": 120000,
   "retries": 3,
-  "customPrompts": {},
+  "customPrompts": {
+    "prompt\nwith\nnewlines": "value",
+    "prompt\twith\ttabs": "value",
+    "prompt\u0000with\null": "value"
+  },
   "excludeFiles": [
     "*.log",
     "*.tmp",

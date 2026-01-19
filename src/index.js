@@ -830,13 +830,14 @@ class AICommitGenerator {
   async generateWithSequentialFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
 
-    // Determine providers to use based on preference
+    // Determine providers to use - preferred first, then fallback
     const allProviders = ['ollama', 'groq'];
     const providers = preferredProvider ?
       [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
       allProviders;
 
-    console.log(chalk.blue('🤖 Using parallel AI generation...'));
+    const mode = preferredProvider ? 'sequential fallback' : 'parallel';
+    console.log(chalk.blue(`🤖 Using ${mode} provider mode...`));
 
     // Step 1: Intelligent diff management
     const diffManagement = this.manageDiffForAI(diff);
@@ -855,14 +856,8 @@ class AICommitGenerator {
       },
     };
 
-    // Step 2: Try providers in parallel if no preferred provider, otherwise sequential with fallback
-    if (!preferredProvider) {
-      // Parallel processing: try all providers simultaneously
-      return await this.generateWithParallelProviders(diffManagement, enrichedOptions, providers);
-    } else {
-      // Sequential processing with fallback: try preferred provider first, then others
-      return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
-    }
+    // Step 2: Use sequential fallback mode
+    return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
   }
 
   /**
@@ -1199,11 +1194,11 @@ class AICommitGenerator {
     */
   manageDiffForAI(diff, options = {}) {
     const diffSize = diff.length;
-    const MAX_SAFE_SIZE = 500000; // 500K chars - safety limit
+    const MAX_SAFE_SIZE = 400000; // ~100K tokens after prompt overhead, fits in Groq's 128K limit
 
-    // Always use full diff for speed, unless extremely large (safety)
+    // Truncate very large diffs to fit within AI model limits
     if (diffSize > MAX_SAFE_SIZE) {
-      console.log(chalk.yellow(`⚠️  Very large diff detected (${Math.round(diffSize/1024)}KB), truncating for safety`));
+      console.log(chalk.yellow(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), truncating for AI processing`));
       return {
         strategy: 'full',
         data: diff.substring(0, MAX_SAFE_SIZE),
@@ -1212,8 +1207,9 @@ class AICommitGenerator {
           strategy: 'truncated',
           size: MAX_SAFE_SIZE,
           chunks: 1,
-          reasoning: 'Diff truncated for safety - too large to process',
-          truncated: true
+          reasoning: 'Diff truncated to fit within AI model token limits',
+          truncated: true,
+          originalSize: diffSize
         }
       };
     }
