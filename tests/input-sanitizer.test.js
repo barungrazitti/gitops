@@ -2,19 +2,18 @@
  * Unit tests for InputSanitizer
  */
 
-describe('InputSanitizer', () => {
-  let InputSanitizer;
+// Mock the secret-scanner module
+jest.mock('../src/utils/secret-scanner', () => {
+  return class MockSecretScanner {
+    scanAndRedact(input) {
+      return input;
+    }
+  };
+});
 
-  beforeEach(() => {
-    jest.resetModules();
-    jest.clearAllMocks();
-    
-    jest.mock('../src/utils/secret-scanner', () => ({
-      scanAndRedact: jest.fn((input) => input)
-    }));
-    
-    InputSanitizer = require('../src/utils/input-sanitizer');
-  });
+const InputSanitizer = require('../src/utils/input-sanitizer');
+
+describe('InputSanitizer', () => {
 
   describe('sanitizeFilePath', () => {
     it('should return null for null input', () => {

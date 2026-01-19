@@ -121,7 +121,7 @@ class ProgressTracker {
       `${message}${details.progress ? ` (${details.progress})` : ''}${elapsed}` :
       `${message}${elapsed}`;
     
-    this.spinner?.text = fullMessage;
+    if (this.spinner) this.spinner.text = fullMessage;
     
     return this;
   }
