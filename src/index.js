@@ -16,7 +16,7 @@ const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
 const fs = require('fs-extra');
-const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
+const OptimizedDiffProcessor = new (require('./utils/optimized-diff-processor'))();
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
 const PerformanceUtils = require('./utils/performance-utils');
 
@@ -31,13 +31,17 @@ class AICommitGenerator {
     this.hookManager = new HookManager();
     this.activityLogger = new ActivityLogger();
     this.efficientPromptBuilder = new EfficientPromptBuilder();
+    // Removed circuit breaker and performance manager for simplicity
   }
 
   /**
    * Generate AI commit messages
    */
   async generate(options = {}) {
-    const spinner = ora('Initializing AI commit generator...').start();
+    const spinner = ora({
+      text: chalk.blue('🚀 Initializing AI commit generator...'),
+      spinner: 'clock'
+    }).start();
     const startTime = Date.now();
 
     try {
@@ -48,30 +52,32 @@ class AICommitGenerator {
       const mergedOptions = { ...config, ...options };
 
       // Validate git repository
-      spinner.text = 'Checking git repository...';
+      spinner.text = chalk.blue('🔍 Checking git repository...');
       await this.gitManager.validateRepository();
       await this.activityLogger.logGitOperation('validate_repository', { success: true });
 
       // Get staged changes
-      spinner.text = 'Analyzing staged changes...';
-      const diff = await this.gitManager.getStagedDiff();
+      spinner.text = chalk.blue('📋 Analyzing staged changes...');
+      let diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
         spinner.fail(
-          'No staged changes found. Please stage your changes first.'
+          chalk.red('❌ No staged changes found. Please stage your changes first.')
         );
         await this.activityLogger.warn('generate_failed', { reason: 'no_staged_changes' });
         return;
       }
 
-      // Simplified cache check (exact match only)
+
+      // Advanced cache check with semantic similarity
       let messages = [];
       if (mergedOptions.cache !== false) {
-        spinner.text = 'Checking cache...';
+        spinner.text = chalk.blue('💾 Checking for cached results...');
         // Only cache exact matches to avoid complexity
         messages = await this.cacheManager.getValidated(diff);
         if (messages && messages.length > 0) {
           await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
+          spinner.succeed(chalk.green('✅ Found cached results'));
         } else {
           await this.activityLogger.debug('cache_miss', { diffLength: diff.length });
         }
@@ -80,11 +86,11 @@ class AICommitGenerator {
       // Advanced analysis and generation with intelligent merging
       if (!messages || messages.length === 0) {
         // Analyze repository context
-        spinner.text = 'Analyzing repository context...';
+        spinner.text = chalk.blue('🧩 Analyzing repository context...');
         const context = await this.analysisEngine.analyzeRepository();
 
         // Generate commit messages with sequential fallback
-        spinner.text = 'Generating commit messages with AI...';
+        spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
         messages = await this.generateWithSequentialFallback(diff, {
           context,
           count: parseInt(mergedOptions.count) || 3,
@@ -101,7 +107,7 @@ class AICommitGenerator {
         }
       }
 
-      spinner.succeed('Commit messages generated successfully!');
+      spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
       // Format messages
       const formattedMessages = messages.map((msg) =>
@@ -143,12 +149,19 @@ class AICommitGenerator {
         });
       }
     } catch (error) {
-      spinner.fail(`Failed to generate commit message: ${error.message}`);
-      await this.activityLogger.error('generate_failed', { 
-        error: error.message,
-        stack: error.stack,
+      spinner.fail(chalk.red(`❌ Failed to generate commit message: ${error.message}`));
+      await this.activityLogger.logDetailedError(error, {
+        operation: 'generate_commit',
         duration: Date.now() - startTime,
+        provider: mergedOptions.provider || (await this.configManager.get('defaultProvider')),
+        diffLength: diff?.length,
+        cacheEnabled: mergedOptions.cache !== false,
+        conventionalCommits: mergedOptions.conventional,
       });
+
+      // Provide helpful suggestions based on error type
+      this.provideErrorSuggestions(error, mergedOptions);
+
       throw error;
     }
   }
@@ -869,24 +882,29 @@ class AICommitGenerator {
   }
 
   /**
-   * Generate commit messages with sequential fallback (Ollama first, Groq on failure)
+   * Generate commit messages with parallel processing and fallback
    */
   async generateWithSequentialFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
-    const providers = preferredProvider ? [preferredProvider] : ['ollama', 'groq'];
-    
-    console.log(chalk.blue('🤖 Using sequential AI generation (Ollama first)...'));
-    
+
+    // Determine providers to use based on preference
+    const allProviders = ['ollama', 'groq'];
+    const providers = preferredProvider ?
+      [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
+      allProviders;
+
+    console.log(chalk.blue('🤖 Using parallel AI generation...'));
+
     // Step 1: Intelligent diff management
     const diffManagement = this.manageDiffForAI(diff);
     console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
-    
+
     // Special indicator for plugin updates
     if (diffManagement.info.pluginUpdate) {
       console.log(chalk.yellow(`🔌 Plugin/dependency update detected - avoiding chunking`));
     }
-    
+
     // Enrich options with context
     const enrichedOptions = {
       ...generationOptions,
@@ -899,22 +917,37 @@ class AICommitGenerator {
       },
     };
 
-    // Step 2: Try providers sequentially
-    for (const providerName of providers) {
-      const startTime = Date.now();
-      
+    // Step 2: Try providers in parallel if no preferred provider, otherwise sequential with fallback
+    if (!preferredProvider) {
+      // Parallel processing: try all providers simultaneously
+      return await this.generateWithParallelProviders(diffManagement, enrichedOptions, providers);
+    } else {
+      // Sequential processing with fallback: try preferred provider first, then others
+      return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
+    }
+  }
+
+  /**
+   * Generate commit messages with parallel provider processing
+   */
+  async generateWithParallelProviders(diffManagement, options, providers) {
+    const startTime = Date.now();
+
+    // Create promises for all providers running in parallel
+    const providerPromises = providers.map(async (providerName) => {
       try {
+        const startProviderTime = Date.now();
         const provider = AIProviderFactory.create(providerName);
+
         let messages;
         let actualPrompt;
 
-        // Step 3: Handle different diff strategies
+        // Handle different diff strategies
         if (diffManagement.strategy === 'full') {
           // Simple case: full diff in one prompt
-          const prompt = provider.buildPrompt(diffManagement.data, enrichedOptions);
-          messages = await provider.generateCommitMessages(diffManagement.data, enrichedOptions);
+          const prompt = provider.buildPrompt(diffManagement.data, options);
+          messages = await provider.generateCommitMessages(diffManagement.data, options);
           actualPrompt = prompt;
-          
         } else {
           // Complex case: chunked processing
           console.log(
@@ -924,20 +957,20 @@ class AICommitGenerator {
           );
 
           const chunkMessages = [];
-          
+
           for (let i = 0; i < diffManagement.data.length; i++) {
             const chunk = diffManagement.data[i];
             const isLastChunk = i === diffManagement.data.length - 1;
 
             const chunkOptions = {
-              ...enrichedOptions,
+              ...options,
               chunkIndex: i,
               totalChunks: diffManagement.data.length,
               isLastChunk,
               chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
               // Add chunk-specific context
               context: {
-                ...enrichedOptions.context,
+                ...options.context,
                 chunkInfo: {
                   index: i,
                   total: diffManagement.data.length,
@@ -953,35 +986,35 @@ class AICommitGenerator {
             // Generate with this chunk
             const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
             const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
-            
+
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
-              
+
               // Log the actual prompt for this chunk
               await this.activityLogger.logAIInteraction(
                 providerName,
                 'commit_generation_chunk',
                 chunkPrompt,
                 chunkResult[0], // Log first message
-                Date.now() - startTime,
+                Date.now() - startProviderTime,
                 true
               );
             }
           }
 
-          messages = this.selectBestMessages(chunkMessages, generationOptions.count || 3);
+          messages = this.selectBestMessages(chunkMessages, options.count || 3);
           actualPrompt = `Chunked processing (${diffManagement.chunks} chunks)`;
         }
 
-        const responseTime = Date.now() - startTime;
-        
+        const responseTime = Date.now() - startProviderTime;
+
         if (messages && messages.length > 0) {
           await this.statsManager.recordCommit(providerName);
-          
+
           console.log(
             chalk.green(`✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`)
           );
-          
+
           // Log the actual interaction with full prompt
           await this.activityLogger.logAIInteraction(
             providerName,
@@ -991,7 +1024,7 @@ class AICommitGenerator {
             responseTime,
             true
           );
-          
+
           // Log diff management info
           await this.activityLogger.info('diff_management', {
             ...diffManagement.info,
@@ -999,9 +1032,178 @@ class AICommitGenerator {
             responseTime,
             success: true
           });
-          
+
           // Log context usage for debugging
-          if (enrichedOptions.context.hasSemanticContext) {
+          if (options.context.hasSemanticContext) {
+            console.log(
+              chalk.blue(`🧠 Used semantic context for ${providerName}`)
+            );
+          }
+
+          return {
+            messages,
+            provider: providerName,
+            responseTime
+          };
+        }
+      } catch (error) {
+        const responseTime = Date.now() - startTime;
+
+        console.warn(
+          chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
+        );
+
+        // Log failed interaction
+        await this.activityLogger.logAIInteraction(
+          providerName,
+          'commit_generation',
+          diffManagement.strategy === 'full' ? diffManagement.data : `Chunked processing (${diffManagement.chunks} chunks)`,
+          null,
+          responseTime,
+          false
+        );
+
+        // Log diff management info for failure
+        await this.activityLogger.info('diff_management', {
+          ...diffManagement.info,
+          provider: providerName,
+          responseTime,
+          success: false,
+          error: error.message
+        });
+
+        return null; // Indicate failure
+      }
+    });
+
+    // Wait for the first successful result or all to complete
+    const results = await Promise.allSettled(providerPromises);
+
+    // Find the first successful result
+    for (const result of results) {
+      if (result.status === 'fulfilled' && result.value) {
+        const { messages, provider, responseTime } = result.value;
+        console.log(chalk.green(`🎯 Fastest provider: ${provider} (${responseTime}ms)`));
+        return messages;
+      }
+    }
+
+    // If all providers failed, throw an error with details
+    const errors = results
+      .filter(r => r.status === 'rejected')
+      .map(r => r.reason);
+
+    throw new Error(`All AI providers failed to generate commit messages. Errors: ${errors.join(', ')}`);
+  }
+
+  /**
+   * Generate commit messages with sequential provider processing (with fallback)
+   */
+  async generateWithSequentialProviders(diffManagement, options, providers) {
+    const startTime = Date.now();
+
+    // Try providers sequentially
+    for (const providerName of providers) {
+      try {
+        const startProviderTime = Date.now();
+        const provider = AIProviderFactory.create(providerName);
+
+        let messages;
+        let actualPrompt;
+
+        // Handle different diff strategies
+        if (diffManagement.strategy === 'full') {
+          // Simple case: full diff in one prompt
+          const prompt = provider.buildPrompt(diffManagement.data, options);
+          messages = await provider.generateCommitMessages(diffManagement.data, options);
+          actualPrompt = prompt;
+        } else {
+          // Complex case: chunked processing
+          console.log(
+            chalk.blue(
+              `📦 Processing ${diffManagement.chunks} chunks with ${providerName}...`
+            )
+          );
+
+          const chunkMessages = [];
+
+          for (let i = 0; i < diffManagement.data.length; i++) {
+            const chunk = diffManagement.data[i];
+            const isLastChunk = i === diffManagement.data.length - 1;
+
+            const chunkOptions = {
+              ...options,
+              chunkIndex: i,
+              totalChunks: diffManagement.data.length,
+              isLastChunk,
+              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
+              // Add chunk-specific context
+              context: {
+                ...options.context,
+                chunkInfo: {
+                  index: i,
+                  total: diffManagement.data.length,
+                  size: chunk.size,
+                  files: chunk.context.files,
+                  functions: chunk.context.functions,
+                  classes: chunk.context.classes,
+                  hasSignificantChanges: chunk.context.hasSignificantChanges
+                }
+              }
+            };
+
+            // Generate with this chunk
+            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
+            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
+
+            if (chunkResult && chunkResult.length > 0) {
+              chunkMessages.push(...chunkResult);
+
+              // Log the actual prompt for this chunk
+              await this.activityLogger.logAIInteraction(
+                providerName,
+                'commit_generation_chunk',
+                chunkPrompt,
+                chunkResult[0], // Log first message
+                Date.now() - startProviderTime,
+                true
+              );
+            }
+          }
+
+          messages = this.selectBestMessages(chunkMessages, options.count || 3);
+          actualPrompt = `Chunked processing (${diffManagement.chunks} chunks)`;
+        }
+
+        const responseTime = Date.now() - startProviderTime;
+
+        if (messages && messages.length > 0) {
+          await this.statsManager.recordCommit(providerName);
+
+          console.log(
+            chalk.green(`✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`)
+          );
+
+          // Log the actual interaction with full prompt
+          await this.activityLogger.logAIInteraction(
+            providerName,
+            'commit_generation',
+            actualPrompt,
+            messages.join('\n'),
+            responseTime,
+            true
+          );
+
+          // Log diff management info
+          await this.activityLogger.info('diff_management', {
+            ...diffManagement.info,
+            provider: providerName,
+            responseTime,
+            success: true
+          });
+
+          // Log context usage for debugging
+          if (options.context.hasSemanticContext) {
             console.log(
               chalk.blue(`🧠 Used semantic context for ${providerName}`)
             );
@@ -1011,21 +1213,21 @@ class AICommitGenerator {
         }
       } catch (error) {
         const responseTime = Date.now() - startTime;
-        
+
         console.warn(
           chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
         );
-        
+
         // Log failed interaction
         await this.activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' ? diff : `Chunked processing (${diffManagement.chunks} chunks)`,
+          diffManagement.strategy === 'full' ? diffManagement.data : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
           responseTime,
           false
         );
-        
+
         // Log diff management info for failure
         await this.activityLogger.info('diff_management', {
           ...diffManagement.info,
@@ -1034,26 +1236,13 @@ class AICommitGenerator {
           success: false,
           error: error.message
         });
-        
-        // If preferred provider fails, try Groq as fallback
-        if (providerName === preferredProvider && preferredProvider !== 'groq') {
-          console.log(chalk.blue('🔄 Falling back to Groq...'));
-          try {
-            const groqProvider = AIProviderFactory.create('groq');
-            const messages = await groqProvider.generateCommitMessages(diffManagement.data, enrichedOptions);
-            if (messages && messages.length > 0) {
-              await this.statsManager.recordCommit('groq');
-              console.log(chalk.green(`✅ Groq fallback generated ${messages.length} messages`));
-              return messages;
-            }
-          } catch (fallbackError) {
-            console.warn(chalk.yellow(`⚠️  Groq fallback also failed: ${fallbackError.message}`));
-          }
-        }
+
+        // Continue to next provider in sequence
+        continue;
       }
     }
 
-    throw new Error('All AI providers failed to generate commit messages');
+    throw new Error('All AI providers failed to generate commit messages.');
   }
 
   /**
@@ -1132,7 +1321,7 @@ class AICommitGenerator {
         // Add current chunk to list
         chunks.push({
           content: currentChunk.join('\n'),
-          size: currentSize,
+          size: currentChunk.join('\n').length,
           lines: currentChunk.length,
           context: this.extractChunkContext(currentChunk.join('\n'))
         });
@@ -1360,8 +1549,6 @@ class AICommitGenerator {
     
     console.log(chalk.dim('\n💡 Tip: Use --export to get detailed data for further analysis'));
   }
-
-
 }
 
 module.exports = AICommitGenerator;// Test change for prompt improvement

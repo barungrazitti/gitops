@@ -1,303 +1,351 @@
 /**
- * Optimized Diff Processor - High-performance diff processing with chunking
+ * Optimized Diff Processor - Efficiently processes git diffs with performance optimizations
  */
 
-const PerformanceUtils = require('./performance-utils');
-
 class OptimizedDiffProcessor {
-  constructor(options = {}) {
-    this.maxTokens = options.maxTokens || 4000;
-    this.chunkSize = options.chunkSize || 8000;
-    this.preserveContext = options.preserveContext || true;
-  }
-
-  /**
-   * Process diff with intelligent chunking
-   */
-  process(diff, options = {}) {
-    const startTime = Date.now();
-    
-    // Optimize the diff first
-    const optimizedDiff = PerformanceUtils.optimizeDiffProcessing(diff, {
-      maxDiffSize: 100000, // 100KB
-      maxLineLength: 300,
-      preserveContextLines: 3
-    });
-    
-    // Determine if we need to chunk based on token estimation
-    const estimatedTokens = PerformanceUtils.estimateTokens(optimizedDiff);
-    
-    if (estimatedTokens <= this.maxTokens || options.forceFull) {
-      return {
-        strategy: 'full',
-        data: optimizedDiff,  // Should be the diff string for full strategy
-        chunks: null,
-        info: {
-          strategy: 'full',
-          originalSize: diff.length,
-          processedSize: optimizedDiff.length,
-          estimatedTokens,
-          processingTime: Date.now() - startTime,
-          requiresChunking: false,
-          reasoning: 'Diff size manageable, using full content'
-        }
-      };
-    }
-    
-    // Use parallel chunking for better performance
-    const chunks = this.chunkOptimized(optimizedDiff);
-    
-    return {
-      strategy: 'chunked',
-      data: chunks,  // Should be an array of chunks for chunked strategy
-      chunks: chunks.length,
-      info: {
-        strategy: 'parallel_chunked',
-        originalSize: diff.length,
-        processedSize: optimizedDiff.length,
-        estimatedTokens,
-        chunks: chunks.length,
-        avgChunkSize: Math.round(optimizedDiff.length / chunks.length),
-        processingTime: Date.now() - startTime,
-        requiresChunking: true,
-        reasoning: `Diff too large (${optimizedDiff.length} chars), chunked into ${chunks.length} parts`
-      }
+  constructor() {
+    // Configuration for optimization
+    this.config = {
+      maxTokensPerChunk: 6000,
+      minChunkSize: 1000, // Minimum size before considering chunking
+      tokenEstimateFactor: 4, // Characters per token estimation
+      preserveContextLines: 5, // Lines of context to preserve around changes
     };
   }
 
   /**
-   * Optimized chunking using parallel processing
+   * Estimate token count for a string
    */
-  chunkOptimized(diff) {
+  estimateTokens(text) {
+    if (!text) return 0;
+    return Math.ceil(text.length / this.config.tokenEstimateFactor);
+  }
+
+  /**
+   * Process diff with optimized chunking algorithm
+   */
+  processDiff(diff, options = {}) {
+    const { maxChunkSize = this.config.maxTokensPerChunk, preserveContext = true } = options;
+    
+    if (!diff || diff.length < this.config.minChunkSize) {
+      // For small diffs, return as-is with basic sanitization
+      return [{
+        content: diff,
+        size: diff ? diff.length : 0,
+        estimatedTokens: diff ? this.estimateTokens(diff) : 0,
+        isSingleChunk: true
+      }];
+    }
+
+    // Use streaming approach for large diffs to minimize memory usage
+    return this.chunkDiffStream(diff, maxChunkSize, preserveContext);
+  }
+
+  /**
+   * Streaming chunking algorithm to minimize memory usage
+   */
+  chunkDiffStream(diff, maxChunkSize, preserveContext = true) {
     const lines = diff.split('\n');
     const chunks = [];
     let currentChunk = [];
     let currentSize = 0;
     
-    // Use a more efficient chunking algorithm
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lineSize = line.length;
-      
-      // If line is too large, split it
-      if (lineSize > this.chunkSize) {
-        if (currentChunk.length > 0) {
-          chunks.push({
-            content: currentChunk.join('\n'),
-            size: currentSize,
-            context: this.extractChunkContext(currentChunk.join('\n'))
-          });
-          currentChunk = [];
-          currentSize = 0;
+    // Define semantic boundaries that should not be split
+    const isSemanticBoundary = (line) => {
+      return line.startsWith('diff --git') ||
+             line.startsWith('index ') ||
+             line.startsWith('--- ') ||
+             line.startsWith('+++ ') ||
+             (line.startsWith('@@ ') && currentChunk.length > 10) || // Hunks
+             this.isFunctionDeclaration(line) ||
+             this.isClassDeclaration(line) ||
+             this.isImportStatement(line);
+    };
+
+    // Look ahead to find good chunk boundaries
+    const findNextBoundary = (startIndex, maxSize) => {
+      let size = 0;
+      for (let i = startIndex; i < lines.length; i++) {
+        const lineSize = lines[i].length + 1; // +1 for newline
+        
+        if (size + lineSize > maxSize && i > startIndex) {
+          // Try to find the nearest semantic boundary before exceeding size
+          for (let j = i; j > startIndex; j--) {
+            if (isSemanticBoundary(lines[j])) {
+              return j;
+            }
+          }
+          // If no semantic boundary found, return current position
+          return i;
         }
         
-        // Break large line into smaller segments
-        for (let j = 0; j < line.length; j += this.chunkSize) {
-          const segment = line.substring(j, Math.min(j + this.chunkSize, line.length));
-          chunks.push({
-            content: segment,
-            size: segment.length,
-            context: this.extractChunkContext(segment)
-          });
-        }
-        continue;
+        size += lineSize;
+      }
+      return lines.length; // End of diff
+    };
+
+    let i = 0;
+    while (i < lines.length) {
+      const boundary = findNextBoundary(i, maxChunkSize);
+      
+      // Extract chunk
+      const chunkLines = lines.slice(i, boundary);
+      const chunkContent = chunkLines.join('\n');
+      
+      // Add context if preserving context and not at the end
+      if (preserveContext && boundary < lines.length) {
+        // Add context lines from the next section
+        const contextEnd = Math.min(boundary + this.config.preserveContextLines, lines.length);
+        const contextLines = lines.slice(boundary, contextEnd);
+        const contextContent = contextLines.join('\n');
+        
+        chunks.push({
+          content: chunkContent + '\n' + contextContent,
+          size: chunkContent.length + contextContent.length,
+          estimatedTokens: this.estimateTokens(chunkContent + contextContent),
+          startIndex: i,
+          endIndex: contextEnd,
+          hasContext: true
+        });
+      } else {
+        chunks.push({
+          content: chunkContent,
+          size: chunkContent.length,
+          estimatedTokens: this.estimateTokens(chunkContent),
+          startIndex: i,
+          endIndex: boundary,
+          hasContext: false
+        });
       }
       
-      // Check if adding this line would exceed chunk size
-      if (currentSize + lineSize > this.chunkSize && currentChunk.length > 0) {
-        // Find semantic boundaries for better chunking
-        if (this.isSemanticBoundary(line)) {
-          chunks.push({
-            content: currentChunk.join('\n'),
-            size: currentSize,
-            context: this.extractChunkContext(currentChunk.join('\n'))
-          });
-          currentChunk = [line];
-          currentSize = lineSize;
-        } else {
-          // Add to current chunk but check if it's getting too large
-          if (currentChunk.length < 1000) { // Prevent infinite accumulation
-            currentChunk.push(line);
-            currentSize += lineSize;
-          } else {
-            // Force chunk if accumulating too many lines
-            chunks.push({
-              content: currentChunk.join('\n'),
-              size: currentSize,
-              context: this.extractChunkContext(currentChunk.join('\n'))
-            });
-            currentChunk = [line];
-            currentSize = lineSize;
-          }
+      i = boundary;
+    }
+
+    return chunks;
+  }
+
+  /**
+   * Identify function declarations to preserve semantic boundaries
+   */
+  isFunctionDeclaration(line) {
+    return /^\s*(async\s+)?(function|const|let|var)\s+\w+\s*(=|\()/.test(line) ||
+           /^\s*\w+\s*:\s*(async\s+)?(function|\s*=>)/.test(line) ||
+           /^\s*def\s+\w+\s*\(/.test(line) ||
+           /^\s*public\s+\w+|private\s+\w+|protected\s+\w+/.test(line);
+  }
+
+  /**
+   * Identify class declarations to preserve semantic boundaries
+   */
+  isClassDeclaration(line) {
+    return /^\s*(export\s+)?class\s+\w+/.test(line) ||
+           /^\s*interface\s+\w+/.test(line) ||
+           /^\s*type\s+\w+/.test(line);
+  }
+
+  /**
+   * Identify import statements to preserve semantic boundaries
+   */
+  isImportStatement(line) {
+    return /^\s*(import|export|require)/.test(line);
+  }
+
+  /**
+   * Analyze diff to determine optimal processing strategy
+   */
+  analyzeDiff(diff) {
+    const stats = {
+      totalSize: diff.length,
+      lineCount: diff.split('\n').length,
+      fileCount: (diff.match(/diff --git/g) || []).length,
+      addedLines: (diff.match(/^\+/gm) || []).length,
+      removedLines: (diff.match(/^-/gm) || []).length,
+      modifiedFiles: [],
+      hasLargeFiles: false
+    };
+
+    // Extract file information
+    const fileMatches = diff.match(/diff --git a\/(.+?) b\/(.+)/g) || [];
+    for (const match of fileMatches) {
+      const fileMatch = match.match(/diff --git a\/(.+?) b\/(.+)/);
+      if (fileMatch) {
+        const filePath = fileMatch[2];
+        stats.modifiedFiles.push(filePath);
+        
+        // Check if file is large
+        const fileContent = this.extractFileContent(diff, filePath);
+        if (fileContent && fileContent.length > 50000) { // 50KB
+          stats.hasLargeFiles = true;
         }
+      }
+    }
+
+    // Determine processing strategy based on diff characteristics
+    stats.processingStrategy = this.determineProcessingStrategy(stats);
+
+    return stats;
+  }
+
+  /**
+   * Extract content for a specific file from the diff
+   */
+  extractFileContent(diff, filePath) {
+    const regex = new RegExp(`diff --git a\/.*? b\/${this.escapeRegExp(filePath)}\\n([\\s\\S]*?)(?=\\ndiff --git|$)`, 'g');
+    const matches = diff.match(regex);
+    return matches ? matches[0] : null;
+  }
+
+  /**
+   * Escape special regex characters
+   */
+  escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  /**
+   * Determine optimal processing strategy based on diff analysis
+   */
+  determineProcessingStrategy(stats) {
+    if (stats.totalSize < 5000) {
+      return 'single-chunk'; // Small diff, process as one chunk
+    } else if (stats.fileCount === 1 && !stats.hasLargeFiles) {
+      return 'adaptive-chunking'; // Single file, adaptive chunking
+    } else if (stats.hasLargeFiles) {
+      return 'aggressive-chunking'; // Has large files, aggressive chunking
+    } else {
+      return 'balanced-chunking'; // Balanced approach
+    }
+  }
+
+  /**
+   * Process diff with strategy-based optimization
+   */
+  processDiffWithStrategy(diff) {
+    const analysis = this.analyzeDiff(diff);
+    
+    switch (analysis.processingStrategy) {
+      case 'single-chunk':
+        return this.processAsSingleChunk(diff);
+      case 'adaptive-chunking':
+        return this.processWithAdaptiveChunking(diff, analysis);
+      case 'aggressive-chunking':
+        return this.processWithAggressiveChunking(diff, analysis);
+      case 'balanced-chunking':
+      default:
+        return this.processWithBalancedChunking(diff, analysis);
+    }
+  }
+
+  /**
+   * Process as single chunk (for small diffs)
+   */
+  processAsSingleChunk(diff) {
+    return [{
+      content: diff,
+      size: diff.length,
+      estimatedTokens: this.estimateTokens(diff),
+      strategy: 'single-chunk',
+      fileBoundaries: this.getFileBoundaries(diff)
+    }];
+  }
+
+  /**
+   * Process with adaptive chunking (for single large file)
+   */
+  processWithAdaptiveChunking(diff, analysis) {
+    // For single file changes, chunk by logical sections (functions, classes, etc.)
+    const chunks = [];
+    const lines = diff.split('\n');
+    let currentChunk = [];
+    let currentSize = 0;
+    const maxChunkSize = Math.min(this.config.maxTokensPerChunk * 2, 15000); // Larger chunks for single file
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineSize = line.length + 1;
+
+      if (currentSize + lineSize > maxChunkSize && currentChunk.length > 0 && this.isLogicalBoundary(line)) {
+        // Create chunk at logical boundary
+        chunks.push({
+          content: currentChunk.join('\n'),
+          size: currentChunk.reduce((sum, l) => sum + l.length + 1, 0),
+          estimatedTokens: this.estimateTokens(currentChunk.join('\n')),
+          strategy: 'adaptive-chunking',
+          logicalBoundary: true
+        });
+
+        currentChunk = [line];
+        currentSize = lineSize;
       } else {
         currentChunk.push(line);
         currentSize += lineSize;
       }
     }
-    
-    // Add the final chunk
+
+    // Add final chunk
     if (currentChunk.length > 0) {
       chunks.push({
         content: currentChunk.join('\n'),
-        size: currentChunk.join('\n').length,
-        context: this.extractChunkContext(currentChunk.join('\n'))
+        size: currentChunk.reduce((sum, l) => sum + l.length + 1, 0),
+        estimatedTokens: this.estimateTokens(currentChunk.join('\n')),
+        strategy: 'adaptive-chunking',
+        logicalBoundary: true
       });
     }
-    
+
     return chunks;
   }
 
   /**
-   * Identify semantic boundaries for intelligent chunking
+   * Check if line is at a logical boundary
    */
-  isSemanticBoundary(line) {
-    return line.startsWith('diff --git') ||
-           line.startsWith('index ') ||
-           line.startsWith('---') ||
-           line.startsWith('+++') ||
-           (line.startsWith('@@') && line.includes('function')) ||
-           (line.startsWith('@@') && line.includes('class')) ||
-           (line.startsWith('@@') && line.includes('def '));
+  isLogicalBoundary(line) {
+    return this.isFunctionDeclaration(line) ||
+           this.isClassDeclaration(line) ||
+           line.startsWith('diff --git') ||
+           line.startsWith('@@ '); // Hunks
   }
 
   /**
-   * Extract context from chunk for AI processing
+   * Process with aggressive chunking (for large files)
    */
-  extractChunkContext(chunkContent) {
-    const context = {
-      files: [],
-      functions: [],
-      classes: [],
-      components: [],
-      hasSignificantChanges: false
-    };
-
-    // Extract file names
-    const fileMatches = chunkContent.match(/\+\+\+ b\/(.+)/g) || [];
-    context.files = fileMatches.map(f => f.replace('+++ b/', '').trim()).slice(0, 5);
-
-    // Extract functions
-    const funcMatches = chunkContent.match(/(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>|(\w+)\s*:\s*\([^)]*\)\s*=>)/g) || [];
-    context.functions = funcMatches.map(m => m.replace(/.*function\s+|const\s+|:.*/, '').trim()).slice(0, 3);
-
-    // Extract classes
-    const classMatches = chunkContent.match(/class\s+(\w+)/g) || [];
-    context.classes = classMatches.map(m => m.replace('class ', '').trim()).slice(0, 3);
-
-    // Extract components (for web frameworks)
-    const componentMatches = chunkContent.match(/(?:function\s+(\w+)\s*\([^)]*\)\s*\{|const\s+(\w+)\s*=\s*(?:React\.)?(?:forwardRef\s*\()?\([^)]*\)\s*=>\s*{)/g) || [];
-    context.components = componentMatches.map(m => m.replace(/.*function\s+|const\s+|.*React\.forwardRef.*\(/, '').replace(/\s*\(.*/, '').trim()).slice(0, 3);
-
-    context.hasSignificantChanges = context.functions.length > 0 || 
-                                   context.classes.length > 0 || 
-                                   context.components.length > 0;
-
-    return context;
+  processWithAggressiveChunking(diff, analysis) {
+    // Use smaller chunks and more aggressive splitting
+    return this.chunkDiffStream(diff, this.config.maxTokensPerChunk / 2, true);
   }
 
   /**
-   * Process chunk in parallel
+   * Process with balanced chunking (default approach)
    */
-  async processChunkParallel(chunk, processorFn) {
-    return PerformanceUtils.withTimeout(
-      processorFn(chunk),
-      60000 // 1 minute timeout
-    );
+  processWithBalancedChunking(diff, analysis) {
+    // Standard chunking with moderate settings
+    return this.chunkDiffStream(diff, this.config.maxTokensPerChunk, true);
   }
 
   /**
-   * Select best messages from multiple results
+   * Get file boundaries in the diff
    */
-  selectBestMessages(messages, count = 3, options = {}) {
-    if (!messages || messages.length === 0) return [];
+  getFileBoundaries(diff) {
+    const boundaries = [];
+    const regex = /diff --git a\/(.+?) b\/(.+?)\n/g;
+    let match;
 
-    // Remove exact duplicates while preserving order
-    const uniqueMessages = [];
-    const seen = new Set();
-    
-    for (const message of messages) {
-      if (!seen.has(message)) {
-        seen.add(message);
-        uniqueMessages.push(message);
-      }
+    while ((match = regex.exec(diff)) !== null) {
+      boundaries.push({
+        index: match.index,
+        fileA: match[1],
+        fileB: match[2]
+      });
     }
 
-    // Score messages based on quality factors
-    const scored = uniqueMessages.map((msg, index) => ({
-      message: msg,
-      score: this.scoreCommitMessage(msg),
-      originalIndex: index // Preserve original ordering for tie-breaking
-    }));
-
-    // Sort by score (descending) and then by original index (ascending) for ties
-    scored.sort((a, b) => {
-      if (b.score !== a.score) {
-        return b.score - a.score;
-      }
-      return a.originalIndex - b.originalIndex; // Prioritize earlier messages for ties
-    });
-
-    return scored.slice(0, count).map(item => item.message);
+    return boundaries;
   }
 
   /**
-   * Score a commit message for quality
+   * Merge chunked results back into coherent output
    */
-  scoreCommitMessage(message) {
-    let score = 0;
-
-    // Prefer conventional commit format
-    if (/^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(message)) {
-      score += 15;
-    }
-
-    // Optimal length range
-    const length = message.length;
-    if (length >= 15 && length <= 72) {
-      score += 10;
-    } else if (length >= 10 && length <= 100) {
-      score += 5;
-    }
-
-    // Prefer messages without trailing period (conventional)
-    if (!message.trim().endsWith('.')) {
-      score += 2;
-    }
-
-    // Prefer imperative mood indicators
-    const imperativeIndicators = [
-      /^Add\b/, /^Fix\b/, /^Remove\b/, /^Update\b/, /^Create\b/,
-      /^Refactor\b/, /^Improve\b/, /^Change\b/, /^Modify\b/
-    ];
-    
-    if (imperativeIndicators.some(regex => regex.test(message))) {
-      score += 5;
-    }
-
-    // Penalize generic terms
-    const genericTerms = [
-      /\bchanges?\b/i, /\bupdates?\b/i, /\bfixes?\b/i, 
-      /\bstuff\b/i, /\bthings?\b/i, /\bvarious\b/i
-    ];
-    
-    const genericPenalty = genericTerms.filter(regex => regex.test(message)).length * 8;
-    score = Math.max(0, score - genericPenalty);
-
-    // Reward specific technical terms
-    const specificIndicators = [
-      /\b[A-Z][a-zA-Z]*\b/, // Class names
-      /\b\w+\(\)/, // Function calls
-      /\b(import|export|require|module|component|hook|middleware)\b/i
-    ];
-    
-    specificIndicators.forEach(regex => {
-      if (regex.test(message)) {
-        score += 3;
-      }
-    });
-
-    return score;
+  mergeChunks(chunks) {
+    return chunks.map(chunk => chunk.content).join('\n--- CHUNK BREAK ---\n');
   }
 }
 
