@@ -825,63 +825,6 @@ class AICommitGenerator {
   }
 
   /**
-   * Detect if diff represents a plugin/dependency update
-   */
-  detectPluginUpdate(diff) {
-    // Extract file paths from diff
-    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
-      .map(f => f.replace('+++ b/', '').trim());
-    
-    // Very strict package file list - ONLY core dependency files
-    const corePackageFiles = [
-      'package.json',
-      'composer.json'
-    ];
-    
-    // Check if ALL changed files are core package files AND diff is small
-    const hasOnlyCorePackageFiles = filePaths.length > 0 && 
-      filePaths.length <= 3 && // Max 3 files
-      filePaths.every(file => corePackageFiles.some(pkg => file.endsWith(pkg))) &&
-      diff.length < 10000; // Max 10KB
-    
-    // Check for simple version update patterns in package files
-    const simpleVersionPattern = /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm;
-    const versionLines = (diff.match(simpleVersionPattern) || []).length;
-    const totalLines = diff.split('\n').length;
-    
-    // Only consider it a simple dependency update if:
-    // 1. Only core package files are changed (max 3 files)
-    // 2. Most changes are version updates
-    // 3. Diff size is very small (under 10KB)
-    const isSimpleDependencyUpdate = hasOnlyCorePackageFiles && 
-      versionLines > 0 && 
-      versionLines / totalLines > 0.7 && // 70%+ version updates
-      diff.length < 10000;
-    
-    // WordPress plugin/theme updates must be very specific
-    const wordpressPluginPatterns = [
-      /^wp-content\/plugins\/[^\/]+\/package\.json$/,
-      /^wp-content\/plugins\/[^\/]+\/composer\.json$/,
-      /^wp-content\/themes\/[^\/]+\/package\.json$/,
-      /^wp-content\/themes\/[^\/]+\/composer\.json$/
-    ];
-    
-    const hasWordPressPluginUpdate = filePaths.some(file => 
-      wordpressPluginPatterns.some(pattern => pattern.test(file))
-    );
-    
-    // Additional check: if diff contains any non-package files, it's NOT a plugin update
-    const hasNonPackageFiles = filePaths.some(file => 
-      !corePackageFiles.some(pkg => file.endsWith(pkg)) &&
-      !wordpressPluginPatterns.some(pattern => pattern.test(file))
-    );
-    
-    // Final decision: must be simple dependency update OR WordPress plugin update
-    // AND must not contain other file types
-    return (isSimpleDependencyUpdate || hasWordPressPluginUpdate) && !hasNonPackageFiles;
-  }
-
-  /**
    * Generate commit messages with parallel processing and fallback
    */
   async generateWithSequentialFallback(diff, options) {
@@ -899,11 +842,6 @@ class AICommitGenerator {
     const diffManagement = this.manageDiffForAI(diff);
     console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
-
-    // Special indicator for plugin updates
-    if (diffManagement.info.pluginUpdate) {
-      console.log(chalk.yellow(`🔌 Plugin/dependency update detected - avoiding chunking`));
-    }
 
     // Enrich options with context
     const enrichedOptions = {
@@ -1256,209 +1194,44 @@ class AICommitGenerator {
 
 
   /**
-   * Intelligent diff management for optimal AI generation
-   */
+    * Intelligent diff management for optimal AI generation
+    * Simplified: always send full diff for faster commit generation
+    */
   manageDiffForAI(diff, options = {}) {
-    const MAX_DIFF_SIZE = 15000; // 15K chars max for single prompt
-    const CHUNK_SIZE = 8000; // 8K chars for chunks
-    const MAX_CONTEXT_LINES = 50; // Max context lines per chunk
-
     const diffSize = diff.length;
+    const MAX_SAFE_SIZE = 500000; // 500K chars - safety limit
 
-    // Check if this is a plugin/dependency update that should avoid chunking
-    const isPluginUpdate = this.detectPluginUpdate(diff);
-
-    // Strategy 1: Use full diff if under limit OR if plugin update (but not extremely large)
-    if (diffSize <= MAX_DIFF_SIZE || (isPluginUpdate && diffSize < 100000)) {
-      const reasoning = isPluginUpdate
-        ? 'Plugin/dependency update detected, avoiding chunking for better context'
-        : 'Diff size manageable, using full content';
-
+    // Always use full diff for speed, unless extremely large (safety)
+    if (diffSize > MAX_SAFE_SIZE) {
+      console.log(chalk.yellow(`⚠️  Very large diff detected (${Math.round(diffSize/1024)}KB), truncating for safety`));
       return {
         strategy: 'full',
-        data: diff,
+        data: diff.substring(0, MAX_SAFE_SIZE),
         chunks: null,
         info: {
-          strategy: 'full',
-          size: diffSize,
+          strategy: 'truncated',
+          size: MAX_SAFE_SIZE,
           chunks: 1,
-          reasoning,
-          pluginUpdate: isPluginUpdate
+          reasoning: 'Diff truncated for safety - too large to process',
+          truncated: true
         }
       };
     }
 
-    // Safety fallback: if diff is extremely large (>1MB), force chunking regardless of plugin detection
-    if (diffSize > 1000000) {
-      console.log(chalk.yellow(`⚠️  Extremely large diff detected (${Math.round(diffSize/1024/1024)}MB), forcing chunking`));
-    }
-
-    // Strategy 2: Chunk large diffs intelligently
-    const lines = diff.split('\n');
-    const chunks = [];
-    let currentChunk = [];
-    let currentSize = 0;
-    let inContext = false;
-    let contextBuffer = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lineSize = line.length + 1; // +1 for newline
-
-      // Detect diff headers and file boundaries
-      const isFileHeader = line.startsWith('diff --git') ||
-                           line.startsWith('index ') ||
-                           line.startsWith('---') ||
-                           line.startsWith('+++');
-
-      const isContextLine = line.startsWith(' ') || line.startsWith('');
-      const isCodeLine = line.startsWith('+') || line.startsWith('-');
-
-      // Start new chunk if size limit reached and we're at a good boundary
-      if (currentSize + lineSize > CHUNK_SIZE &&
-          (isFileHeader || (inContext && contextBuffer.length >= MAX_CONTEXT_LINES))) {
-
-        // Add current chunk to list
-        chunks.push({
-          content: currentChunk.join('\n'),
-          size: currentChunk.join('\n').length,
-          lines: currentChunk.length,
-          context: this.extractChunkContext(currentChunk.join('\n'))
-        });
-
-        // Reset for next chunk, but carry some context
-        currentChunk = [...contextBuffer.slice(-10)]; // Keep last 10 context lines
-        currentSize = currentChunk.join('\n').length + 1;
-        contextBuffer = [];
-        inContext = false;
-      }
-
-      // Add line to current chunk
-      currentChunk.push(line);
-      currentSize += lineSize;
-
-      // Track context for intelligent boundaries
-      if (isContextLine) {
-        contextBuffer.push(line);
-        inContext = true;
-      } else if (isCodeLine) {
-        inContext = false;
-      }
-
-      // Reset context buffer at file boundaries
-      if (isFileHeader) {
-        contextBuffer = [];
-      }
-    }
-
-    // Add final chunk
-    if (currentChunk.length > 0) {
-      chunks.push({
-        content: currentChunk.join('\n'),
-        size: currentChunk.join('\n').length,
-        lines: currentChunk.length,
-        context: this.extractChunkContext(currentChunk.join('\n'))
-      });
-    }
-
     return {
-      strategy: 'chunked',
-      data: chunks,
-      chunks: chunks.length,
+      strategy: 'full',
+      data: diff,
+      chunks: null,
       info: {
-        strategy: 'intelligent_chunking',
-        originalSize: diffSize,
-        chunkCount: chunks.length,
-        avgChunkSize: Math.round(diffSize / chunks.length),
-        reasoning: `Diff too large (${diffSize} chars), intelligently chunked into ${chunks.length} parts with preserved context`
+        strategy: 'full',
+        size: diffSize,
+        chunks: 1,
+        reasoning: 'Full diff sent to AI for fast processing',
+        pluginUpdate: false
       }
     };
   }
   
-  /**
-   * Detect if diff represents a plugin/dependency update
-   */
-  detectPluginUpdate(diff) {
-    // Check for package manager files
-    const packageFiles = [
-      'package.json',
-      'package-lock.json',
-      'yarn.lock',
-      'pnpm-lock.yaml',
-      'composer.json',
-      'composer.lock',
-      'requirements.txt',
-      'Pipfile.lock',
-      'Gemfile.lock',
-      'Cargo.lock',
-      'go.mod',
-      'go.sum',
-      'pom.xml',
-      'build.gradle'
-    ];
-    
-    // Check for WordPress plugin/theme patterns
-    const wordpressPatterns = [
-      /wp-content\/plugins\//,
-      /wp-content\/themes\//,
-      /plugins\//,
-      /themes\//
-    ];
-    
-    // Extract file paths from diff
-    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
-      .map(f => f.replace('+++ b/', '').trim());
-    
-    // Check if any changed files are package managers
-    const hasPackageFiles = filePaths.some(file => 
-      packageFiles.some(pkg => file.endsWith(pkg))
-    );
-    
-    // Check if this is a WordPress plugin/theme update
-    const hasWordPressUpdate = filePaths.some(file => 
-      wordpressPatterns.some(pattern => pattern.test(file))
-    );
-    
-    // Check for dependency update patterns in diff content
-    const depPatterns = [
-      /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm, // package.json version updates
-      /^\+.*version\s*[:=]\s*["'][\d][^"']*["']/gm, // version property updates
-      /^\+.*\b(upgraded|updated|downgraded|bumped)\b.*\b(version|dependency|package)\b/gmi,
-      /^\+.*\b(install|require|include)\b.*\b(package|dependency|module|plugin)\b/gmi
-    ];
-    
-    const hasDependencyChanges = depPatterns.some(pattern => pattern.test(diff));
-    
-    // Also check for large lock files or vendor directories
-    const hasVendorChanges = filePaths.some(file => 
-      /vendor|node_modules|wp-content\/(plugins|themes)/.test(file) &&
-      (file.includes('lock') || file.endsWith('.json') || file.endsWith('.lock'))
-    );
-    
-    return hasPackageFiles || hasWordPressUpdate || hasDependencyChanges || hasVendorChanges;
-  }
-
-  /**
-   * Extract key context from chunk for better generation
-   */
-  extractChunkContext(chunkContent) {
-    const files = chunkContent.match(/\+\+\+ b\/(.+)/g) || [];
-    const fileNames = files.map(f => f.replace('+++ b/', '').trim());
-    
-    const functions = (chunkContent.match(/\+.*function\s+(\w+)/g) || [])
-      .map(m => m.replace(/\+.*function\s+/, ''));
-    
-    const classes = (chunkContent.match(/\+.*class\s+(\w+)/g) || [])
-      .map(m => m.replace(/\+.*class\s+/, ''));
-    
-    return {
-      files: fileNames,
-      functions: functions.slice(0, 5), // Top 5 functions
-      classes: classes.slice(0, 5), // Top 5 classes
-      hasSignificantChanges: functions.length > 0 || classes.length > 0
-    };
-  }
-
   /**
    * Show usage statistics
    */
