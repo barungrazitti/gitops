@@ -9,6 +9,13 @@
 - `npm run test:coverage` - Jest with coverage report
 - `npm run test:watch` - Jest in watch mode for development
 
+### Setup Commands
+
+- `aic setup` - Interactive setup wizard for AI provider configuration
+- `aic config --list` - View current configuration
+- `aic config --set key=value` - Set configuration value
+- `aic config --reset` - Reset configuration to defaults
+
 ### Logging & Analysis
 
 - `aic stats` - Show basic usage statistics
@@ -72,8 +79,10 @@ No linting/formatting tools - removed per user request.
 
 - **Groq First**: Tries Groq (cloud AI) first for fast inference
 - **Ollama Fallback**: Falls back to Ollama (local AI) if Groq fails
+- **Default Model**: `llama-3.3-70b-versatile` (Groq)
 - **No Parallel Overhead**: Simpler, faster single-provider approach
 - **Smart Context**: Uses semantic analysis for better commit messages
+- **Diff Truncation**: Auto-truncates at 15KB to fit AI token limits (Groq's 6K TPM)
 
 ### Comprehensive Activity Logging
 

@@ -20,7 +20,7 @@ aic
 
 - **🚀 Fast** - Full diff sent in single prompt (no chunking)
 - **🔄 Sequential Fallback** - Groq first, Ollama if Groq fails (no parallel)
-- **📦 Large Diff Support** - Auto-truncates at 400KB to fit AI limits
+- **📦 Large Diff Support** - Auto-truncates at 15KB to fit AI limits
 - **🔧 Simple Config** - Just set your provider and API key
 - **🤖 Auto Git** - Stage, commit, pull, and push in one command
 
@@ -113,7 +113,7 @@ aic config --reset
 1. **Preferred Provider First** - Tries your configured provider (default: Groq)
 2. **Sequential Fallback** - If primary fails, tries backup (no parallel)
 3. **Full Diff** - Sends entire diff in one prompt (no chunking)
-4. **Auto-Truncation** - Diffs >400KB are truncated to fit token limits
+4. **Auto-Truncation** - Diffs >15KB are truncated to fit token limits
 
 ### Setup
 
@@ -178,9 +178,9 @@ curl http://localhost:11434/api/tags
 ### Large Diff Handling
 
 The tool handles large diffs automatically:
-- **<400KB**: Full diff sent (fastest)
-- **>400KB**: Truncated to 400KB with warning
-- **Truncation Reason**: Fits within AI model token limits
+- **<15KB**: Full diff sent (fastest)
+- **>15KB**: Truncated to 15KB with warning
+- **Truncation Reason**: Fits within AI model token limits (Groq's 6K TPM limit)
 
 For very large changes (WordPress updates, complete rewrites):
 - Some context may be lost due to truncation
@@ -205,6 +205,42 @@ git clone https://github.com/barungrazitti/gitops.git
 cd gitops
 npm install
 npm test
+```
+
+### Testing Commands
+
+- `npm test` - Run full Jest test suite
+- `npx jest tests/aicommit-cli.test.js` - Run single test file
+- `npm run test:coverage` - Jest with coverage report
+
+### Code Structure
+
+```
+src/
+├── core/           # Core modules (git-manager, config-manager, etc.)
+├── providers/      # AI providers (groq, ollama)
+├── utils/          # Utility functions
+└── index.js        # Main entry point
+bin/
+├── aic.js          # Main CLI entry
+└── aicommit.js     # Commit message generator CLI
+tests/              # Test files
+```
+
+## 📊 Statistics
+
+```bash
+# View stats
+aic stats
+
+# Analyze activity
+aic stats --analyze
+
+# Export logs
+aic stats --export --format csv
+
+# Reset stats
+aic stats --reset
 ```
 
 ## 📄 License

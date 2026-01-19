@@ -4,7 +4,7 @@
 
 🤖 AI Commit Generator - Automate your git workflow with AI-powered commit messages
 
-A Node.js CLI tool that generates intelligent commit messages using Groq or Ollama AI providers. Offers both full git automation (`aic`) and commit message generation (`aicommit`).
+A Node.js CLI tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). Features full git automation (`aic`) with sequential provider fallback - Groq first, Ollama if Groq fails. Auto-truncates diffs at 15KB to fit AI token limits.
 
 ## Repository Topics/Tags
 
@@ -21,6 +21,8 @@ A Node.js CLI tool that generates intelligent commit messages using Groq or Olla
 - developer-tools
 - version-control
 - automation-tools
+- ai-git
+- git-automation
 
 ## Primary Language
 
@@ -37,4 +39,12 @@ JavaScript
 ## Social Preview
 
 Use the first paragraph from README as the social preview description:
-"🤖 AI Commit Generator - Automate your git workflow with AI-powered commit messages. A Node.js CLI tool that generates intelligent commit messages using Groq or Ollama AI providers."
+"🤖 AI Commit Generator - Automate your git workflow with AI-powered commit messages. A Node.js CLI tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). Features full git automation with sequential provider fallback."
+
+## Key Features to Highlight
+
+- Groq-first AI generation with Ollama fallback
+- Full git automation: stage, commit, pull, resolve conflicts, push
+- Auto-truncates diffs at 15KB for AI token limits
+- Conventional commit message formatting
+- Usage statistics and activity logging
