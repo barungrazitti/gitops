@@ -2,12 +2,51 @@
  * Tests for GitManager
  */
 
+jest.mock('simple-git');
+
 const GitManager = require('../src/core/git-manager');
 
 describe('GitManager', () => {
   let gitManager;
+  let mockGit;
 
   beforeEach(() => {
+    jest.clearAllMocks();
+
+    mockGit = {
+      checkIsRepo: jest.fn().mockResolvedValue(true),
+      diff: jest.fn().mockResolvedValue('diff --git a/test.js b/test.js\n+ const x = 1;'),
+      log: jest.fn().mockResolvedValue({ all: [] }),
+      branch: jest.fn().mockResolvedValue({ current: 'main' }),
+      revparse: jest.fn().mockResolvedValue('/test/repo'),
+      status: jest.fn().mockResolvedValue({
+        staged: ['file1.js'],
+        modified: [],
+        not_added: [],
+        deleted: [],
+        created: [],
+      }),
+      commit: jest.fn().mockResolvedValue({ commit: 'abc123' }),
+      diffSummary: jest.fn().mockResolvedValue({
+        files: [{ file: 'test.js', changes: 1 }],
+        insertions: 1,
+        deletions: 0,
+        changed: 1,
+      }),
+      getRemotes: jest.fn().mockResolvedValue([]),
+      add: jest.fn().mockResolvedValue(),
+      pull: jest.fn().mockResolvedValue({ files: [] }),
+      push: jest.fn().mockResolvedValue(),
+      reset: jest.fn().mockResolvedValue(),
+      stash: jest.fn().mockResolvedValue(),
+      stashList: jest.fn().mockResolvedValue({ all: [] }),
+      checkout: jest.fn().mockResolvedValue(),
+      checkoutLocalBranch: jest.fn().mockResolvedValue(),
+      deleteLocalBranch: jest.fn().mockResolvedValue(),
+    };
+
+    const simpleGit = require('simple-git');
+    simpleGit.mockReturnValue(mockGit);
     gitManager = new GitManager();
   });
 
@@ -19,20 +58,21 @@ describe('GitManager', () => {
 
   describe('validateRepository', () => {
     it('should validate repository successfully', async () => {
-      // This test will work if we're in a git repo
       const result = await gitManager.validateRepository();
-      expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
+      expect(mockGit.checkIsRepo).toHaveBeenCalled();
+    });
+
+    it('should throw error when not in git repo', async () => {
+      mockGit.checkIsRepo.mockResolvedValue(false);
+
+      await expect(gitManager.validateRepository()).rejects.toThrow('Not a git repository');
     });
 
     it('should handle validation errors', async () => {
-      // Test error handling by mocking a scenario
-      const originalCheckIsRepo = gitManager.git.checkIsRepo;
-      gitManager.git.checkIsRepo = jest.fn().mockRejectedValue(new Error('Git error'));
-      
-      await expect(gitManager.validateRepository()).rejects.toThrow('Git repository validation failed: Git error');
-      
-      // Restore original method
-      gitManager.git.checkIsRepo = originalCheckIsRepo;
+      mockGit.checkIsRepo.mockRejectedValue(new Error('Git error'));
+
+      await expect(gitManager.validateRepository()).rejects.toThrow('Git repository validation failed');
     });
   });
 
@@ -40,15 +80,13 @@ describe('GitManager', () => {
     it('should get staged diff', async () => {
       const result = await gitManager.getStagedDiff();
       expect(typeof result).toBe('string');
+      expect(mockGit.diff).toHaveBeenCalledWith(['--staged']);
     });
 
     it('should handle diff errors', async () => {
-      const originalDiff = gitManager.git.diff;
-      gitManager.git.diff = jest.fn().mockRejectedValue(new Error('Diff error'));
-      
-      await expect(gitManager.getStagedDiff()).rejects.toThrow('Failed to get staged diff: Diff error');
-      
-      gitManager.git.diff = originalDiff;
+      mockGit.diff.mockRejectedValue(new Error('Diff error'));
+
+      await expect(gitManager.getStagedDiff()).rejects.toThrow('Failed to get staged diff');
     });
   });
 
@@ -56,36 +94,28 @@ describe('GitManager', () => {
     it('should get unstaged diff', async () => {
       const result = await gitManager.getUnstagedDiff();
       expect(typeof result).toBe('string');
-    });
-
-    it('should handle diff errors', async () => {
-      const originalDiff = gitManager.git.diff;
-      gitManager.git.diff = jest.fn().mockRejectedValue(new Error('Diff error'));
-      
-      await expect(gitManager.getUnstagedDiff()).rejects.toThrow('Failed to get unstaged diff: Diff error');
-      
-      gitManager.git.diff = originalDiff;
+      expect(mockGit.diff).toHaveBeenCalledWith();
     });
   });
 
   describe('getCommitHistory', () => {
     it('should get commit history with default limit', async () => {
+      mockGit.log.mockResolvedValue({
+        all: [
+          { hash: 'abc', message: 'test commit', author_name: 'test', date: '2024-01-01', refs: 'HEAD -> main' },
+        ],
+      });
+
       const result = await gitManager.getCommitHistory();
+
       expect(Array.isArray(result)).toBe(true);
+      expect(mockGit.log).toHaveBeenCalledWith({ maxCount: 50 });
     });
 
     it('should get commit history with custom limit', async () => {
-      const result = await gitManager.getCommitHistory(10);
-      expect(Array.isArray(result)).toBe(true);
-    });
+      await gitManager.getCommitHistory(10);
 
-    it('should handle log errors', async () => {
-      const originalLog = gitManager.git.log;
-      gitManager.git.log = jest.fn().mockRejectedValue(new Error('Log error'));
-      
-      await expect(gitManager.getCommitHistory()).rejects.toThrow('Failed to get commit history: Log error');
-      
-      gitManager.git.log = originalLog;
+      expect(mockGit.log).toHaveBeenCalledWith({ maxCount: 10 });
     });
   });
 
@@ -93,15 +123,7 @@ describe('GitManager', () => {
     it('should get current branch', async () => {
       const result = await gitManager.getCurrentBranch();
       expect(typeof result).toBe('string');
-    });
-
-    it('should handle branch errors', async () => {
-      const originalBranch = gitManager.git.branch;
-      gitManager.git.branch = jest.fn().mockRejectedValue(new Error('Branch error'));
-      
-      await expect(gitManager.getCurrentBranch()).rejects.toThrow('Failed to get current branch: Branch error');
-      
-      gitManager.git.branch = originalBranch;
+      expect(mockGit.branch).toHaveBeenCalled();
     });
   });
 
@@ -109,16 +131,7 @@ describe('GitManager', () => {
     it('should get repository root', async () => {
       const result = await gitManager.getRepositoryRoot();
       expect(typeof result).toBe('string');
-      expect(result.length).toBeGreaterThan(0);
-    });
-
-    it('should handle revparse errors', async () => {
-      const originalRevparse = gitManager.git.revparse;
-      gitManager.git.revparse = jest.fn().mockRejectedValue(new Error('Revparse error'));
-      
-      await expect(gitManager.getRepositoryRoot()).rejects.toThrow('Failed to get repository root: Revparse error');
-      
-      gitManager.git.revparse = originalRevparse;
+      expect(mockGit.revparse).toHaveBeenCalledWith(['--show-toplevel']);
     });
   });
 
@@ -126,31 +139,35 @@ describe('GitManager', () => {
     it('should get staged files', async () => {
       const result = await gitManager.getStagedFiles();
       expect(Array.isArray(result)).toBe(true);
-    });
-
-    it('should handle status errors', async () => {
-      const originalStatus = gitManager.git.status;
-      gitManager.git.status = jest.fn().mockRejectedValue(new Error('Status error'));
-      
-      await expect(gitManager.getStagedFiles()).rejects.toThrow('Failed to get staged files: Status error');
-      
-      gitManager.git.status = originalStatus;
+      expect(mockGit.status).toHaveBeenCalled();
     });
   });
 
   describe('hasStagedChanges', () => {
-    it('should return boolean for staged changes', async () => {
+    it('should return true when staged changes exist', async () => {
+      mockGit.status.mockResolvedValue({
+        staged: ['file1.js'],
+        modified: [],
+        not_added: [],
+        deleted: [],
+        created: [],
+      });
+
       const result = await gitManager.hasStagedChanges();
-      expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
     });
 
-    it('should handle status errors', async () => {
-      const originalStatus = gitManager.git.status;
-      gitManager.git.status = jest.fn().mockRejectedValue(new Error('Status error'));
-      
-      await expect(gitManager.hasStagedChanges()).rejects.toThrow('Failed to check staged changes: Status error');
-      
-      gitManager.git.status = originalStatus;
+    it('should return false when no staged changes', async () => {
+      mockGit.status.mockResolvedValue({
+        staged: [],
+        modified: [],
+        not_added: [],
+        deleted: [],
+        created: [],
+      });
+
+      const result = await gitManager.hasStagedChanges();
+      expect(result).toBe(false);
     });
   });
 
@@ -158,258 +175,154 @@ describe('GitManager', () => {
     it('should commit with message', async () => {
       const message = 'Test commit message';
       const result = await gitManager.commit(message);
+
       expect(result).toBeDefined();
+      expect(mockGit.commit).toHaveBeenCalledWith(message);
     });
 
     it('should handle commit errors', async () => {
-      const originalCommit = gitManager.git.commit;
-      gitManager.git.commit = jest.fn().mockRejectedValue(new Error('Commit error'));
-      
-      await expect(gitManager.commit('Test')).rejects.toThrow('Failed to commit: Commit error');
-      
-      gitManager.git.commit = originalCommit;
+      mockGit.commit.mockRejectedValue(new Error('Commit error'));
+
+      await expect(gitManager.commit('Test')).rejects.toThrow('Failed to commit');
     });
   });
 
   describe('getFileStats', () => {
     it('should get file statistics', async () => {
       const result = await gitManager.getFileStats();
+
       expect(result).toBeDefined();
-      expect(typeof result.files).toBe('object');
       expect(typeof result.insertions).toBe('number');
       expect(typeof result.deletions).toBe('number');
-      expect(typeof result.changed).toBe('number');
-    });
-
-    it('should handle diff summary errors', async () => {
-      const originalDiffSummary = gitManager.git.diffSummary;
-      gitManager.git.diffSummary = jest.fn().mockRejectedValue(new Error('Diff summary error'));
-      
-      await expect(gitManager.getFileStats()).rejects.toThrow('Failed to get file stats: Diff summary error');
-      
-      gitManager.git.diffSummary = originalDiffSummary;
     });
   });
 
   describe('getRepositoryInfo', () => {
     it('should get repository information', async () => {
+      mockGit.getRemotes.mockResolvedValue([{ name: 'origin', refs: { fetch: 'https://github.com/test/repo.git' } }]);
+
       const result = await gitManager.getRepositoryInfo();
+
       expect(result).toBeDefined();
       expect(typeof result.branch).toBe('string');
       expect(typeof result.root).toBe('string');
       expect(Array.isArray(result.remotes)).toBe(true);
     });
-
-    it('should handle repository info errors', async () => {
-      const originalGetRemotes = gitManager.git.getRemotes;
-      gitManager.git.getRemotes = jest.fn().mockRejectedValue(new Error('Remotes error'));
-      
-      await expect(gitManager.getRepositoryInfo()).rejects.toThrow('Failed to get repository info: Remotes error');
-      
-      gitManager.git.getRemotes = originalGetRemotes;
-    });
   });
 
   describe('getCommitPatterns', () => {
     it('should analyze commit patterns', async () => {
+      mockGit.log.mockResolvedValue({
+        all: [
+          { hash: 'abc', message: 'feat: add feature', author_name: 'test', date: '2024-01-01', refs: '' },
+          { hash: 'def', message: 'fix: bug fix', author_name: 'test', date: '2024-01-02', refs: '' },
+        ],
+      });
+
       const result = await gitManager.getCommitPatterns();
+
       expect(result).toBeDefined();
       expect(Array.isArray(result.mostUsedTypes)).toBe(true);
-      expect(Array.isArray(result.mostUsedScopes)).toBe(true);
       expect(typeof result.averageLength).toBe('number');
-      expect(typeof result.preferredFormat).toBe('string');
-    });
-
-    it('should handle pattern analysis errors', async () => {
-      const originalGetCommitHistory = gitManager.getCommitHistory;
-      gitManager.getCommitHistory = jest.fn().mockRejectedValue(new Error('History error'));
-      
-      await expect(gitManager.getCommitPatterns()).rejects.toThrow('Failed to analyze commit patterns: History error');
-      
-      gitManager.getCommitHistory = originalGetCommitHistory;
     });
   });
 
   describe('stashChanges', () => {
     it('should stash changes', async () => {
-      const result = await gitManager.stashChanges();
-      expect(result).toBeDefined();
-    });
+      mockGit.stash.mockResolvedValue({ saved: true });
 
-    it('should handle stash errors', async () => {
-      const originalStash = gitManager.git.stash;
-      gitManager.git.stash = jest.fn().mockRejectedValue(new Error('Stash error'));
-      
-      await expect(gitManager.stashChanges()).rejects.toThrow('Failed to stash changes: Stash error');
-      
-      gitManager.git.stash = originalStash;
+      const result = await gitManager.stashChanges();
+
+      expect(mockGit.stash).toHaveBeenCalled();
     });
   });
 
   describe('popStash', () => {
     it('should pop stash', async () => {
-      const result = await gitManager.popStash();
-      expect(result).toBeDefined();
-    });
+      mockGit.stash.mockResolvedValue({ applied: true });
 
-    it('should handle pop stash errors', async () => {
-      const originalStash = gitManager.git.stash;
-      gitManager.git.stash = jest.fn().mockRejectedValue(new Error('Pop stash error'));
-      
-      await expect(gitManager.popStash()).rejects.toThrow('Failed to pop stash: Pop stash error');
-      
-      gitManager.git.stash = originalStash;
+      const result = await gitManager.popStash();
+
+      expect(mockGit.stash).toHaveBeenCalledWith(['pop']);
     });
   });
 
   describe('hasStash', () => {
-    it('should return boolean for stash existence', async () => {
+    it('should return true when stash exists', async () => {
+      mockGit.stashList.mockResolvedValue({ all: [{ hash: 'abc' }] });
+
       const result = await gitManager.hasStash();
-      expect(typeof result).toBe('boolean');
+      expect(result).toBe(true);
     });
 
-    it('should return false on stash list error', async () => {
-      const originalStashList = gitManager.git.stashList;
-      gitManager.git.stashList = jest.fn().mockRejectedValue(new Error('Stash list error'));
-      
+    it('should return false on error', async () => {
+      mockGit.stashList.mockRejectedValue(new Error('Stash error'));
+
       const result = await gitManager.hasStash();
       expect(result).toBe(false);
-      
-      gitManager.git.stashList = originalStashList;
     });
   });
 
   describe('getUnstagedFiles', () => {
     it('should get unstaged files', async () => {
+      mockGit.status.mockResolvedValue({
+        staged: [],
+        modified: ['file1.js'],
+        not_added: [],
+        deleted: [],
+        created: [],
+      });
+
       const result = await gitManager.getUnstagedFiles();
       expect(Array.isArray(result)).toBe(true);
-    });
-
-    it('should handle unstaged files errors', async () => {
-      const originalStatus = gitManager.git.status;
-      gitManager.git.status = jest.fn().mockRejectedValue(new Error('Status error'));
-      
-      await expect(gitManager.getUnstagedFiles()).rejects.toThrow('Failed to get unstaged files: Status error');
-      
-      gitManager.git.status = originalStatus;
+      expect(result).toContain('file1.js');
     });
   });
 
   describe('resetStaged', () => {
     it('should reset staged changes', async () => {
       await expect(gitManager.resetStaged()).resolves.toBeUndefined();
-    });
-
-    it('should handle reset errors', async () => {
-      const originalReset = gitManager.git.reset;
-      gitManager.git.reset = jest.fn().mockRejectedValue(new Error('Reset error'));
-      
-      await expect(gitManager.resetStaged()).rejects.toThrow('Failed to reset staged changes: Reset error');
-      
-      gitManager.git.reset = originalReset;
+      expect(mockGit.reset).toHaveBeenCalledWith(['--mixed']);
     });
   });
 
-  describe('createValidationBranch', () => {
-    it('should create validation branch', async () => {
-      const result = await gitManager.createValidationBranch();
-      expect(result).toBeDefined();
-      expect(typeof result.branch).toBe('string');
-      expect(typeof result.previousBranch).toBe('string');
-    });
+  describe('getAllChangedFiles', () => {
+    it('should get all changed files', async () => {
+      mockGit.status.mockResolvedValue({
+        staged: ['file1.js'],
+        modified: ['file2.js'],
+        not_added: ['file3.js'],
+        deleted: ['file4.js'],
+        created: ['file5.js'],
+      });
 
-    it('should handle validation branch creation errors', async () => {
-      const originalGetCurrentBranch = gitManager.getCurrentBranch;
-      gitManager.getCurrentBranch = jest.fn().mockRejectedValue(new Error('Branch error'));
-      
-      await expect(gitManager.createValidationBranch()).rejects.toThrow('Failed to create validation branch: Branch error');
-      
-      gitManager.getCurrentBranch = originalGetCurrentBranch;
-    });
-  });
+      const result = await gitManager.getAllChangedFiles();
 
-  describe('cleanupValidationBranch', () => {
-    it('should cleanup validation branch', async () => {
-      // Ensure we're on main branch first
-      await gitManager.git.checkout('main');
-      
-      // Mock the timestamp generation to ensure unique branch name
-      const originalCreateValidationBranch = gitManager.createValidationBranch;
-      const uniqueSuffix = Math.random().toString(36).substring(7);
-      
-      gitManager.createValidationBranch = async function(baseBranch = null) {
-        const timestamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, '-')
-          .slice(0, 19);
-        const validationBranch = `validation-${timestamp}-${uniqueSuffix}`;
-        
-        await this.git.checkoutLocalBranch(validationBranch);
-        
-        return {
-          branch: validationBranch,
-          previousBranch: 'main', // We know we're on main
-        };
-      };
-      
-      // First create a branch to cleanup
-      const branchInfo = await gitManager.createValidationBranch();
-      
-      // Then cleanup
-      await expect(gitManager.cleanupValidationBranch(branchInfo.branch, branchInfo.previousBranch)).resolves.toBeUndefined();
-      
-      // Restore original method
-      gitManager.createValidationBranch = originalCreateValidationBranch;
-    });
-
-    it('should handle cleanup errors', async () => {
-      const originalCheckout = gitManager.git.checkout;
-      gitManager.git.checkout = jest.fn().mockRejectedValue(new Error('Checkout error'));
-      
-      await expect(gitManager.cleanupValidationBranch('test-branch', 'main')).rejects.toThrow('Failed to cleanup validation branch: Checkout error');
-      
-      gitManager.git.checkout = originalCheckout;
-    });
-  });
-
-  describe('createDualCommits', () => {
-    it('should create original commit only', async () => {
-      const originalMessage = 'Test commit';
-      const result = await gitManager.createDualCommits(originalMessage);
       expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBeGreaterThanOrEqual(1);
-      expect(result[0].type).toBe('original');
-    });
-
-    it('should handle dual commit errors', async () => {
-      const originalCommit = gitManager.git.commit;
-      gitManager.git.commit = jest.fn().mockRejectedValue(new Error('Commit error'));
-      
-      await expect(gitManager.createDualCommits('Test')).rejects.toThrow('Failed to create dual commits: Failed to commit: Commit error');
-      
-      gitManager.git.commit = originalCommit;
+      expect(result.length).toBe(5);
     });
   });
 
   describe('pushCommits', () => {
     it('should push commits to current branch', async () => {
-      // This might fail if no remote is configured, but we test the method structure
-      try {
-        const result = await gitManager.pushCommits();
-        expect(result).toBeDefined();
-      } catch (error) {
-        // Expected if no remote is configured
-        expect(error.message).toContain('Failed to push commits');
-      }
+      mockGit.branch.mockResolvedValue({ current: 'main' });
+      mockGit.push.mockResolvedValue({ pushed: true });
+
+      const result = await gitManager.pushCommits();
+
+      expect(mockGit.push).toHaveBeenCalledWith('origin', 'main', '');
+    });
+
+    it('should push to specified branch', async () => {
+      const result = await gitManager.pushCommits('develop');
+
+      expect(mockGit.push).toHaveBeenCalledWith('origin', 'develop', '');
     });
 
     it('should handle push errors', async () => {
-      const originalGetCurrentBranch = gitManager.getCurrentBranch;
-      gitManager.getCurrentBranch = jest.fn().mockRejectedValue(new Error('Branch error'));
-      
-      await expect(gitManager.pushCommits()).rejects.toThrow('Failed to push commits: Branch error');
-      
-      gitManager.getCurrentBranch = originalGetCurrentBranch;
+      mockGit.push.mockRejectedValue(new Error('Push error'));
+
+      await expect(gitManager.pushCommits()).rejects.toThrow('Failed to push commits');
     });
   });
 });

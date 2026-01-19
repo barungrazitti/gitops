@@ -207,12 +207,44 @@ class AutoGit {
         throw new Error('No staged changes available');
       }
 
+      // Check for and clean up conflict markers before generating commit
+      if (/<<<<<<<|=======|>>>>>>>/.test(diff)) {
+        console.log(chalk.yellow('\n⚠️  Conflict markers detected in staged changes'));
+        console.log(chalk.blue('🧹 Cleaning up conflict markers...'));
+
+        const cleanupResult = await this.aiCommit.detectAndCleanupConflictMarkers();
+
+        if (cleanupResult.cleaned) {
+          console.log(chalk.green(`✅ Cleaned ${cleanupResult.filesFixed} file(s) with conflict markers`));
+
+          // Re-stage the cleaned files
+          await this.git.add(['.']);
+
+          // Get fresh diff after cleanup
+          const newDiff = await this.git.diff(['--staged']);
+
+          if (newDiff && newDiff.trim().length > 0) {
+            // Generate commit message from cleaned diff
+            const config = await this.aiCommit.configManager.getAll();
+            const messages = await this.aiCommit.generateWithSequentialFallback(newDiff, {
+              context,
+              count: 1,
+              conventional: true,
+              preferredProvider: config.defaultProvider || 'groq',
+            });
+            this.spinner.succeed('AI commit message generated (after conflict cleanup)');
+            return messages[0];
+          }
+        }
+      }
+
       // Use the main AI commit generator with sequential fallback
+      const config = await this.aiCommit.configManager.getAll();
       const messages = await this.aiCommit.generateWithSequentialFallback(diff, {
         context,
         count: 1, // Only need one message for auto-commit
         conventional: true,
-        provider: options?.provider || 'ollama',
+        preferredProvider: config.defaultProvider || 'groq',
       });
 
       this.spinner.succeed('AI commit message generated');

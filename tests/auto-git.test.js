@@ -55,6 +55,9 @@ describe('AutoGit', () => {
       analysisEngine: {
         analyzeRepository: jest.fn().mockResolvedValue({}),
       },
+      configManager: {
+        getAll: jest.fn().mockResolvedValue({}),
+      },
       generateWithSequentialFallback: jest.fn(),
       resolveConflictWithAI: jest.fn(),
     };
@@ -358,7 +361,7 @@ describe('AutoGit', () => {
         context: {},
         count: 1,
         conventional: true,
-        provider: 'ollama',
+        preferredProvider: 'groq',
       });
     });
   });

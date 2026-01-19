@@ -158,12 +158,12 @@ fi
 
 # Check if there are staged changes
 if ! git diff --cached --quiet; then
-    # Generate commit message using aicommit
-    if command -v aicommit > /dev/null 2>&1; then
+    # Generate commit message using aic
+    if command -v aic > /dev/null 2>&1; then
         echo "# Generating AI commit message..." >&2
         
         # Generate message and write to commit file
-        aicommit generate --dry-run 2>/dev/null | head -1 > "$1" 2>/dev/null
+        aic --dry-run 2>/dev/null | head -1 > "$1" 2>/dev/null
         
         if [ $? -eq 0 ] && [ -s "$1" ]; then
             echo "# AI-generated commit message added" >&2
@@ -173,7 +173,7 @@ if ! git diff --cached --quiet; then
             echo "# Failed to generate AI commit message" >&2
         fi
     else
-        echo "# aicommit command not found" >&2
+        echo "# aic command not found" >&2
         echo "# Install with: npm install -g ai-commit-generator" >&2
     fi
 fi
@@ -233,18 +233,14 @@ fi
 
 # Check if there are staged changes
 if ! git diff --cached --quiet; then
-    if command -v aicommit > /dev/null 2>&1; then
+    if command -v aic > /dev/null 2>&1; then
         echo "# Generating AI commit message..." >&2
         
         # Build command with options
-        CMD="aicommit generate"
+        CMD="aic"
         
         if [ "$PROVIDER" != "" ]; then
             CMD="$CMD --provider $PROVIDER"
-        fi
-        
-        if [ "$CONVENTIONAL" = "true" ]; then
-            CMD="$CMD --conventional"
         fi
         
         if [ "$AUTO_COMMIT" = "true" ]; then
@@ -265,7 +261,7 @@ if ! git diff --cached --quiet; then
             fi
         fi
     else
-        echo "# aicommit command not found" >&2
+        echo "# aic command not found" >&2
     fi
 fi
 

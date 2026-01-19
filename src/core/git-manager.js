@@ -3,6 +3,7 @@
  */
 
 const simpleGit = require('simple-git');
+const InputSanitizer = require('../utils/input-sanitizer');
 
 class GitManager {
   constructor() {
@@ -121,7 +122,8 @@ class GitManager {
    */
   async commit(message) {
     try {
-      const result = await this.git.commit(message);
+      const sanitizedMessage = InputSanitizer.sanitizeCommitMessage(message);
+      const result = await this.git.commit(sanitizedMessage);
       return result;
     } catch (error) {
       throw new Error(`Failed to commit: ${error.message}`);
@@ -310,7 +312,13 @@ class GitManager {
    */
   async pushCommits(branch = null, force = false) {
     try {
-      const targetBranch = branch || (await this.getCurrentBranch());
+      let targetBranch = branch || (await this.getCurrentBranch());
+
+      // Validate branch name to prevent injection
+      if (targetBranch && !InputSanitizer.validateGitReference(targetBranch)) {
+        throw new Error(`Invalid branch name: ${targetBranch}`);
+      }
+
       const forceFlag = force ? '--force' : '';
 
       const result = await this.git.push('origin', targetBranch, forceFlag);
@@ -325,7 +333,8 @@ class GitManager {
    */
   async stashChanges(message = 'Auto-stash before validation') {
     try {
-      const result = await this.git.stash(['push', '-m', message]);
+      const sanitizedMessage = InputSanitizer.sanitizeString(message);
+      const result = await this.git.stash(InputSanitizer.sanitizeGitArgs(['push', '-m', sanitizedMessage]));
       return result;
     } catch (error) {
       throw new Error(`Failed to stash changes: ${error.message}`);

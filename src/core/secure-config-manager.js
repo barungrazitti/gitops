@@ -1,14 +1,20 @@
 /**
- * Configuration Manager - Handles application configuration
+ * Secure Configuration Manager - Handles encrypted application configuration
  */
 
 const Conf = require('conf');
-
+const crypto = require('crypto');
 const fs = require('fs-extra');
 const Joi = require('joi');
+const ConfigValidator = require('../utils/config-validator');
+const configValidator = new ConfigValidator();
 
-class ConfigManager {
+class SecureConfigManager {
   constructor() {
+    // Generate a key for encryption (in a real app, this should be stored securely)
+    this.key = this.generateOrLoadKey();
+    this.algorithm = 'aes-256-gcm';
+    
     this.config = new Conf({
       projectName: 'ai-commit-generator',
       defaults: this.getDefaults(),
@@ -18,12 +24,77 @@ class ConfigManager {
   }
 
   /**
+   * Generate or load encryption key
+   */
+  generateOrLoadKey() {
+    // In a real application, you'd want to store this key securely
+    // For now, we'll derive it from a consistent source
+    const keyPath = this.getKeyFilePath();
+    
+    if (fs.existsSync(keyPath)) {
+      return Buffer.from(fs.readFileSync(keyPath, 'utf8'), 'hex');
+    } else {
+      // Generate a new key and save it
+      const newKey = crypto.randomBytes(32); // 256-bit key
+      fs.ensureDirSync(require('path').dirname(keyPath));
+      fs.writeFileSync(keyPath, newKey.toString('hex'));
+      return newKey;
+    }
+  }
+
+  /**
+   * Get path for storing the encryption key
+   */
+  getKeyFilePath() {
+    const os = require('os');
+    const path = require('path');
+    return path.join(os.homedir(), '.ai-commit-generator', 'encryption.key');
+  }
+
+  /**
+   * Encrypt data
+   */
+  encrypt(data) {
+    if (!data) return null;
+    
+    const iv = crypto.randomBytes(16); // Initialization vector
+    const cipher = crypto.createCipher(this.algorithm, this.key);
+    const encrypted = Buffer.concat([cipher.update(data, 'utf8'), cipher.final()]);
+    const authTag = cipher.getAuthTag();
+    
+    // Return encrypted data with IV and auth tag
+    return {
+      data: encrypted.toString('hex'),
+      iv: iv.toString('hex'),
+      authTag: authTag.toString('hex')
+    };
+  }
+
+  /**
+   * Decrypt data
+   */
+  decrypt(encryptedObj) {
+    if (!encryptedObj) return null;
+    
+    const decipher = crypto.createDecipher(this.algorithm, this.key);
+    decipher.setAuthTag(Buffer.from(encryptedObj.authTag, 'hex'));
+    decipher.setAAD(Buffer.from('', 'utf8')); // No additional authenticated data
+    
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encryptedObj.data, 'hex')),
+      decipher.final()
+    ]);
+    
+    return decrypted.toString('utf8');
+  }
+
+  /**
    * Get default configuration
    */
   getDefaults() {
     return {
       defaultProvider: 'groq',
-      apiKey: null,
+      encryptedApiKey: null, // Store encrypted API key
       model: null,
       conventionalCommits: true,
       language: 'en',
@@ -95,8 +166,7 @@ class ConfigManager {
   getValidationSchema() {
     return Joi.object({
       defaultProvider: Joi.string().valid('groq', 'ollama').required(),
-      encryptedApiKey: Joi.object().allow(null),
-      apiKey: Joi.string().allow(null),
+      encryptedApiKey: Joi.object().allow(null), // Changed to object for encrypted data
       model: Joi.string().allow(null),
       conventionalCommits: Joi.boolean(),
       language: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja'),
@@ -117,7 +187,15 @@ class ConfigManager {
         testCommand: Joi.string(),
         lintCommand: Joi.string(),
         formatCommand: Joi.string(),
-        aiProvider: Joi.string().valid('groq', 'ollama'),
+        aiProvider: Joi.string().valid(
+          'openai',
+          'anthropic',
+          'gemini',
+          'mistral',
+          'cohere',
+          'groq',
+          'ollama'
+        ),
         confirmFixes: Joi.boolean(),
         timeout: Joi.number().integer().min(5000),
         pushAfterValidation: Joi.boolean(),
@@ -173,6 +251,12 @@ class ConfigManager {
    */
   async get(key) {
     try {
+      if (key === 'apiKey') {
+        // Special handling for API key - decrypt it
+        const encryptedApiKey = this.config.get('encryptedApiKey');
+        return encryptedApiKey ? this.decrypt(encryptedApiKey) : null;
+      }
+      
       return this.config.get(key);
     } catch (error) {
       throw new Error(`Failed to get configuration value: ${error.message}`);
@@ -185,14 +269,27 @@ class ConfigManager {
   async set(key, value) {
     try {
       // Validate the key-value pair
-      const testConfig = { ...this.config.store, [key]: value };
+      const testConfig = { ...this.config.store };
+      
+      if (key === 'apiKey') {
+        // Special handling for API key - encrypt it
+        const encryptedValue = this.encrypt(value);
+        testConfig.encryptedApiKey = encryptedValue;
+      } else {
+        testConfig[key] = value;
+      }
+      
       const { error } = this.schema.validate(testConfig);
 
       if (error) {
         throw new Error(`Invalid configuration value: ${error.message}`);
       }
 
-      this.config.set(key, value);
+      if (key === 'apiKey') {
+        this.config.set('encryptedApiKey', encryptedValue);
+      } else {
+        this.config.set(key, value);
+      }
     } catch (error) {
       throw new Error(`Failed to set configuration value: ${error.message}`);
     }
@@ -203,18 +300,28 @@ class ConfigManager {
    */
   async setMultiple(values) {
     try {
-      // Strip any encryptedApiKey since ConfigManager doesn't handle encryption
-      const { encryptedApiKey, ...cleanValues } = values;
+      const testConfig = { ...this.config.store };
       
-      // Validate all values
-      const testConfig = { ...this.config.store, ...cleanValues };
+      let encryptedApiKey = null;
+      if (values.apiKey !== undefined) {
+        encryptedApiKey = this.encrypt(values.apiKey);
+        testConfig.encryptedApiKey = encryptedApiKey;
+        delete values.apiKey;
+      }
+      
+      Object.assign(testConfig, values);
+      
       const { error } = this.schema.validate(testConfig);
 
       if (error) {
         throw new Error(`Invalid configuration values: ${error.message}`);
       }
 
-      Object.entries(cleanValues).forEach(([key, value]) => {
+      if (encryptedApiKey) {
+        this.config.set('encryptedApiKey', encryptedApiKey);
+      }
+
+      Object.entries(values).forEach(([key, value]) => {
         this.config.set(key, value);
       });
     } catch (error) {
@@ -250,7 +357,13 @@ class ConfigManager {
   async export(filePath) {
     try {
       const config = this.config.store;
-      await fs.writeJson(filePath, config, { spaces: 2 });
+      // Decrypt API key for export (should be used carefully)
+      const exportedConfig = { ...config };
+      if (exportedConfig.encryptedApiKey) {
+        exportedConfig.apiKey = this.decrypt(exportedConfig.encryptedApiKey);
+        delete exportedConfig.encryptedApiKey;
+      }
+      await fs.writeJson(filePath, exportedConfig, { spaces: 2 });
     } catch (error) {
       throw new Error(`Failed to export configuration: ${error.message}`);
     }
@@ -268,6 +381,13 @@ class ConfigManager {
         throw new Error(`Invalid configuration file: ${error.message}`);
       }
 
+      // Encrypt API key if present in imported config
+      if (config.apiKey) {
+        const encryptedApiKey = this.encrypt(config.apiKey);
+        delete config.apiKey; // Remove unencrypted key
+        config.encryptedApiKey = encryptedApiKey;
+      }
+
       this.config.store = config;
     } catch (error) {
       throw new Error(`Failed to import configuration: ${error.message}`);
@@ -280,8 +400,10 @@ class ConfigManager {
   async getProviderConfig(provider) {
     try {
       const config = await this.load();
+      const apiKey = await this.get('apiKey'); // Get decrypted API key
+      
       const providerConfig = {
-        apiKey: config.apiKey,
+        apiKey: apiKey,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         timeout: config.timeout,
@@ -291,6 +413,36 @@ class ConfigManager {
 
       // Provider-specific model handling - don't use global model for different providers
       switch (provider) {
+      case 'openai':
+        providerConfig.model =
+            config.model && config.model.startsWith('gpt')
+              ? config.model
+              : 'gpt-3.5-turbo';
+        break;
+      case 'anthropic':
+        providerConfig.model =
+            config.model && config.model.startsWith('claude')
+              ? config.model
+              : 'claude-3-sonnet-20240229';
+        break;
+      case 'gemini':
+        providerConfig.model =
+            config.model && config.model.includes('gemini')
+              ? config.model
+              : 'gemini-pro';
+        break;
+      case 'mistral':
+        providerConfig.model =
+            config.model && config.model.includes('mistral')
+              ? config.model
+              : 'mistral-medium';
+        break;
+      case 'cohere':
+        providerConfig.model =
+            config.model && config.model.includes('command')
+              ? config.model
+              : 'command';
+        break;
       case 'groq':
         providerConfig.model =
             config.model &&
@@ -305,6 +457,7 @@ class ConfigManager {
               : 'llama-3.1-8b-instant';
         break;
       case 'ollama': {
+        // For Ollama, always use the default unless it's explicitly an Ollama model
         const ollamaModels = [
           'qwen2.5-coder:latest',
           'deepseek-v3.1:671b-cloud',
@@ -319,6 +472,7 @@ class ConfigManager {
         break;
       }
       default:
+        // For unknown providers, use basic config
         providerConfig.model = config.model || 'default-model';
         break;
       }
@@ -334,7 +488,16 @@ class ConfigManager {
    */
   async getAll() {
     try {
-      return this.config.store;
+      const config = this.config.store;
+      const allConfig = { ...config };
+      
+      // Decrypt API key for return
+      if (allConfig.encryptedApiKey) {
+        allConfig.apiKey = this.decrypt(allConfig.encryptedApiKey);
+        delete allConfig.encryptedApiKey;
+      }
+      
+      return allConfig;
     } catch (error) {
       throw new Error(`Failed to get all configuration: ${error.message}`);
     }
@@ -350,7 +513,8 @@ class ConfigManager {
       return true; // Ollama doesn't require API key
     }
 
-    if (!config.apiKey) {
+    const apiKey = await this.get('apiKey'); // Get decrypted API key
+    if (!apiKey) {
       throw new Error(
         `API key not configured for ${provider}. Run 'aicommit setup' to configure.`
       );
@@ -371,32 +535,22 @@ class ConfigManager {
     if (!availableProviders.includes(provider.toLowerCase())) {
       return {
         valid: false,
-        errors: [`Unknown provider: ${provider}`]
+        errors: [`Unknown provider: ${provider}. Available providers: ${availableProviders.join(', ')}`],
+        suggestions: ['Check the provider name spelling', 'Refer to documentation for supported providers']
       };
     }
 
-    const errors = [];
-
-    switch (provider.toLowerCase()) {
-      case 'groq':
-        if (!config.apiKey) {
-          errors.push('API key is required');
-        }
-        break;
-      case 'ollama':
-        // Ollama doesn't require API key but may need other validations
-        if (config.url && !this.isValidUrl(config.url)) {
-          errors.push('Invalid URL format for Ollama');
-        }
-        break;
-    }
+    // Use enhanced validator
+    const result = configValidator.validateProviderConfig(provider, config);
 
     return {
-      valid: errors.length === 0,
-      errors
+      valid: result.valid,
+      errors: result.errors,
+      warnings: result.warnings,
+      suggestions: result.suggestions
     };
   }
-  
+
   /**
    * Helper function to validate URL format
    */
@@ -418,7 +572,7 @@ class ConfigManager {
     if (!override) return base;
 
     const result = { ...base };
-    
+
     for (const [key, value] of Object.entries(override)) {
       if (value !== undefined && value !== null) {
         if (typeof value === 'object' && value !== null && !Array.isArray(value) && typeof result[key] === 'object' && result[key] !== null) {
@@ -433,4 +587,4 @@ class ConfigManager {
   }
 }
 
-module.exports = ConfigManager;
+module.exports = SecureConfigManager;

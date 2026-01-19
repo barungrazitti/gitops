@@ -121,19 +121,21 @@ class ActivityLogger {
         platform: os.platform(),
         nodeVersion: process.version,
         memoryUsage: process.memoryUsage(),
+        pid: process.pid,
+        uptime: process.uptime(),
       },
     };
 
     const logLine = JSON.stringify(logEntry) + '\n';
-    
+
     try {
       if (this.currentLogFile) {
         await fs.appendFile(this.currentLogFile, logLine);
-        
+
         // Check file size and rotate if needed
         const stats = await fs.stat(this.currentLogFile);
         const maxSize = this.config.get('maxLogSize');
-        
+
         if (stats.size > maxSize) {
           await this.rotateLogFile();
         }
@@ -252,6 +254,97 @@ class ActivityLogger {
       resolutionTime: details.resolutionTime,
       fallbackUsed: details.fallbackUsed,
       chunkingUsed: details.chunkingUsed,
+      timestamp: Date.now(),
+      ...details,
+    });
+  }
+
+  /**
+   * Log detailed error with stack trace and context
+   */
+  async logDetailedError(error, context = {}) {
+    await this.error('detailed_error', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name,
+      code: error.code,
+      context,
+      timestamp: Date.now(),
+      system: {
+        platform: os.platform(),
+        nodeVersion: process.version,
+        memoryUsage: process.memoryUsage(),
+        pid: process.pid,
+      }
+    });
+  }
+
+  /**
+   * Log performance metrics
+   */
+  async logPerformanceMetric(metricName, value, context = {}) {
+    await this.info('performance_metric', {
+      metric: metricName,
+      value,
+      unit: context.unit || 'ms',
+      threshold: context.threshold,
+      exceeded: context.threshold ? value > context.threshold : false,
+      context,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Log resource usage
+   */
+  async logResourceUsage(context = {}) {
+    const memoryUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage ? process.cpuUsage() : null;
+
+    await this.info('resource_usage', {
+      memory: {
+        rss: memoryUsage.rss,
+        heapTotal: memoryUsage.heapTotal,
+        heapUsed: memoryUsage.heapUsed,
+        external: memoryUsage.external,
+        arrayBuffers: memoryUsage.arrayBuffers,
+      },
+      cpu: cpuUsage,
+      uptime: process.uptime(),
+      activeHandles: process._getActiveHandles ? process._getActiveHandles().length : 0,
+      activeRequests: process._getActiveRequests ? process._getActiveRequests().length : 0,
+      context,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Log provider health status
+   */
+  async logProviderHealth(providerName, status, details = {}) {
+    await this.info('provider_health', {
+      provider: providerName,
+      status, // 'healthy', 'degraded', 'unhealthy', 'offline'
+      responseTime: details.responseTime,
+      errorRate: details.errorRate,
+      successRate: details.successRate,
+      lastError: details.lastError,
+      timestamp: Date.now(),
+      ...details,
+    });
+  }
+
+  /**
+   * Log cache performance
+   */
+  async logCachePerformance(hits, misses, hitRate, details = {}) {
+    await this.info('cache_performance', {
+      hits,
+      misses,
+      hitRate,
+      size: details.size,
+      maxSize: details.maxSize,
+      utilization: details.maxSize ? (details.size / details.maxSize * 100).toFixed(2) + '%' : 'N/A',
       timestamp: Date.now(),
       ...details,
     });
@@ -422,26 +515,6 @@ class ActivityLogger {
     });
     
     return csvLines.join('\n');
-  }
-
-  /**
-   * Export logs with different formats
-   */
-  async exportLogs(format = 'json', options = {}) {
-    const logs = this.buffer;
-    
-    switch (format.toLowerCase()) {
-      case 'json':
-        return JSON.stringify(logs, null, 2);
-      case 'csv':
-        return this.convertToCSV(logs);
-      case 'text':
-        return logs.map(log => 
-          `[${new Date(log.timestamp).toISOString()}] ${log.level.toUpperCase()} ${log.action}${log.data ? ': ' + JSON.stringify(log.data) : ''}`
-        ).join('\n');
-      default:
-        throw new Error(`Unsupported format: ${format}. Use 'json', 'csv', or 'text'.`);
-    }
   }
 }
 

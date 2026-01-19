@@ -30,47 +30,55 @@ class AICommitGenerator {
     this.hookManager = new HookManager();
     this.activityLogger = new ActivityLogger();
     this.efficientPromptBuilder = new EfficientPromptBuilder();
+    // Removed circuit breaker and performance manager for simplicity
   }
 
   /**
    * Generate AI commit messages
    */
   async generate(options = {}) {
-    const spinner = ora('Initializing AI commit generator...').start();
+    const spinner = ora({
+      text: chalk.blue('🚀 Initializing AI commit generator...'),
+      spinner: 'clock'
+    }).start();
     const startTime = Date.now();
+    let mergedOptions = {};
+    let diff = '';
 
     try {
       await this.activityLogger.info('generate_started', { options });
 
       // Load configuration
       const config = await this.configManager.load();
-      const mergedOptions = { ...config, ...options };
+      mergedOptions = { ...config, ...options };
 
       // Validate git repository
-      spinner.text = 'Checking git repository...';
+      spinner.text = chalk.blue('🔍 Checking git repository...');
       await this.gitManager.validateRepository();
       await this.activityLogger.logGitOperation('validate_repository', { success: true });
 
       // Get staged changes
-      spinner.text = 'Analyzing staged changes...';
-      const diff = await this.gitManager.getStagedDiff();
+      spinner.text = chalk.blue('📋 Analyzing staged changes...');
+      let diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
         spinner.fail(
-          'No staged changes found. Please stage your changes first.'
+          chalk.red('❌ No staged changes found. Please stage your changes first.')
         );
         await this.activityLogger.warn('generate_failed', { reason: 'no_staged_changes' });
         return;
       }
 
-      // Simplified cache check (exact match only)
+
+      // Advanced cache check with semantic similarity
       let messages = [];
       if (mergedOptions.cache !== false) {
-        spinner.text = 'Checking cache...';
+        spinner.text = chalk.blue('💾 Checking for cached results...');
         // Only cache exact matches to avoid complexity
         messages = await this.cacheManager.getValidated(diff);
         if (messages && messages.length > 0) {
           await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
+          spinner.succeed(chalk.green('✅ Found cached results'));
         } else {
           await this.activityLogger.debug('cache_miss', { diffLength: diff.length });
         }
@@ -79,11 +87,11 @@ class AICommitGenerator {
       // Advanced analysis and generation with intelligent merging
       if (!messages || messages.length === 0) {
         // Analyze repository context
-        spinner.text = 'Analyzing repository context...';
+        spinner.text = chalk.blue('🧩 Analyzing repository context...');
         const context = await this.analysisEngine.analyzeRepository();
 
         // Generate commit messages with sequential fallback
-        spinner.text = 'Generating commit messages with AI...';
+        spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
         messages = await this.generateWithSequentialFallback(diff, {
           context,
           count: parseInt(mergedOptions.count) || 3,
@@ -100,7 +108,7 @@ class AICommitGenerator {
         }
       }
 
-      spinner.succeed('Commit messages generated successfully!');
+      spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
       // Format messages
       const formattedMessages = messages.map((msg) =>
@@ -142,12 +150,19 @@ class AICommitGenerator {
         });
       }
     } catch (error) {
-      spinner.fail(`Failed to generate commit message: ${error.message}`);
-      await this.activityLogger.error('generate_failed', { 
-        error: error.message,
-        stack: error.stack,
+      spinner.fail(chalk.red(`❌ Failed to generate commit message: ${error.message}`));
+      await this.activityLogger.logDetailedError(error, {
+        operation: 'generate_commit',
         duration: Date.now() - startTime,
+        provider: mergedOptions?.provider || (await this.configManager.get('defaultProvider')),
+        diffLength: diff?.length,
+        cacheEnabled: mergedOptions?.cache !== false,
+        conventionalCommits: mergedOptions?.conventional,
       });
+
+      // Provide helpful suggestions based on error type
+      this.provideErrorSuggestions(error, mergedOptions);
+
       throw error;
     }
   }
@@ -811,83 +826,25 @@ class AICommitGenerator {
   }
 
   /**
-   * Detect if diff represents a plugin/dependency update (consolidated method)
-   */
-  detectPluginUpdate(diff) {
-    // Extract file paths from diff
-    const filePaths = (diff.match(/\+\+\+ b\/(.+)/g) || [])
-      .map(f => f.replace('+++ b/', '').trim());
-
-    // Comprehensive package file list
-    const packageFiles = [
-      'package.json',
-      'package-lock.json',
-      'yarn.lock',
-      'pnpm-lock.yaml',
-      'composer.json',
-      'composer.lock',
-      'requirements.txt',
-      'Pipfile.lock',
-      'Gemfile.lock',
-      'Cargo.lock',
-      'go.mod',
-      'go.sum',
-      'pom.xml',
-      'build.gradle'
-    ];
-
-    // Check for WordPress plugin/theme patterns
-    const wordpressPatterns = [
-      /wp-content\/plugins\//,
-      /wp-content\/themes\//,
-      /plugins\//,
-      /themes\//
-    ];
-
-    // Check if this is a WordPress plugin/theme update
-    const hasWordPressUpdate = filePaths.some(file =>
-      wordpressPatterns.some(pattern => pattern.test(file))
-    );
-
-    // Check for dependency update patterns in diff content
-    const depPatterns = [
-      /^\s*["'][^"']+"\s*:\s*["'][\^~\d][^"']*["']/gm, // package.json version updates
-      /^\+.*version\s*[:=]\s*["'][\d][^"']*["']/gm, // version property updates
-      /^\+.*\b(upgraded|updated|downgraded|bumped)\b.*\b(version|dependency|package)\b/gmi,
-      /^\+.*\b(install|require|include)\b.*\b(package|dependency|module|plugin)\b/gmi
-    ];
-
-    const hasDependencyChanges = depPatterns.some(pattern => pattern.test(diff));
-
-    // Also check for large lock files or vendor directories
-    const hasVendorChanges = filePaths.some(file =>
-      /vendor|node_modules|wp-content\/(plugins|themes)/.test(file) &&
-      (file.includes('lock') || file.endsWith('.json') || file.endsWith('.lock'))
-    );
-
-    return hasWordPressUpdate || hasDependencyChanges || hasVendorChanges ||
-           packageFiles.some(pkg => filePaths.some(f => f.endsWith(pkg)));
-  }
-
-  /**
-   * Generate commit messages with sequential fallback (Ollama first, Groq on failure)
+   * Generate commit messages with sequential fallback (preferred provider first, then backup)
    */
   async generateWithSequentialFallback(diff, options) {
     const { preferredProvider, context, ...generationOptions } = options;
-    const providers = preferredProvider ? [preferredProvider] : ['ollama', 'groq'];
-    
-    console.log(chalk.blue('🤖 Using sequential AI generation (Ollama first)...'));
-    
+
+    // Determine providers to use - preferred first, then fallback
+    const allProviders = ['ollama', 'groq'];
+    const providers = preferredProvider ?
+      [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
+      allProviders;
+
+    const mode = preferredProvider ? 'sequential fallback' : 'parallel';
+    console.log(chalk.blue(`🤖 Using ${mode} provider mode...`));
+
     // Step 1: Intelligent diff management
     const diffManagement = this.manageDiffForAI(diff);
     console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
-    
-    // Special indicator for plugin updates
-    if (diffManagement.info.pluginUpdate) {
-      console.log(chalk.yellow(`🔌 Plugin/dependency update detected - avoiding chunking`));
-    }
-    
+
     // Enrich options with context
     const enrichedOptions = {
       ...generationOptions,
@@ -900,22 +857,31 @@ class AICommitGenerator {
       },
     };
 
-    // Step 2: Try providers sequentially
+    // Step 2: Use sequential fallback mode
+    return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
+  }
+
+  /**
+   * Generate commit messages with sequential provider processing (with fallback)
+   */
+  async generateWithSequentialProviders(diffManagement, options, providers) {
+    const startTime = Date.now();
+
+    // Try providers sequentially
     for (const providerName of providers) {
-      const startTime = Date.now();
-      
       try {
+        const startProviderTime = Date.now();
         const provider = AIProviderFactory.create(providerName);
+
         let messages;
         let actualPrompt;
 
-        // Step 3: Handle different diff strategies
+        // Handle different diff strategies
         if (diffManagement.strategy === 'full') {
           // Simple case: full diff in one prompt
-          const prompt = provider.buildPrompt(diffManagement.data, enrichedOptions);
-          messages = await provider.generateCommitMessages(diffManagement.data, enrichedOptions);
+          const prompt = provider.buildPrompt(diffManagement.data, options);
+          messages = await provider.generateCommitMessages(diffManagement.data, options);
           actualPrompt = prompt;
-          
         } else {
           // Complex case: chunked processing
           console.log(
@@ -925,20 +891,20 @@ class AICommitGenerator {
           );
 
           const chunkMessages = [];
-          
+
           for (let i = 0; i < diffManagement.data.length; i++) {
             const chunk = diffManagement.data[i];
             const isLastChunk = i === diffManagement.data.length - 1;
 
             const chunkOptions = {
-              ...enrichedOptions,
+              ...options,
               chunkIndex: i,
               totalChunks: diffManagement.data.length,
               isLastChunk,
               chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
               // Add chunk-specific context
               context: {
-                ...enrichedOptions.context,
+                ...options.context,
                 chunkInfo: {
                   index: i,
                   total: diffManagement.data.length,
@@ -954,35 +920,35 @@ class AICommitGenerator {
             // Generate with this chunk
             const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
             const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
-            
+
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
-              
+
               // Log the actual prompt for this chunk
               await this.activityLogger.logAIInteraction(
                 providerName,
                 'commit_generation_chunk',
                 chunkPrompt,
                 chunkResult[0], // Log first message
-                Date.now() - startTime,
+                Date.now() - startProviderTime,
                 true
               );
             }
           }
 
-          messages = this.selectBestMessages(chunkMessages, generationOptions.count || 3);
+          messages = this.selectBestMessages(chunkMessages, options.count || 3);
           actualPrompt = `Chunked processing (${diffManagement.chunks} chunks)`;
         }
 
-        const responseTime = Date.now() - startTime;
-        
+        const responseTime = Date.now() - startProviderTime;
+
         if (messages && messages.length > 0) {
           await this.statsManager.recordCommit(providerName);
-          
+
           console.log(
             chalk.green(`✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`)
           );
-          
+
           // Log the actual interaction with full prompt
           await this.activityLogger.logAIInteraction(
             providerName,
@@ -992,7 +958,7 @@ class AICommitGenerator {
             responseTime,
             true
           );
-          
+
           // Log diff management info
           await this.activityLogger.info('diff_management', {
             ...diffManagement.info,
@@ -1000,9 +966,9 @@ class AICommitGenerator {
             responseTime,
             success: true
           });
-          
+
           // Log context usage for debugging
-          if (enrichedOptions.context.hasSemanticContext) {
+          if (options.context.hasSemanticContext) {
             console.log(
               chalk.blue(`🧠 Used semantic context for ${providerName}`)
             );
@@ -1012,21 +978,21 @@ class AICommitGenerator {
         }
       } catch (error) {
         const responseTime = Date.now() - startTime;
-        
+
         console.warn(
           chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
         );
-        
+
         // Log failed interaction
         await this.activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' ? diff : `Chunked processing (${diffManagement.chunks} chunks)`,
+          diffManagement.strategy === 'full' ? diffManagement.data : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
           responseTime,
           false
         );
-        
+
         // Log diff management info for failure
         await this.activityLogger.info('diff_management', {
           ...diffManagement.info,
@@ -1035,26 +1001,13 @@ class AICommitGenerator {
           success: false,
           error: error.message
         });
-        
-        // If preferred provider fails, try Groq as fallback
-        if (providerName === preferredProvider && preferredProvider !== 'groq') {
-          console.log(chalk.blue('🔄 Falling back to Groq...'));
-          try {
-            const groqProvider = AIProviderFactory.create('groq');
-            const messages = await groqProvider.generateCommitMessages(diffManagement.data, enrichedOptions);
-            if (messages && messages.length > 0) {
-              await this.statsManager.recordCommit('groq');
-              console.log(chalk.green(`✅ Groq fallback generated ${messages.length} messages`));
-              return messages;
-            }
-          } catch (fallbackError) {
-            console.warn(chalk.yellow(`⚠️  Groq fallback also failed: ${fallbackError.message}`));
-          }
-        }
+
+        // Continue to next provider in sequence
+        continue;
       }
     }
 
-    throw new Error('All AI providers failed to generate commit messages');
+    throw new Error('All AI providers failed to generate commit messages.');
   }
 
   /**
@@ -1068,144 +1021,368 @@ class AICommitGenerator {
 
 
   /**
-   * Intelligent diff management for optimal AI generation
-   */
+    * Intelligent diff management for optimal AI generation
+    * Simplified: always send full diff for faster commit generation
+    */
   manageDiffForAI(diff, options = {}) {
-    const MAX_DIFF_SIZE = 15000; // 15K chars max for single prompt
-    const CHUNK_SIZE = 8000; // 8K chars for chunks
-    const MAX_CONTEXT_LINES = 50; // Max context lines per chunk
-
     const diffSize = diff.length;
+    const MAX_SAFE_SIZE = 400000; // ~100K tokens after prompt overhead, fits in Groq's 128K limit
 
-    // Check if this is a plugin/dependency update that should avoid chunking
-    const isPluginUpdate = this.detectPluginUpdate(diff);
-
-    // Strategy 1: Use full diff if under limit OR if plugin update (but not extremely large)
-    if (diffSize <= MAX_DIFF_SIZE || (isPluginUpdate && diffSize < 100000)) {
-      const reasoning = isPluginUpdate
-        ? 'Plugin/dependency update detected, avoiding chunking for better context'
-        : 'Diff size manageable, using full content';
-
+    // Truncate very large diffs to fit within AI model limits
+    if (diffSize > MAX_SAFE_SIZE) {
+      console.log(chalk.yellow(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), truncating for AI processing`));
       return {
         strategy: 'full',
-        data: diff,
+        data: diff.substring(0, MAX_SAFE_SIZE),
         chunks: null,
         info: {
-          strategy: 'full',
-          size: diffSize,
+          strategy: 'truncated',
+          size: MAX_SAFE_SIZE,
           chunks: 1,
-          reasoning,
-          pluginUpdate: isPluginUpdate
+          reasoning: 'Diff truncated to fit within AI model token limits',
+          truncated: true,
+          originalSize: diffSize
         }
       };
     }
 
-    // Safety fallback: if diff is extremely large (>1MB), force chunking regardless of plugin detection
-    if (diffSize > 1000000) {
-      console.log(chalk.yellow(`⚠️  Extremely large diff detected (${Math.round(diffSize/1024/1024)}MB), forcing chunking`));
-    }
-
-    // Strategy 2: Chunk large diffs intelligently
-    const lines = diff.split('\n');
-    const chunks = [];
-    let currentChunk = [];
-    let currentSize = 0;
-    let inContext = false;
-    let contextBuffer = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const lineSize = line.length + 1; // +1 for newline
-
-      // Detect diff headers and file boundaries
-      const isFileHeader = line.startsWith('diff --git') ||
-                           line.startsWith('index ') ||
-                           line.startsWith('---') ||
-                           line.startsWith('+++');
-
-      const isContextLine = line.startsWith(' ') || line.startsWith('');
-      const isCodeLine = line.startsWith('+') || line.startsWith('-');
-
-      // Start new chunk if size limit reached and we're at a good boundary
-      if (currentSize + lineSize > CHUNK_SIZE &&
-          (isFileHeader || (inContext && contextBuffer.length >= MAX_CONTEXT_LINES))) {
-
-        // Add current chunk to list
-        chunks.push({
-          content: currentChunk.join('\n'),
-          size: currentSize,
-          lines: currentChunk.length,
-          context: this.extractChunkContext(currentChunk.join('\n'))
-        });
-
-        // Reset for next chunk, but carry some context
-        currentChunk = [...contextBuffer.slice(-10)]; // Keep last 10 context lines
-        currentSize = currentChunk.join('\n').length + 1;
-        contextBuffer = [];
-        inContext = false;
+    return {
+      strategy: 'full',
+      data: diff,
+      chunks: null,
+      info: {
+        strategy: 'full',
+        size: diffSize,
+        chunks: 1,
+        reasoning: 'Full diff sent to AI for fast processing',
+        pluginUpdate: false
       }
+    };
+  }
+  
+  /**
+   * Parse conflict markers from content and extract both versions
+   */
+  parseConflictBlocks(content) {
+    const conflicts = [];
+    const lines = content.split('\n');
+    let currentConflict = null;
+    let collectingCurrent = false;
+    let collectingIncoming = false;
 
-      // Add line to current chunk
-      currentChunk.push(line);
-      currentSize += lineSize;
-
-      // Track context for intelligent boundaries
-      if (isContextLine) {
-        contextBuffer.push(line);
-        inContext = true;
-      } else if (isCodeLine) {
-        inContext = false;
-      }
-
-      // Reset context buffer at file boundaries
-      if (isFileHeader) {
-        contextBuffer = [];
+    for (const line of lines) {
+      if (line.startsWith('<<<<<<<')) {
+        currentConflict = {
+          startLine: lines.indexOf(line),
+          currentVersion: [],
+          incomingVersion: []
+        };
+        collectingCurrent = true;
+        collectingIncoming = false;
+      } else if (line.startsWith('=======')) {
+        collectingCurrent = false;
+        collectingIncoming = true;
+      } else if (line.startsWith('>>>>>>>')) {
+        if (currentConflict) {
+          currentConflict.endLine = lines.indexOf(line);
+          currentConflict.currentVersion = currentConflict.currentVersion.join('\n');
+          currentConflict.incomingVersion = currentConflict.incomingVersion.join('\n');
+          conflicts.push(currentConflict);
+        }
+        currentConflict = null;
+        collectingCurrent = false;
+        collectingIncoming = false;
+      } else if (currentConflict) {
+        if (collectingCurrent) {
+          currentConflict.currentVersion.push(line);
+        } else if (collectingIncoming) {
+          currentConflict.incomingVersion.push(line);
+        }
       }
     }
 
-    // Add final chunk
-    if (currentChunk.length > 0) {
-      chunks.push({
-        content: currentChunk.join('\n'),
-        size: currentChunk.join('\n').length,
-        lines: currentChunk.length,
-        context: this.extractChunkContext(currentChunk.join('\n'))
+    return conflicts;
+  }
+
+  /**
+   * Resolve a single conflict block using AI
+   */
+  async resolveConflictWithAI(filePath, currentVersion, incomingVersion, language = 'javascript') {
+    const prompt = `You are an expert software developer. Resolve a git merge conflict intelligently.
+
+CONTEXT:
+- File: ${filePath}
+- Language: ${language}
+- Original code (HEAD): The code before the conflict
+- Incoming code: The new code that conflicts with HEAD
+
+INSTRUCTIONS:
+1. Analyze both versions and their purpose
+2. Merge them intelligently - keep functionality from BOTH if possible
+3. If the same lines were modified differently, choose the better implementation
+4. Return ONLY the resolved code - NO explanations, NO comments about conflicts
+5. Preserve all working code from both versions
+
+CURRENT VERSION (HEAD):
+\`\`\`
+${currentVersion}
+\`\`\`
+
+INCOMING VERSION:
+\`\`\`
+${incomingVersion}
+\`\`\`
+
+RESOLVED CODE (output only):
+`;
+
+    try {
+      const config = await this.configManager.getAll();
+      const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
+      
+      const messages = await provider.generateCommitMessages(
+        `RESOLVE CONFLICT IN ${filePath}:\n\n${prompt}`,
+        { count: 1 }
+      );
+
+      if (messages && messages.length > 0) {
+        let resolved = messages[0].trim();
+        
+        // Clean up any markdown code blocks if present
+        resolved = resolved.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
+        
+        return resolved;
+      }
+    } catch (error) {
+      console.warn(chalk.yellow(`AI resolution failed, using current version: ${error.message}`));
+    }
+
+    // Fallback: keep current version
+    return currentVersion;
+  }
+
+  /**
+   * Handle conflict markers in a diff using AI-powered resolution
+   */
+  async handleConflictMarkers(diff, filePath) {
+    const conflictPattern = /<<<<<<< HEAD\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> .+/g;
+    const matches = [...diff.matchAll(conflictPattern)];
+
+    if (matches.length === 0) {
+      return { cleanedDiff: diff, hasConflicts: false, resolved: [] };
+    }
+
+    console.log(chalk.yellow(`⚠️  Found ${matches.length} conflict(s) in ${filePath}`));
+    console.log(chalk.blue(`🧠 Using AI to intelligently resolve conflicts...`));
+
+    let cleanedDiff = diff;
+    const resolved = [];
+    let aiUsed = false;
+
+    for (const match of matches) {
+      const currentVersion = match[1].trim();
+      const incomingVersion = match[2].trim();
+      const conflictBlock = match[0];
+
+      // Detect language from file extension
+      const ext = filePath.split('.').pop();
+      const langMap = {
+        'js': 'javascript', 'ts': 'typescript', 'py': 'python',
+        'php': 'php', 'html': 'html', 'css': 'css',
+        'json': 'json', 'md': 'markdown', 'sql': 'sql',
+        'java': 'java', 'go': 'go', 'rs': 'rust'
+      };
+      const language = langMap[ext] || 'javascript';
+
+      // Use AI to resolve the conflict
+      let resolvedVersion;
+      try {
+        resolvedVersion = await this.resolveConflictWithAI(
+          filePath,
+          currentVersion,
+          incomingVersion,
+          language
+        );
+        aiUsed = true;
+      } catch (error) {
+        console.warn(chalk.yellow(`AI resolution failed: ${error.message}`));
+        // Fallback to current version
+        resolvedVersion = currentVersion;
+      }
+
+      // Replace the conflict block with resolved version
+      cleanedDiff = cleanedDiff.replace(conflictBlock, resolvedVersion);
+
+      resolved.push({
+        file: filePath,
+        resolutionType: aiUsed ? 'ai-merged' : 'kept-current',
+        linesKept: resolvedVersion.split('\n').length
       });
     }
 
+    const successType = aiUsed ? 'AI-merged' : 'fallback';
+    console.log(chalk.green(`✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`));
+
     return {
-      strategy: 'chunked',
-      data: chunks,
-      chunks: chunks.length,
-      info: {
-        strategy: 'intelligent_chunking',
-        originalSize: diffSize,
-        chunkCount: chunks.length,
-        avgChunkSize: Math.round(diffSize / chunks.length),
-        reasoning: `Diff too large (${diffSize} chars), intelligently chunked into ${chunks.length} parts with preserved context`
-      }
+      cleanedDiff,
+      hasConflicts: true,
+      resolved,
+      aiUsed
     };
   }
 
   /**
-   * Extract key context from chunk for better generation
+   * Detect and clean up conflict markers in all staged files using AI
    */
-  extractChunkContext(chunkContent) {
-    const files = chunkContent.match(/\+\+\+ b\/(.+)/g) || [];
-    const fileNames = files.map(f => f.replace('+++ b/', '').trim());
-    
-    const functions = (chunkContent.match(/\+.*function\s+(\w+)/g) || [])
-      .map(m => m.replace(/\+.*function\s+/, ''));
-    
-    const classes = (chunkContent.match(/\+.*class\s+(\w+)/g) || [])
-      .map(m => m.replace(/\+.*class\s+/, ''));
-    
+  async detectAndCleanupConflictMarkers() {
+    const diff = await this.gitManager.getStagedDiff();
+
+    if (!diff || !/<<<<<<<|=======|>>>>>>>/.test(diff)) {
+      return { cleaned: false, filesFixed: 0, diff };
+    }
+
+    console.log(chalk.yellow('\n🔧 Detected conflict markers in staged changes'));
+
+    // Parse diff to find which files have conflicts
+    const filePattern = /diff --git a\/(.+?) b\/(.+)/g;
+    const files = [];
+    let match;
+    while ((match = filePattern.exec(diff)) !== null) {
+      files.push({ fileA: match[1], fileB: match[2] });
+    }
+
+    let cleanedDiff = diff;
+    let totalResolved = 0;
+    let aiUsed = false;
+
+    for (const file of files) {
+      // Extract file diff
+      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const fileDiffPattern = new RegExp(
+        `diff --git a/${escapeRegExp(file.fileA)} b/${escapeRegExp(file.fileB)}[\\s\\S]*?(?=diff --git a|$)`,
+        'g'
+      );
+      const fileMatches = [...diff.matchAll(fileDiffPattern)];
+
+      for (const fileMatch of fileMatches) {
+        const fileDiff = fileMatch[0];
+        if (/<<<<<<<|=======|>>>>>>>/.test(fileDiff)) {
+          // Check if file exists and read it
+          const fullPath = path.isAbsolute(file.fileB)
+            ? file.fileB
+            : path.resolve(process.cwd(), file.fileB);
+
+          try {
+            const content = await fs.readFile(fullPath, 'utf8');
+            if (/<<<<<<<|=======|>>>>>>>/.test(content)) {
+              // Parse and resolve conflicts using AI
+              const conflicts = this.parseConflictBlocks(content);
+              let cleanedContent = content;
+              let fileResolved = 0;
+              let fileAiUsed = false;
+
+              for (const conflict of conflicts) {
+                // Resolve each conflict block
+                const ext = file.fileB.split('.').pop();
+                const langMap = {
+                  'js': 'javascript', 'ts': 'typescript', 'py': 'python',
+                  'php': 'php', 'html': 'html', 'css': 'css',
+                  'json': 'json', 'md': 'markdown', 'sql': 'sql'
+                };
+                const language = langMap[ext] || 'javascript';
+
+                try {
+                  const resolved = await this.resolveConflictWithAI(
+                    file.fileB,
+                    conflict.currentVersion,
+                    conflict.incomingVersion,
+                    language
+                  );
+                  
+                  // Replace the conflict block
+                  const conflictBlockStart = content.indexOf('<<<<<<<', conflict.startLine > 0 ? content.lastIndexOf('\n', conflict.startLine) : 0);
+                  const conflictBlockEnd = content.indexOf('>>>>>>>', conflictBlockStart) + content.substring(content.indexOf('>>>>>>>', conflictBlockStart)).indexOf('\n') + 1;
+                  
+                  if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
+                    cleanedContent = content.substring(0, conflictBlockStart) + resolved + '\n' + content.substring(conflictBlockEnd);
+                  } else {
+                    cleanedContent = cleanedContent.replace(
+                      `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
+                      resolved + '\n'
+                    );
+                  }
+                  
+                  fileResolved++;
+                  fileAiUsed = true;
+                } catch (e) {
+                  // Fallback: use current version
+                  cleanedContent = cleanedContent.replace(
+                    `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
+                    conflict.currentVersion + '\n'
+                  );
+                }
+              }
+
+              if (fileResolved > 0) {
+                await fs.writeFile(fullPath, cleanedContent, 'utf8');
+                console.log(chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`));
+                totalResolved += fileResolved;
+                if (fileAiUsed) aiUsed = true;
+              }
+            }
+          } catch (e) {
+            // File might not exist (deleted), skip
+          }
+        }
+      }
+    }
+
     return {
-      files: fileNames,
-      functions: functions.slice(0, 5), // Top 5 functions
-      classes: classes.slice(0, 5), // Top 5 classes
-      hasSignificantChanges: functions.length > 0 || classes.length > 0
+      cleaned: totalResolved > 0,
+      filesFixed: totalResolved,
+      diff: cleanedDiff,
+      aiUsed
     };
+  }
+
+  /**
+   * Clean conflict markers from content string (simple version - keeps HEAD)
+   */
+  cleanConflictMarkers(content) {
+    const lines = content.split('\n');
+    const result = [];
+    let inConflict = false;
+    let collectingHead = true;
+    let headLines = [];
+
+    for (const line of lines) {
+      if (line.startsWith('<<<<<<<')) {
+        inConflict = true;
+        collectingHead = true;
+        continue;
+      }
+
+      if (line.startsWith('=======')) {
+        collectingHead = false;
+        continue;
+      }
+
+      if (line.startsWith('>>>>>>>')) {
+        inConflict = false;
+        result.push(...headLines);
+        headLines = [];
+        continue;
+      }
+
+      if (inConflict) {
+        if (collectingHead) {
+          headLines.push(line);
+        }
+      } else {
+        result.push(line);
+      }
+    }
+    return result.join('\n').trim();
   }
 
   /**
@@ -1298,8 +1475,6 @@ class AICommitGenerator {
     
     console.log(chalk.dim('\n💡 Tip: Use --export to get detailed data for further analysis'));
   }
-
-
 }
 
 module.exports = AICommitGenerator;// Test change for prompt improvement

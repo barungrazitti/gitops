@@ -70,8 +70,8 @@ No linting/formatting tools - removed per user request.
 
 ### Sequential AI Generation
 
-- **Ollama First**: Tries Ollama (local AI) first for better context awareness
-- **Groq Fallback**: Falls back to Groq (cloud AI) if Ollama fails
+- **Groq First**: Tries Groq (cloud AI) first for fast inference
+- **Ollama Fallback**: Falls back to Ollama (local AI) if Groq fails
 - **No Parallel Overhead**: Simpler, faster single-provider approach
 - **Smart Context**: Uses semantic analysis for better commit messages
 
@@ -144,7 +144,7 @@ Per user request, the following has been completely removed:
 ## Current Architecture
 
 The codebase now focuses on:
-1. **Ollama-first AI generation** with Groq fallback
+1. **Groq-first AI generation** with Ollama fallback
 2. **Simplified provider selection** - no complex merging logic
 3. **Highly relevant** commit message generation
 4. **Semantic analysis** for better context understanding

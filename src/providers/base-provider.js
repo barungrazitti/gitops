@@ -816,19 +816,6 @@ Use: "config: update database connection settings for production"
   }
 
   /**
-   * Get provider configuration
-   */
-  async getConfig() {
-    try {
-      const config = await this.configManager.getProviderConfig(this.name);
-      return config || {};
-    } catch (error) {
-      console.warn(`Failed to get config for ${this.name}:`, error.message);
-      return {};
-    }
-  }
-
-  /**
    * Chunk diff into smaller pieces
    */
   chunkDiff(diff, maxTokens = 4000) {
