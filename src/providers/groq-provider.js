@@ -47,17 +47,10 @@ class GroqProvider extends BaseProvider {
     await this.initializeClient();
     const config = await this.getConfig();
 
-    // Groq has strict TPM limits, so we need to be more aggressive with chunking
-    const maxTokens = 4000; // Leave room for system message and response
+    // Send full diff without chunking for fast processing
     const prompt = this.buildPrompt(diff, options);
 
-    // Check if we need to chunk the diff
-    const estimatedTokens = this.estimateTokens(prompt);
-    if (estimatedTokens > maxTokens) {
-      return await this.generateFromChunks(diff, options, maxTokens);
-    }
-
-      return await this.withRetry(async () => {
+    return await this.withRetry(async () => {
         return await this.circuitBreaker.execute(async () => {
           const response = await this.client.chat.completions.create({
             model: options.model || config.model || 'llama-3.1-8b-instant',
