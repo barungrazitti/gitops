@@ -18,6 +18,7 @@ const ActivityLogger = require('./core/activity-logger');
 const fs = require('fs-extra');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
 const PerformanceUtils = require('./utils/performance-utils');
+const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
 
 class AICommitGenerator {
   constructor() {
@@ -30,7 +31,7 @@ class AICommitGenerator {
     this.hookManager = new HookManager();
     this.activityLogger = new ActivityLogger();
     this.efficientPromptBuilder = new EfficientPromptBuilder();
-    // Removed circuit breaker and performance manager for simplicity
+    this.diffProcessor = new OptimizedDiffProcessor();
   }
 
   /**
@@ -840,12 +841,7 @@ class AICommitGenerator {
     const mode = preferredProvider ? 'sequential fallback' : 'parallel';
     console.log(chalk.blue(`🤖 Using ${mode} provider mode...`));
 
-    // Step 1: Intelligent diff management
-    const diffManagement = this.manageDiffForAI(diff);
-    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
-    console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
-
-    // Enrich options with context
+    // Enrich options with context first
     const enrichedOptions = {
       ...generationOptions,
       context: {
@@ -856,6 +852,11 @@ class AICommitGenerator {
         ),
       },
     };
+
+    // Step 1: Intelligent diff management with semantic context
+    const diffManagement = this.manageDiffForAI(diff, enrichedOptions);
+    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
+    console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
 
     // Step 2: Use sequential fallback mode
     return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
@@ -877,8 +878,8 @@ class AICommitGenerator {
         let actualPrompt;
 
         // Handle different diff strategies
-        if (diffManagement.strategy === 'full') {
-          // Simple case: full diff in one prompt
+        if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
+          // Simple case: diff in one prompt (full or smart-truncated)
           const prompt = provider.buildPrompt(diffManagement.data, options);
           messages = await provider.generateCommitMessages(diffManagement.data, options);
           actualPrompt = prompt;
@@ -987,7 +988,9 @@ class AICommitGenerator {
         await this.activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' ? diffManagement.data : `Chunked processing (${diffManagement.chunks} chunks)`,
+          diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated' 
+            ? diffManagement.data 
+            : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
           responseTime,
           false
@@ -1022,42 +1025,229 @@ class AICommitGenerator {
 
   /**
     * Intelligent diff management for optimal AI generation
-    * Simplified: always send full diff for faster commit generation
+    * Smart truncation that preserves file headers and prioritizes significant changes
     */
   manageDiffForAI(diff, options = {}) {
     const diffSize = diff.length;
     const MAX_SAFE_SIZE = 15000; // ~4000 tokens, safe for all models including 6K TPM limits
+    const { context } = options;
 
-    // Truncate very large diffs to fit within AI model limits
-    if (diffSize > MAX_SAFE_SIZE) {
-      console.log(chalk.yellow(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), truncating for AI processing`));
+    if (diffSize <= MAX_SAFE_SIZE) {
       return {
         strategy: 'full',
-        data: diff.substring(0, MAX_SAFE_SIZE),
+        data: diff,
         chunks: null,
         info: {
-          strategy: 'truncated',
-          size: MAX_SAFE_SIZE,
+          strategy: 'full',
+          size: diffSize,
           chunks: 1,
-          reasoning: 'Diff truncated to fit within AI model token limits',
-          truncated: true,
-          originalSize: diffSize
+          reasoning: 'Full diff sent to AI for fast processing',
+          pluginUpdate: false
         }
       };
     }
 
+    console.log(chalk.yellow(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), applying smart truncation`));
+
+    const smartTruncated = this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
     return {
-      strategy: 'full',
-      data: diff,
+      strategy: 'smart-truncated',
+      data: smartTruncated.data,
       chunks: null,
       info: {
-        strategy: 'full',
-        size: diffSize,
+        strategy: 'smart-truncated',
+        size: smartTruncated.data.length,
         chunks: 1,
-        reasoning: 'Full diff sent to AI for fast processing',
-        pluginUpdate: false
+        reasoning: smartTruncated.reasoning,
+        truncated: true,
+        originalSize: diffSize,
+        preservedFiles: smartTruncated.preservedFiles,
+        skippedFiles: smartTruncated.skippedFiles
       }
     };
+  }
+
+  /**
+   * Smart truncate diff to preserve most relevant content
+   */
+  smartTruncateDiff(diff, maxSize, semanticContext) {
+    const fileChunks = this.parseDiffIntoFileChunks(diff);
+
+    const IGNORED_PATTERNS = [
+      'node_modules/', 'dist/', 'build/', 'vendor/', '.git/',
+      '.lock', '.min.js', '.min.css', '.map'
+    ];
+
+    const filteredChunks = fileChunks.filter(fc => {
+      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
+    });
+
+    const scoredChunks = filteredChunks.map(fc => {
+      const score = this.scoreFileChunk(fc, semanticContext);
+      return { ...fc, score };
+    });
+
+    scoredChunks.sort((a, b) => b.score - a.score);
+
+    let selectedContent = [];
+    let preservedFiles = [];
+    let skippedFiles = [];
+    let currentSize = 0;
+    const HEADER_BUDGET = 500;
+
+    for (const chunk of scoredChunks) {
+      const headerSize = chunk.header.length;
+      const contentSize = chunk.content.length;
+      const totalSize = headerSize + contentSize;
+
+      if (currentSize + totalSize <= maxSize) {
+        selectedContent.push(chunk.header);
+        if (chunk.content.trim()) {
+          selectedContent.push(chunk.content);
+        }
+        currentSize += totalSize;
+        preservedFiles.push(chunk.fileName);
+      } else {
+        skippedFiles.push(chunk);
+      }
+
+      if (currentSize >= maxSize * 0.9) {
+        break;
+      }
+    }
+
+    let remainingHeaderSpace = Math.max(0, maxSize - currentSize);
+    const skippedHeaders = [];
+    for (const chunk of skippedFiles) {
+      if (remainingHeaderSpace <= 0) break;
+      if (chunk.header.length <= remainingHeaderSpace) {
+        skippedHeaders.push(chunk.header);
+        remainingHeaderSpace -= chunk.header.length;
+        preservedFiles.push(chunk.fileName);
+      }
+    }
+
+    let reasoning = `Preserved ${preservedFiles.length} files with full content, ${skippedFiles.length - skippedHeaders.length} skipped (node_modules ignored)`;
+    if (preservedFiles.length === 0 && filteredChunks.length > 0) {
+      reasoning = 'No files fit within token limits - diff too large';
+    }
+
+    return {
+      data: [...selectedContent, ...skippedHeaders].join('\n'),
+      reasoning,
+      preservedFiles,
+      skippedFiles: skippedFiles.map(f => f.fileName)
+    };
+  }
+
+  /**
+   * Parse diff into individual file chunks with headers and content
+   */
+  parseDiffIntoFileChunks(diff) {
+    const fileChunks = [];
+    const lines = diff.split('\n');
+    let currentFile = null;
+    let currentContent = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.startsWith('diff --git')) {
+        if (currentFile) {
+          fileChunks.push({
+            header: currentFile.header,
+            content: currentContent.join('\n'),
+            fileName: currentFile.fileName,
+            isNewFile: currentFile.isNewFile,
+            changeCount: currentFile.changeCount
+          });
+        }
+
+        const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
+        const fileName = fileMatch ? fileMatch[2] : 'unknown';
+        let isNewFile = line.includes('/dev/null') || (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
+        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
+          isNewFile = true;
+        }
+
+        currentFile = {
+          header: line,
+          fileName,
+          isNewFile,
+          changeCount: 0
+        };
+        currentContent = [];
+      } else if (currentFile && (line.startsWith('@@ ') || line.startsWith('+') || line.startsWith('-'))) {
+        currentContent.push(line);
+        if (line.startsWith('+') || line.startsWith('-')) {
+          currentFile.changeCount++;
+        }
+      } else if (currentFile) {
+        currentContent.push(line);
+      }
+    }
+
+    if (currentFile) {
+      fileChunks.push({
+        header: currentFile.header,
+        content: currentContent.join('\n'),
+        fileName: currentFile.fileName,
+        isNewFile: currentFile.isNewFile,
+        changeCount: currentFile.changeCount
+      });
+    }
+
+    return fileChunks;
+  }
+
+  /**
+   * Score a file chunk by significance (higher = more important)
+   */
+  scoreFileChunk(chunk, semanticContext) {
+    let score = 0;
+
+    if (chunk.isNewFile) {
+      score += 50;
+      if (chunk.fileName.includes('package.json') ||
+          chunk.fileName.includes('composer.json') ||
+          chunk.fileName.includes('requirements.txt')) {
+        score += 100;
+      }
+    }
+
+    score += Math.min(chunk.changeCount / 10, 30);
+
+    const ext = chunk.fileName.split('.').pop();
+    const importantExts = ['js', 'ts', 'py', 'php', 'java', 'go', 'rs'];
+    if (importantExts.includes(ext)) {
+      score += 20;
+    }
+
+    const ignoredPatterns = ['node_modules', '.git', 'dist', 'build', 'vendor', '.lock'];
+    if (ignoredPatterns.some(p => chunk.fileName.includes(p))) {
+      score -= 50;
+    }
+
+    const semanticFiles = semanticContext?.files?.semantic || {};
+    for (const [filePath, info] of Object.entries(semanticFiles)) {
+      if (chunk.fileName.includes(filePath) || filePath.includes(chunk.fileName)) {
+        if (info?.functions?.length > 0 || info?.classes?.length > 0) {
+          score += 40;
+        }
+        if (info?.significance === 'high') {
+          score += 60;
+        }
+      }
+    }
+
+    if (chunk.fileName.includes('index.') ||
+        chunk.fileName.includes('main.') ||
+        chunk.fileName.includes('app.') ||
+        chunk.fileName.includes('config.')) {
+      score += 25;
+    }
+
+    return score;
   }
   
   /**

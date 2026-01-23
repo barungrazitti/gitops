@@ -276,8 +276,105 @@ describe('AICommitGenerator', () => {
       const largeDiff = 'diff --git a/test.js b/test.js\n' + 'a'.repeat(500000);
       const result = generator.manageDiffForAI(largeDiff);
 
-      expect(result.strategy).toBe('full');
+      expect(result.strategy).toBe('smart-truncated');
       expect(result.data.length).toBeLessThan(largeDiff.length);
+      expect(result.info.truncated).toBe(true);
+      expect(result.info.preservedFiles).toBeDefined();
+      expect(result.info.reasoning).toBeDefined();
+    });
+
+    it('should preserve new files with higher priority', () => {
+      const newFileDiff = `diff --git a/new-feature/new-file.js b/new-feature/new-file.js
+new file mode 100644
+--- /dev/null
++++ b/new-feature/new-file.js
+@@ -0,0 +1,500 @@
++console.log('new file');
++${Array(500).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
+diff --git a/old-file.js b/old-file.js
+--- a/old-file.js
++++ b/old-file.js
+@@ -1,3 +1,503 @@
+ const x = 1;
++const added = 'change';
++${Array(500).fill(0).map((_, i) => `+const y${i} = ${i};`).join('\n')}
+ const y = 2;`;
+      const result = generator.manageDiffForAI(newFileDiff);
+      expect(result.info.strategy).toBe('smart-truncated');
+      expect(result.info.preservedFiles).toContain('new-feature/new-file.js');
+    });
+
+    it('should filter out node_modules files', () => {
+      const diffWithNodeModules = `diff --git a/src/main.js b/src/main.js
+--- a/src/main.js
++++ b/src/main.js
+@@ -1,2 +1,1000 @@
+ console.log('hello');
++${Array(1000).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
+diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
+--- a/node_modules/some-lib/index.js
++++ b/node_modules/some-lib/index.js
+@@ -1,2 +1,3 @@
+ module.exports = {};
++const x = 1;`;
+      const result = generator.manageDiffForAI(diffWithNodeModules);
+      expect(result.info.strategy).toBe('smart-truncated');
+      expect(result.info.preservedFiles).toContain('src/main.js');
+      expect(result.info.preservedFiles).not.toContain('node_modules/some-lib/index.js');
+      expect(result.data).not.toContain('node_modules');
+    });
+
+    it('should use semantic context for prioritization', () => {
+      const multiFileDiff = `diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1 +1 @@
+-{"version": "1.0.0"}
++{"version": "1.1.0"}
+diff --git a/src/main.js b/src/main.js
+--- a/src/main.js
++++ b/src/main.js
+@@ -1,3 +1,4 @@
++import newFeature from './new-feature';
+ function main() {
+   console.log('hello');
+ }
+diff --git a/src/utils.js b/src/utils.js
+--- a/src/utils.js
++++ b/src/utils.js
+@@ -1,2 +1,3 @@
+ export const util1 = () => {};
++export const util2 = () => {};`;
+      const semanticContext = {
+        files: {
+          semantic: {
+            'src/main.js': { significance: 'high', functions: ['main'] },
+            'src/utils.js': { significance: 'low', functions: [] }
+          }
+        }
+      };
+      const result = generator.manageDiffForAI(multiFileDiff, { context: semanticContext });
+      expect(result.data).toContain('src/main.js');
+    });
+
+    it('should filter out node_modules files', () => {
+      const diffWithNodeModules = `diff --git a/src/main.js b/src/main.js
+--- a/src/main.js
++++ b/src/main.js
+@@ -1,2 +1,1000 @@
+ console.log('hello');
++${Array(1000).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
+diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
+--- a/node_modules/some-lib/index.js
++++ b/node_modules/some-lib/index.js
+@@ -1,2 +1,3 @@
+ module.exports = {};
++const x = 1;`;
+      const result = generator.manageDiffForAI(diffWithNodeModules);
+      expect(result.info.strategy).toBe('smart-truncated');
+      expect(result.info.preservedFiles).toContain('src/main.js');
+      expect(result.info.preservedFiles).not.toContain('node_modules/some-lib/index.js');
+      expect(result.data).not.toContain('node_modules');
     });
   });
 
