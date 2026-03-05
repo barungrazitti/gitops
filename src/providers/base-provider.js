@@ -39,29 +39,43 @@ class BaseProvider {
   preprocessDiff(diff) {
     if (!diff) return '';
 
-    // Remove binary file indicators but keep everything else
     let processed = diff;
 
-    // Check for binary file lines and replace them
-    const lines = diff.split('\n');
-    const processedLines = lines.map(line => {
-      if (/^Binary files? .* differ$/.test(line)) {
-        return '[Binary file modified]';
-      }
-      return line;
-    });
-
-    processed = processedLines.join('\n');
-
     // Split into lines for intelligent processing
-    const processedLines2 = [];
+    const processedLines = [];
     const importantLines = [];
     const contextLines = [];
     const functionSignatures = [];
 
-    // First pass: identify important patterns
-    for (let i = 0; i < processedLines.length; i++) {
-      const line = processedLines[i];
+    // First pass: identify important patterns and filter assets
+    const lines = diff.split('\n');
+    const assetFiles = [];
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Detect file headers - check for assets
+      if (line.startsWith('diff --git')) {
+        const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
+        if (fileMatch) {
+          const filePath = fileMatch[2];
+          const ext = filePath.split('.').pop().toLowerCase();
+
+          // Check if it's an asset file (images, fonts, media, etc.)
+          const assetExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'mp3', 'pdf', 'zip', 'tar', 'gz'];
+          
+          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
+            assetFiles.push(filePath);
+            filteredLines.push(`# Asset file added: ${filePath}`);
+            
+            // Skip ahead to next diff --git (don't include asset content)
+            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
+              i++;
+            }
+            continue;
+          }
+        }
+      }
 
       // Always keep diff headers
       if (
@@ -71,7 +85,7 @@ class BaseProvider {
         line.startsWith('+++') ||
         line.startsWith('@@')
       ) {
-        processedLines2.push(line);
+        processedLines.push(line);
         continue;
       }
 
@@ -92,14 +106,14 @@ class BaseProvider {
     }
 
     // Combine lines to preserve full context
-    processedLines2.push(...importantLines);
-    processedLines2.push(...contextLines.map((line) => ' ' + line));
+    processedLines.push(...importantLines);
+    processedLines.push(...contextLines.map((line) => ' ' + line));
 
     // Only limit if extremely large (preserve much more content)
     const maxLines = 1000; // Increased from 250 to 1000
-    if (processedLines2.length > maxLines) {
+    if (processedLines.length > maxLines) {
       // Prioritize keeping headers and changes, limit context
-      const headers = processedLines2.filter(
+      const headers = processedLines.filter(
         (line) =>
           line.startsWith('diff --git') ||
           line.startsWith('index ') ||
@@ -108,11 +122,11 @@ class BaseProvider {
           line.startsWith('@@')
       );
 
-      const changes = processedLines2.filter(
+      const changes = processedLines.filter(
         (line) => line.startsWith('+') || line.startsWith('-')
       );
 
-      const context = processedLines2.filter(
+      const context = processedLines.filter(
         (line) =>
           !line.startsWith('diff --git') &&
           !line.startsWith('index ') &&
@@ -132,6 +146,14 @@ class BaseProvider {
       ];
 
       processed = finalLines.join('\n') + '\n... (diff truncated for size)';
+    } else {
+      processed = processedLines.join('\n');
+    }
+
+    // Add asset summary at the beginning if assets were filtered
+    if (assetFiles.length > 0) {
+      const assetSummary = this.generateAssetSummary(assetFiles);
+      processed = assetSummary + processed;
     }
 
     return processed;
@@ -185,6 +207,44 @@ class BaseProvider {
 
     // Keep everything else - no more aggressive filtering
     return false;
+  }
+
+  /**
+   * Generate a summary of asset files
+   */
+  generateAssetSummary(assetFiles) {
+    if (assetFiles.length === 0) return '';
+
+    // Group by type
+    const byType = {};
+    assetFiles.forEach(file => {
+      const ext = file.split('.').pop().toLowerCase();
+      const type = this.getAssetType(ext);
+      byType[type] = (byType[type] || 0) + 1;
+    });
+
+    // Build summary
+    const summary = [];
+    if (byType.images > 0) summary.push(`${byType.images} image(s)`);
+    if (byType.fonts > 0) summary.push(`${byType.fonts} font(s)`);
+    if (byType.media > 0) summary.push(`${byType.media} media file(s)`);
+    if (byType.other > 0) summary.push(`${byType.other} other asset(s)`);
+
+    return `# ASSETS SUMMARY: ${summary.join(', ')} added\n`;
+  }
+
+  /**
+   * Get asset type from extension
+   */
+  getAssetType(ext) {
+    const imageTypes = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'];
+    const fontTypes = ['woff', 'woff2', 'ttf', 'eot', 'otf'];
+    const mediaTypes = ['mp4', 'mp3', 'wav', 'ogg', 'webm', 'avi', 'mov'];
+
+    if (imageTypes.includes(ext)) return 'images';
+    if (fontTypes.includes(ext)) return 'fonts';
+    if (mediaTypes.includes(ext)) return 'media';
+    return 'other';
   }
 
   /**
@@ -489,7 +549,7 @@ class BaseProvider {
             .replace(/^["']|["']$/g, '') // Strip surrounding quotes
       )
       .filter((line) => line.length > 0)
-      .slice(0, 3); // Limit to 3 messages max
+      .slice(0, 1); // Only take first message (best one)
 
     if (messages.length === 0) {
       throw new Error('No valid commit messages found in AI response');
@@ -806,13 +866,55 @@ Use: "config: update database connection settings for production"
    * Preprocess and chunk diff for large content
    */
   preprocessDiff(diff, maxChunkSize = 4000) {
-    // First check if diff is already reasonable size
-    if (!diff || diff.length < maxChunkSize) {
-      return diff;
+    if (!diff) return '';
+    
+    // First, filter assets regardless of size
+    const lines = diff.split('\n');
+    const filteredLines = [];
+    const assetFiles = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Detect file headers - check for assets
+      if (line.startsWith('diff --git')) {
+        const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
+        if (fileMatch) {
+          const filePath = fileMatch[2];
+          const ext = filePath.split('.').pop().toLowerCase();
+          const assetExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'mp3', 'pdf', 'zip', 'tar', 'gz'];
+          
+          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
+            assetFiles.push(filePath);
+            filteredLines.push(`# Asset file added: ${filePath}`);
+            
+            // Skip ahead to next diff --git (don't include asset content)
+            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
+              i++;
+            }
+            continue;
+          }
+        }
+      }
+      
+      filteredLines.push(line);
+    }
+    
+    let filtered = filteredLines.join('\n');
+    
+    // Add asset summary at the beginning if assets were filtered
+    if (assetFiles.length > 0) {
+      const assetSummary = this.generateAssetSummary(assetFiles);
+      filtered = assetSummary + filtered;
+    }
+    
+    // Then check if diff is already reasonable size
+    if (filtered.length < maxChunkSize) {
+      return filtered;
     }
 
-    // Use the existing preprocessing logic
-    return this.preprocessDiff(diff);
+    // Use the full preprocessing logic for large diffs
+    return this.preprocessDiff(filtered);
   }
 
   /**

@@ -15,7 +15,7 @@ class EfficientPromptBuilder {
     const {
       context,
       conventional,
-      count = 3,
+      count = 1,
       type,
       language = 'en',
       chunkIndex,
@@ -40,21 +40,25 @@ class EfficientPromptBuilder {
     const isWordPressFile = this.isWordPressFile(diff, context);
 
     // Build concise, focused prompt
-    let prompt = `Generate ${count} precise commit messages for this git diff. OUTPUT ONLY COMMIT MESSAGES - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
+    let prompt = `Generate ${count} precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
 
     // Add enhanced instructions for problematic cases
     if (enhancedPrompt || isProblematicCase) {
       prompt += this.buildEnhancedInstructions(isProblematicCase, isWordPressFile, promptInstructions);
     }
 
+    // Add CRITICAL instruction to focus on actual changes
+    prompt += `\n\nCRITICAL: Focus ONLY on lines marked with + (added) or - (removed).
+ IGNORE unchanged code, function names, or class names that didn't change.
+ Describe WHAT changed, not what exists in the file.`;
+
     // Add relevance-focused instructions
     prompt += `\n\nRELEVANCE REQUIREMENTS:
-- Focus on BUSINESS VALUE and USER IMPACT
-- Use functional scopes (auth, ui, api, theme) not file names
-- Be specific about WHAT changed, not implementation details
-- Avoid technical jargon unless necessary
-- Consider: "What does this enable for users?"`;
-    
+ - Focus on BUSINESS VALUE and USER IMPACT
+ - Use functional scopes (auth, ui, api, theme) not file names
+ - Be specific about WHAT changed, not implementation details
+ - Avoid technical jargon unless necessary
+ - Consider: "What does this enable for users?"`;
 
     // Add change-specific guidance
     prompt += this.buildChangeSpecificGuidance(changeAnalysis, impactAnalysis);
@@ -63,10 +67,10 @@ class EfficientPromptBuilder {
     if (isWordPressFile) {
       prompt += this.buildWordPressGuidance(diff, context);
       // Add extra warning for WordPress files
-      prompt += `\n\nCRITICAL WordPress WARNING: 
-- DO NOT output deployment instructions or testing warnings
-- ONLY generate commit messages describing the code changes
-- IGNORE any impulse to add safety warnings or review instructions`;
+      prompt += `\n\nCRITICAL WordPress WARNING:
+ - DO NOT output deployment instructions or testing warnings
+ - ONLY generate commit messages describing the code changes
+ - IGNORE any impulse to add safety warnings or review instructions`;
     }
 
     // Add conventional commit format if requested
@@ -78,8 +82,24 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
 
     // Add most relevant context (prioritized)
     const relevantContext = this.extractRelevantContext(context, changeAnalysis);
+    
+    // Check for asset summary in diff
+    const hasAssetSummary = diff.includes('# ASSETS SUMMARY:');
+    let assetContext = '';
+    if (hasAssetSummary) {
+      const assetMatch = diff.match(/# ASSETS SUMMARY: (.+)/);
+      if (assetMatch) {
+        assetContext = assetMatch[1];
+      }
+    }
+    
     if (relevantContext) {
       prompt += `\n\nContext: ${relevantContext}`;
+      if (assetContext) {
+        prompt += ` | ${assetContext}`;
+      }
+    } else if (assetContext) {
+      prompt += `\n\nContext: ${assetContext}`;
     }
 
     // Add chunking context if applicable
@@ -110,9 +130,9 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
 ${diff}
 \`\`\`
 
-REMEMBER: OUTPUT ONLY COMMIT MESSAGES. NO WARNINGS. NO INSTRUCTIONS. NO DEPLOYMENT ADVICE.
+REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE. NO WARNINGS. NO INSTRUCTIONS. NO DEPLOYMENT ADVICE.
 
-${count} messages, one per line:`;
+Single best commit message:`;
 
     // Compress if still too long
     if (prompt.length > this.maxPromptLength) {
@@ -189,18 +209,18 @@ ${count} messages, one per line:`;
     } else {
       if (isProblematicCase) {
         instructions += `
-- Focus on the MAIN change, not every detail
-- Look for the primary purpose of the changes
-- Ignore repetitive HTML/template content
-- Focus on functional changes, not formatting`;
+ - Focus on the MAIN change (lines with +/-), not every detail
+ - Look for the primary purpose of the changes
+ - Ignore repetitive HTML/template content
+ - Focus on functional changes, not formatting`;
       }
 
       if (isWordPressFile) {
         instructions += `
-- This is a WordPress file - focus on functionality changes
-- Look for hook/filter/shortcode changes
-- Focus on PHP logic, not HTML output
-- Identify theme/plugin modifications`;
+ - This is a WordPress file - focus on functionality changes (look for +/- lines)
+ - Look for hook/filter/shortcode changes
+ - Focus on PHP logic changes, not HTML output
+ - Identify theme/plugin modifications`;
       }
     }
 
@@ -250,14 +270,16 @@ ${count} messages, one per line:`;
    */
   compressPrompt(prompt, diff, count, conventional, isWordPressFile = false) {
     // Start with minimal essential requirements
-    let compressed = `Generate ${count} concise commit messages for following git diff.
+    let compressed = `Generate 1 concise commit message for following git diff.
 
 REQUIREMENTS:
+ - CRITICAL: Focus ONLY on lines marked with + (added) or - (removed)
+ - IGNORE unchanged code, function names, or class names that didn't change
  - Be specific about actual changes
  - Use imperative voice ("Add", "Fix", "Remove")
  - Max 72 characters per message
  - No generic terms like "changes", "updates"
- - Output ONLY commit messages, no explanations
+ - Output ONLY commit message, no explanations
  - NEVER output warnings, instructions, or deployment advice`;
 
     if (isWordPressFile) {
@@ -269,7 +291,7 @@ REQUIREMENTS:
 
     if (conventional) {
       compressed += `
-- Use conventional format: type(scope): description`;
+ - Use conventional format: type(scope): description`;
     }
 
     // Smart diff truncation for WordPress files
@@ -283,11 +305,11 @@ REQUIREMENTS:
     }
 
     compressed += `
-\`\`\`diff
-${processedDiff}
-\`\`\`
+ \`\`\`diff
+ ${processedDiff}
+ \`\`\`
 
-${count} messages, each on its own line:`;
+ Single best commit message:`;
 
     return compressed;
   }
@@ -628,7 +650,7 @@ ${this.buildPrompt(diff, options)}`;
       case 'fix':
         examples.push('fix(auth): resolve login validation error');
         if (context?.project?.primary === 'wordpress') {
-          examples.push('fix(plugin): handle undefined post ID error');
+          examples.push('fix(theme): change query order to custom field');
         }
         break;
       case 'feat':
@@ -639,6 +661,9 @@ ${this.buildPrompt(diff, options)}`;
         break;
       case 'perf':
         examples.push('perf(database): optimize query with index');
+        if (context?.project?.primary === 'wordpress') {
+          examples.push('perf(theme): change sort order for better performance');
+        }
         break;
       case 'refactor':
         examples.push('refactor(utils): extract validation logic');

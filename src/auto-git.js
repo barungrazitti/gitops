@@ -15,7 +15,6 @@ class AutoGit {
   constructor() {
     this.git = simpleGit();
     this.aiCommit = new AICommitGenerator();
-    this.spinner = null;
     this.activityLogger = this.aiCommit.activityLogger;
     // Configure git to prefer merge over rebase for safety
     this.git.raw(['config', 'pull.rebase', 'false']);
@@ -25,20 +24,11 @@ class AutoGit {
    * Main auto git workflow
    */
   async run(options = {}) {
-    console.log(chalk.cyan('Auto Git Workflow Starting...\n'));
     const startTime = Date.now();
 
     // Handle dry-run mode
     if (options.dryRun) {
-      console.log(chalk.yellow('🔍 Dry run mode - showing what would be done:\n'));
-      console.log(chalk.blue('1. Check git repository'));
-      console.log(chalk.blue('2. Stage all changes'));
-      console.log(chalk.blue('3. Generate AI commit message (or use provided)'));
-      console.log(chalk.blue('4. Commit changes'));
-      console.log(chalk.blue('5. Pull latest changes'));
-      console.log(chalk.blue('6. Auto-resolve conflicts if possible'));
-      console.log(chalk.blue('7. Push changes'));
-      console.log();
+      console.log('Dry run mode - would: validate → stage → generate → commit → pull → push');
       return;
     }
 
@@ -47,14 +37,17 @@ class AutoGit {
 
       // Step 1: Validate git repository
       await this.validateRepository();
+      console.log(chalk.green('✓ Repository validated'));
 
       // Step 2: Check for changes
       const hasChanges = await this.checkForChanges();
       if (!hasChanges && !options.force) {
-        console.log(chalk.yellow('No changes detected. Repository is clean!'));
         await this.activityLogger.info('auto_git_completed', { reason: 'no_changes', duration: Date.now() - startTime });
         return;
       }
+
+      // Show changes detected
+      console.log(chalk.green('✓ Changes detected'));
 
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
@@ -63,11 +56,11 @@ class AutoGit {
       let commitMessage;
       if (options.manualMessage) {
         commitMessage = options.manualMessage;
-        console.log(chalk.green(`Using provided message: ${commitMessage}`));
       } else {
+        console.log(chalk.gray('✓ Generating commit message...'));
         commitMessage = await this.generateCommitMessage(options);
         if (!commitMessage) {
-          console.log(chalk.yellow('Commit cancelled by user'));
+          console.log(chalk.yellow('✗ Commit cancelled by user'));
           await this.activityLogger.info('auto_git_cancelled', { reason: 'user_cancelled' });
           return;
         }
@@ -107,8 +100,8 @@ class AutoGit {
         await this.pushChanges();
       }
 
-      console.log(chalk.green('\n✅ Auto Git workflow completed successfully!'));
-      await this.activityLogger.info('auto_git_completed', { 
+      console.log(chalk.green(`✓ Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s`));
+      await this.activityLogger.info('auto_git_completed', {
         success: true,
         duration: Date.now() - startTime,
         commitMessage,
@@ -128,20 +121,14 @@ class AutoGit {
    * Validate that we're in a git repository
    */
   async validateRepository() {
-    this.spinner = ora('Validating git repository...').start();
-
     try {
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
         throw new Error('Not a git repository');
       }
-
-      this.spinner.succeed('Git repository validated');
     } catch (error) {
-      this.spinner.fail('Repository validation failed');
+      console.log(chalk.red('✗ Repository validation failed'));
       throw error;
-    } finally {
-      this.spinner = null;
     }
   }
 
@@ -149,8 +136,6 @@ class AutoGit {
    * Check if there are any changes (staged or unstaged)
    */
   async checkForChanges() {
-    this.spinner = ora('Checking for changes...').start();
-
     try {
       const status = await this.git.status();
       const hasChanges =
@@ -161,13 +146,14 @@ class AutoGit {
         status.modified.length > 0 ||
         status.renamed.length > 0;
 
-      this.spinner.succeed(hasChanges ? 'Changes detected' : 'No changes detected');
+      if (!hasChanges) {
+        console.log(chalk.yellow('✗ No changes detected'));
+      }
+
       return hasChanges;
     } catch (error) {
-      this.spinner.fail('Failed to check for changes');
+      console.log(chalk.red('✗ Failed to check for changes'));
       throw error;
-    } finally {
-      this.spinner = null;
     }
   }
 
@@ -175,17 +161,12 @@ class AutoGit {
    * Stage all changes
    */
   async stageChanges() {
-    this.spinner = ora('Staging changes...').start();
-
     try {
       // Stage all changes including new files
       await this.git.add('.');
-      this.spinner.succeed('Changes staged');
     } catch (error) {
-      this.spinner.fail('Failed to stage changes');
+      console.log(chalk.red('✗ Failed to stage changes'));
       throw error;
-    } finally {
-      this.spinner = null;
     }
   }
 
@@ -193,8 +174,6 @@ class AutoGit {
    * Generate AI commit message
    */
   async generateCommitMessage(options) {
-    this.spinner = ora('Generating AI commit message...').start();
-
     try {
       // Get repository context for better AI generation
       const context = await this.aiCommit.analysisEngine.analyzeRepository();
@@ -203,20 +182,16 @@ class AutoGit {
       const diff = await this.git.diff(['--staged']);
 
       if (!diff || diff.trim().length === 0) {
-        this.spinner.fail('No staged changes found for commit message generation');
         throw new Error('No staged changes available');
       }
 
       // Check for and clean up conflict markers before generating commit
       if (/<<<<<<<|=======|>>>>>>>/.test(diff)) {
-        console.log(chalk.yellow('\n⚠️  Conflict markers detected in staged changes'));
-        console.log(chalk.blue('🧹 Cleaning up conflict markers...'));
+        console.log(chalk.yellow('✗ Conflict markers detected'));
 
         const cleanupResult = await this.aiCommit.detectAndCleanupConflictMarkers();
 
         if (cleanupResult.cleaned) {
-          console.log(chalk.green(`✅ Cleaned ${cleanupResult.filesFixed} file(s) with conflict markers`));
-
           // Re-stage the cleaned files
           await this.git.add(['.']);
 
@@ -232,7 +207,6 @@ class AutoGit {
               conventional: true,
               preferredProvider: config.defaultProvider || 'groq',
             });
-            this.spinner.succeed('AI commit message generated (after conflict cleanup)');
             return messages[0];
           }
         }
@@ -247,13 +221,10 @@ class AutoGit {
         preferredProvider: config.defaultProvider || 'groq',
       });
 
-      this.spinner.succeed('AI commit message generated');
       return messages[0]; // Return the best message
     } catch (error) {
-      this.spinner.fail('Failed to generate AI commit message');
+      console.log(chalk.red('✗ Failed to generate commit message'));
       throw error;
-    } finally {
-      this.spinner = null;
     }
   }
 
@@ -261,16 +232,12 @@ class AutoGit {
    * Commit changes
    */
   async commitChanges(message, options) {
-    this.spinner = ora('Committing changes...').start();
-
     try {
       await this.git.commit(message);
-      this.spinner.succeed(`Committed: ${message}`);
+      console.log(chalk.green(`✓ Committed: ${message}`));
     } catch (error) {
-      this.spinner.fail('Failed to commit changes');
+      console.log(chalk.red('✗ Failed to commit changes'));
       throw error;
-    } finally {
-      this.spinner = null;
     }
   }
 
@@ -278,8 +245,6 @@ class AutoGit {
    * Pull latest changes and handle conflicts with AI-powered resolution
    */
   async pullAndHandleConflicts() {
-    this.spinner = ora('Pulling latest changes...').start();
-
     try {
       const pullResult = await this.git.pull();
 
@@ -289,10 +254,9 @@ class AutoGit {
         const hasConflicts = status.conflicted.length > 0;
 
         if (hasConflicts) {
-          this.spinner.text = 'Analyzing merge conflicts...';
-          console.log(chalk.yellow(`\n⚠️  Merge conflicts detected in ${status.conflicted.length} file(s):`));
+          console.log(chalk.yellow(`⚠ Merge conflicts in ${status.conflicted.length} file(s)`));
           status.conflicted.forEach(file => {
-            console.log(chalk.dim(`   • ${file}`));
+            console.log(chalk.gray(`  • ${file}`));
           });
 
           const { resolutionStrategy } = await inquirer.prompt([
@@ -344,70 +308,59 @@ class AutoGit {
             } else {
               // Traditional resolution
               const checkoutFlag = resolutionStrategy === 'ours' ? '--ours' : '--theirs';
-              
+
               for (const file of status.conflicted) {
                 await this.git.raw(['checkout', checkoutFlag, '--', file]);
               }
-              
+
               await this.git.add('.');
               await this.git.commit(`Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`);
-              
-              this.spinner.succeed(`Conflicts resolved using ${resolutionStrategy} strategy`);
-              console.log(chalk.green(`✅ Resolved conflicts in ${status.conflicted.length} file(s)`));
+
+              console.log(chalk.green(`✓ Resolved ${status.conflicted.length} conflict(s)`));
             }
           } catch (resolveError) {
-            this.spinner.fail('Failed to resolve conflicts');
-            console.log(chalk.red('Error details:', resolveError.message));
+            console.log(chalk.red('✗ Failed to resolve conflicts'));
             throw new Error(`Resolution failed: ${resolveError.message}`);
           }
-        } else {
-          this.spinner.succeed('Pulled latest changes');
         }
-      } else {
-        this.spinner.succeed('Already up to date');
       }
     } catch (error) {
       if (error.message.includes('Not possible to fast-forward')) {
-        this.spinner.text = 'Local branch has diverged. Attempting to rebase...';
-        try {
-          await this.git.pull(['--rebase']);
-          this.spinner.succeed('Successfully rebased and pulled changes');
-        } catch (rebaseError) {
-          this.spinner.fail('Rebase failed');
-          const status = await this.git.status();
-          if (status.conflicted.length > 0) {
-            throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
+          try {
+            await this.git.pull(['--rebase']);
+            console.log(chalk.green('✓ Rebased and pulled changes'));
+          } catch (rebaseError) {
+            console.log(chalk.red('✗ Rebase failed'));
+            const status = await this.git.status();
+            if (status.conflicted.length > 0) {
+              throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
+            }
+            throw new Error(`Failed to rebase: ${rebaseError.message}`);
           }
-          throw new Error(`Failed to rebase: ${rebaseError.message}`);
+          return;
         }
-        return; 
-      }
 
-      this.spinner.fail('Failed to pull changes');
-      
-      if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
-        console.log(chalk.yellow(`\nPull failed: ${error.message}`));
+        console.log(chalk.red(`✗ Pull failed: ${error.message}`));
 
-        const { skipPull } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'skipPull',
-            message: 'Skip pull and continue with push?',
-            default: false,
-          },
-        ]);
+        if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
+          const { skipPull } = await inquirer.prompt([
+            {
+              type: 'confirm',
+              name: 'skipPull',
+              message: 'Skip pull and continue with push?',
+              default: false,
+            },
+          ]);
 
-        if (skipPull) {
-          console.log(chalk.yellow('⚠️  Skipping pull, pushing local changes only'));
-          return; 
+          if (skipPull) {
+            console.log(chalk.yellow('✓ Skipping pull'));
+            return;
+          }
         }
+
+        throw error;
       }
-      
-      throw error;
-    } finally {
-      this.spinner = null;
     }
-  }
 
   /**
    * Resolve conflicts using AI with intelligent merging
@@ -518,16 +471,12 @@ class AutoGit {
    * Push changes to remote
    */
   async pushChanges() {
-    this.spinner = ora('Pushing changes...').start();
-
     try {
       await this.git.push();
-      this.spinner.succeed('Changes pushed to remote');
+      console.log(chalk.green('✓ Pushed to remote'));
     } catch (error) {
-      this.spinner.fail('Failed to push changes');
+      console.log(chalk.red('✗ Failed to push changes'));
       throw error;
-    } finally {
-      this.spinner = null;
     }
   }
 }

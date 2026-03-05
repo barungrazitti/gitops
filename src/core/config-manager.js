@@ -27,7 +27,7 @@ class ConfigManager {
       model: null,
       conventionalCommits: true,
       language: 'en',
-      messageCount: 3,
+      messageCount: 1,
       maxTokens: 150,
       temperature: 0.7,
       cache: true,
@@ -44,6 +44,10 @@ class ConfigManager {
         'dist/**',
         'build/**',
       ],
+      // Security settings
+      sanitize: true, // Auto-redact secrets and PII before sending to AI
+      redactionLog: true, // Log what was redacted for transparency
+      
       // Test validation settings
       testValidation: {
         enabled: false,
@@ -110,6 +114,8 @@ class ConfigManager {
       retries: Joi.number().integer().min(0).max(10),
       customPrompts: Joi.object(),
       excludeFiles: Joi.array().items(Joi.string()),
+      sanitize: Joi.boolean(),
+      redactionLog: Joi.boolean(),
       commitTypes: Joi.array().items(Joi.string()),
       testValidation: Joi.object({
         enabled: Joi.boolean(),

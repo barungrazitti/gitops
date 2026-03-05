@@ -15,6 +15,7 @@ const MessageFormatter = require('./core/message-formatter');
 const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
+const SecretScanner = require('./utils/secret-scanner');
 const fs = require('fs-extra');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
 const PerformanceUtils = require('./utils/performance-utils');
@@ -70,6 +71,46 @@ class AICommitGenerator {
         return;
       }
 
+      // SECURITY: Sanitize diff to remove secrets and PII before sending to AI
+      const secretScanner = new SecretScanner();
+      const shouldSanitize = mergedOptions.sanitize !== false; // Default: true
+      
+      if (shouldSanitize) {
+        spinner.text = chalk.blue('🔒 Scanning for sensitive information...');
+        const originalLength = diff.length;
+        
+        diff = secretScanner.scanAndRedact(diff, true);
+        const redactionSummary = secretScanner.getRedactionSummary();
+        
+        if (redactionSummary.found) {
+          console.log(chalk.yellow(`\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`));
+          
+          // Group by category for cleaner output
+          const categories = Object.entries(redactionSummary.byCategory || {});
+          if (categories.length > 0) {
+            categories.forEach(([category, count]) => {
+              const categoryEmoji = category === 'pii' ? '👤' : '🔑';
+              console.log(chalk.gray(`   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`));
+            });
+          }
+          
+          // Log to activity logger for audit trail
+          await this.activityLogger.warn('sensitive_data_redacted', {
+            redacted: redactionSummary.redacted,
+            byCategory: redactionSummary.byCategory,
+            byType: redactionSummary.byType,
+            originalSize: originalLength,
+            sanitizedSize: diff.length
+          });
+          
+          spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
+        } else {
+          await this.activityLogger.info('no_secrets_found', { diffLength: diff.length });
+        }
+        
+        secretScanner.clearRedactionLog();
+      }
+
 
       // Advanced cache check with semantic similarity
       let messages = [];
@@ -93,15 +134,15 @@ class AICommitGenerator {
 
         // Generate commit messages with sequential fallback
         spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
-        messages = await this.generateWithSequentialFallback(diff, {
-          context,
-          count: parseInt(mergedOptions.count) || 3,
-          type: mergedOptions.type,
-          language: mergedOptions.language || 'en',
-          conventional:
-            mergedOptions.conventional || config.conventionalCommits,
-          preferredProvider: mergedOptions.provider || config.defaultProvider,
-        });
+          messages = await this.generateWithSequentialFallback(diff, {
+            context,
+            count: parseInt(mergedOptions.count) || 1,
+            type: mergedOptions.type,
+            language: mergedOptions.language || 'en',
+            conventional:
+              mergedOptions.conventional || config.conventionalCommits,
+            preferredProvider: mergedOptions.provider || config.defaultProvider,
+          });
 
         // Cache results (simple exact match)
         if (mergedOptions.cache !== false) {
@@ -1118,16 +1159,23 @@ class AICommitGenerator {
 
     let remainingHeaderSpace = Math.max(0, maxSize - currentSize);
     const skippedHeaders = [];
+    // Track which files were added from skipped files to preserved files to avoid duplicates
+    const additionalPreservedFiles = [];
+
     for (const chunk of skippedFiles) {
       if (remainingHeaderSpace <= 0) break;
       if (chunk.header.length <= remainingHeaderSpace) {
         skippedHeaders.push(chunk.header);
         remainingHeaderSpace -= chunk.header.length;
-        preservedFiles.push(chunk.fileName);
+        // Only add to preservedFiles if it's not already there to avoid duplicates
+        if (!preservedFiles.includes(chunk.fileName)) {
+          preservedFiles.push(chunk.fileName);
+        }
+        additionalPreservedFiles.push(chunk.fileName);
       }
     }
 
-    let reasoning = `Preserved ${preservedFiles.length} files with full content, ${skippedFiles.length - skippedHeaders.length} skipped (node_modules ignored)`;
+    let reasoning = `Preserved ${preservedFiles.length} files with full content, ${skippedFiles.length - additionalPreservedFiles.length} skipped (node_modules ignored)`;
     if (preservedFiles.length === 0 && filteredChunks.length > 0) {
       reasoning = 'No files fit within token limits - diff too large';
     }
@@ -1136,7 +1184,9 @@ class AICommitGenerator {
       data: [...selectedContent, ...skippedHeaders].join('\n'),
       reasoning,
       preservedFiles,
-      skippedFiles: skippedFiles.map(f => f.fileName)
+      skippedFiles: skippedFiles
+        .filter(f => !additionalPreservedFiles.includes(f.fileName))
+        .map(f => f.fileName)
     };
   }
 
