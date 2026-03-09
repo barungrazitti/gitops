@@ -1070,7 +1070,7 @@ class AICommitGenerator {
     */
   manageDiffForAI(diff, options = {}) {
     const diffSize = diff.length;
-    const MAX_SAFE_SIZE = 15000; // ~4000 tokens, safe for all models including 6K TPM limits
+    const MAX_SAFE_SIZE = 60000; // ~20K tokens, safe for modern Groq (131K context) and Ollama
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {
@@ -1134,7 +1134,7 @@ class AICommitGenerator {
     let preservedFiles = [];
     let skippedFiles = [];
     let currentSize = 0;
-    const HEADER_BUDGET = 500;
+    const HEADER_BUDGET = Math.min(2000, maxSize * 0.05);
 
     for (const chunk of scoredChunks) {
       const headerSize = chunk.header.length;
@@ -1175,19 +1175,102 @@ class AICommitGenerator {
       }
     }
 
-    let reasoning = `Preserved ${preservedFiles.length} files with full content, ${skippedFiles.length - additionalPreservedFiles.length} skipped (node_modules ignored)`;
+    // Build summary of skipped files for context
+    const trulySkipped = skippedFiles
+      .filter(f => !additionalPreservedFiles.includes(f.fileName))
+      .map(f => f.fileName);
+
+    const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
+
+    let reasoning = `Preserved ${preservedFiles.length} files with full content, ${trulySkipped.length} skipped (node_modules ignored)`;
     if (preservedFiles.length === 0 && filteredChunks.length > 0) {
       reasoning = 'No files fit within token limits - diff too large';
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders].join('\n'),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
       reasoning,
       preservedFiles,
-      skippedFiles: skippedFiles
-        .filter(f => !additionalPreservedFiles.includes(f.fileName))
-        .map(f => f.fileName)
+      skippedFiles: trulySkipped
     };
+  }
+
+  /**
+   * Build a summary of skipped files grouped by pattern
+   */
+  buildSkippedFileSummary(skippedFiles) {
+    if (!skippedFiles.length) return '';
+
+    const groups = {
+      plugin: [],
+      theme: [],
+      vendor: [],
+      assets: [],
+      config: [],
+      other: []
+    };
+
+    skippedFiles.forEach(file => {
+      if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
+        groups.plugin.push(file);
+      } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
+        groups.theme.push(file);
+      } else if (file.includes('vendor/') || file.includes('node_modules/')) {
+        groups.vendor.push(file);
+      } else if (file.match(/\.(js|css|woff|png|jpg|svg|ico)$/i)) {
+        groups.assets.push(file);
+      } else if (file.match(/\.(json|xml|yml|yaml|lock|config)$/i)) {
+        groups.config.push(file);
+      } else {
+        groups.other.push(file);
+      }
+    });
+
+    const summary = [];
+    summary.push('\n# SKIPPED FILES (too large, but changed):');
+
+    if (groups.plugin.length) {
+      const plugins = new Set(groups.plugin.map(f => {
+        const match = f.match(/\/plugins\/([^\/]+)/);
+        return match ? match[1] : f;
+      }));
+      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
+    }
+
+    if (groups.theme.length) {
+      const themes = new Set(groups.theme.map(f => {
+        const match = f.match(/\/themes\/([^\/]+)/);
+        return match ? match[1] : f;
+      }));
+      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
+    }
+
+    if (groups.assets.length > 5) {
+      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
+    } else if (groups.assets.length) {
+      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
+    }
+
+    if (groups.config.length) {
+      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
+    }
+
+    if (groups.vendor.length) {
+      const vendorTypes = new Set(groups.vendor.map(f => {
+        if (f.includes('node_modules')) return 'npm';
+        if (f.includes('vendor/composer')) return 'composer';
+        return 'vendor';
+      }));
+      summary.push(`# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`);
+    }
+
+    if (groups.other.length <= 10) {
+      summary.push(`# Other: ${groups.other.join(', ')}`);
+    } else if (groups.other.length) {
+      summary.push(`# Other: ${groups.other.length} files`);
+    }
+
+    return summary.join('\n');
   }
 
   /**

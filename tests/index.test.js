@@ -324,6 +324,61 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
       expect(result.data).not.toContain('node_modules');
     });
 
+    it('should include summary of skipped files', () => {
+      const largeFileContent = Array(1000).fill(0).map((_, i) => `+const x${i} = ${i} && console.log('line ${i}');`).join('\n');
+      
+      // Create 30 large files to ensure headers don't all fit in budget
+      const files = [];
+      for (let i = 1; i <= 30; i++) {
+        files.push(`diff --git a/src/file${i}.js b/src/file${i}.js
+--- a/src/file${i}.js
++++ b/src/file${i}.js
+@@ -1,2 +1,1000 @@
+console.log('${i}');
+${largeFileContent}`);
+      }
+      
+      const largeDiff = files.join('\n') + `
+diff --git a/wp-content/plugins/wordpress-seo/plugin.php b/wp-content/plugins/wordpress-seo/plugin.php
+--- a/wp-content/plugins/wordpress-seo/plugin.php
++++ b/wp-content/plugins/wordpress-seo/plugin.php
+@@ -1,2 +1,1000 @@
+<?php
+${largeFileContent}
+diff --git a/wp-content/themes/twentytwenty/style.css b/wp-content/themes/twentytwenty/style.css
+--- a/wp-content/themes/twentytwenty/style.css
++++ b/wp-content/themes/twentytwenty/style.css
+@@ -1,2 +1,1000 @@
+body {}
+${Array(1000).fill(0).map((_, i) => `+.class${i} { color: red; }`).join('\n')}
+diff --git a/assets/bundle.js b/assets/bundle.js
+--- a/assets/bundle.js
++++ b/assets/bundle.js
+@@ -1,2 +1,1000 @@
+console.log('');
+${largeFileContent}
+diff --git a/vendor/composer/installed.json b/vendor/composer/installed.json
+--- a/vendor/composer/installed.json
++++ b/vendor/composer/installed.json
+@@ -1,2 +1,1000 @@
+{}
+${Array(1000).fill(0).map((_, i) => `+"key${i}": "value${i}"`).join('\n')}
+diff --git a/config.json b/config.json
+--- a/config.json
++++ b/config.json
+@@ -1,2 +1,1000 @@
+{}
+${Array(1000).fill(0).map((_, i) => `+"key${i}": "value${i}"`).join('\n')}`;
+      
+      const result = generator.manageDiffForAI(largeDiff);
+      expect(result.info.strategy).toBe('smart-truncated');
+      
+      // With 30+ files, some should be truly skipped (beyond header budget)
+      if (result.info.skippedFiles.length > 0) {
+        expect(result.data).toContain('# SKIPPED FILES');
+      }
+    });
+
     it('should use semantic context for prioritization', () => {
       const multiFileDiff = `diff --git a/package.json b/package.json
 --- a/package.json
