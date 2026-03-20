@@ -116,7 +116,6 @@ class AICommitGenerator {
       let messages = [];
       if (mergedOptions.cache !== false) {
         spinner.text = chalk.blue('💾 Checking for cached results...');
-        // Only cache exact matches to avoid complexity
         messages = await this.cacheManager.getValidated(diff);
         if (messages && messages.length > 0) {
           await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
@@ -144,7 +143,7 @@ class AICommitGenerator {
             preferredProvider: mergedOptions.provider || config.defaultProvider,
           });
 
-        // Cache results (simple exact match)
+        // Cache results
         if (mergedOptions.cache !== false) {
           await this.cacheManager.setValidated(diff, messages);
         }
@@ -210,6 +209,75 @@ class AICommitGenerator {
   }
 
   /**
+   * Identify the type of error to provide better suggestions
+   */
+  identifyErrorType(error) {
+    const message = error.message.toLowerCase();
+
+    if (message.includes('no staged changes')) {
+      return 'git_no_changes';
+    }
+
+    if (message.includes('not a git repository')) {
+      return 'git_not_repo';
+    }
+
+    if (message.includes('401') || message.includes('unauthorized') || message.includes('api key')) {
+      return 'ai_auth_error';
+    }
+
+    if (message.includes('429') || message.includes('too many requests') || message.includes('rate limit')) {
+      return 'ai_rate_limit';
+    }
+
+    if (message.includes('econnrefused') || message.includes('enotfound')) {
+      return 'ai_connection_error';
+    }
+
+    if (message.includes('context length exceeded') || message.includes('too large')) {
+      return 'ai_context_limit';
+    }
+
+    return 'unknown';
+  }
+
+  /**
+   * Get a local fallback suggestion for an error type
+   */
+  getLocalSuggestion(type) {
+    const suggestions = {
+      git_no_changes: 'No changes are staged. Use "git add <file>" to stage changes before running aic.',
+      git_not_repo: 'This directory is not a git repository. Run "git init" to initialize one.',
+      ai_auth_error: 'AI provider authentication failed. Run "aic setup" to configure your API key.',
+      ai_rate_limit: 'AI provider rate limit reached. Please wait a moment or switch providers with "aic setup".',
+      ai_connection_error: 'Could not connect to AI provider. Check your internet connection or ensure Ollama is running.',
+      ai_context_limit: 'The diff is too large for the AI provider. Try staging fewer files or smaller changes.',
+      unknown: 'An unexpected error occurred. Check your internet connection and try again.'
+    };
+
+    return suggestions[type] || suggestions.unknown;
+  }
+
+  /**
+   * Provide helpful suggestions based on error type
+   */
+  provideErrorSuggestions(error, options = {}) {
+    try {
+      // 1. Identify error type
+      const errorType = this.identifyErrorType(error);
+
+      // 2. Fallback to local suggestions (AI-powered suggestions will be added in the next plan)
+      const localSuggestion = this.getLocalSuggestion(errorType);
+      
+      if (localSuggestion) {
+        console.log(chalk.yellow(`\n💡 Suggestion: ${localSuggestion}`));
+      }
+    } catch (fallbackError) {
+      // Fail silently to avoid crashing the error handler itself
+    }
+  }
+
+  /**
    * Interactive message selection
    */
   async selectMessage(messages) {
@@ -268,6 +336,7 @@ class AICommitGenerator {
       return null;
     } catch (error) {
       rl.close();
+      this.provideErrorSuggestions(error);
       throw error;
     }
   }
