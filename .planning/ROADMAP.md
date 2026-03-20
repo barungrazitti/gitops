@@ -48,5 +48,15 @@
 2. Code is automatically formatted on save/manual run via Prettier.
 3. `.eslintrc.json` and `.prettierrc` are present in the project root.
 
+### Phase 3: improve the relevance of the git commit messages for small and large diffs
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 2
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd:plan-phase 3 to break down)
+
 ---
 *Roadmap updated: 2026-03-20*
