@@ -16,11 +16,8 @@ class EfficientPromptBuilder {
       context,
       conventional,
       count = 1,
-      type,
-      language = 'en',
       chunkIndex,
       totalChunks,
-      chunkContext,
       enhancedPrompt,
       promptInstructions,
       strictValidation
@@ -78,6 +75,11 @@ class EfficientPromptBuilder {
       prompt += `\n\nFormat: type(scope): description
 Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
 Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
+      
+      // Add type hint if detected from file patterns
+      if (context && context.files && context.files.type) {
+        prompt += `\n\nDetected type hint: ${context.files.type} (based on changed files)`;
+      }
     }
 
     // Add most relevant context (prioritized)
@@ -100,6 +102,12 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
       }
     } else if (assetContext) {
       prompt += `\n\nContext: ${assetContext}`;
+    }
+
+    // Add recent commit history for style reference
+    if (context && context.recentCommits && context.recentCommits.length > 0) {
+      const recentExamples = context.recentCommits.slice(0, 5).join('\n');
+      prompt += `\n\nRecent commit style:\n${recentExamples}`;
     }
 
     // Add chunking context if applicable
@@ -145,7 +153,7 @@ Single best commit message:`;
   /**
    * Detect problematic cases that need special handling
    */
-  detectProblematicCase(diff, context) {
+  detectProblematicCase(diff, _context) {
     if (!diff) return false;
 
     // Large diff detection
@@ -230,7 +238,7 @@ Single best commit message:`;
   /**
    * Build WordPress-specific guidance
    */
-  buildWordPressGuidance(diff, context) {
+  buildWordPressGuidance(diff, _context) {
     let guidance = '\n\nWordPress-Specific Focus:';
 
     // Detect specific WordPress changes
@@ -589,7 +597,7 @@ ${this.buildPrompt(diff, options)}`;
 
     // Key semantic information (limited)
     if (context.files?.semantic) {
-      const semantic = context.files.semantic;
+      const {semantic} = context.files;
       const keyInfo = [];
 
       if (semantic.functions?.length > 0) {

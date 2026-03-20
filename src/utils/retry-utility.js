@@ -59,14 +59,14 @@ class RetryUtility {
    * Calculate delay with exponential backoff
    */
   calculateDelay(attempt, options) {
-    let delay = options.baseDelay * Math.pow(options.factor, attempt);
+    let delay = options.baseDelay * options.factor**attempt;
     
     // Cap the delay at maxDelay
     delay = Math.min(delay, options.maxDelay);
     
     // Add jitter to prevent thundering herd
     if (options.jitter) {
-      delay = delay * (0.5 + Math.random() * 0.5);
+      delay *= (0.5 + Math.random() * 0.5);
     }
     
     return Math.floor(delay);
@@ -75,11 +75,12 @@ class RetryUtility {
   /**
    * Check if error is retryable
    */
-  isRetryableError(error, retryableErrors) {
+  isRetryableError(error, retryableErrors = null) {
+    const errors = retryableErrors || this.options.retryableErrors;
     const errorMessage = error.message || error.toString();
     
     // Check against known retryable error patterns
-    for (const retryable of retryableErrors) {
+    for (const retryable of errors) {
       if (errorMessage.includes(retryable)) {
         return true;
       }

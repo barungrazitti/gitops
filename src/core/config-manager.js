@@ -210,8 +210,8 @@ class ConfigManager {
   async setMultiple(values) {
     try {
       // Strip any encryptedApiKey since ConfigManager doesn't handle encryption
-      const { encryptedApiKey, ...cleanValues } = values;
-      
+      const { ...cleanValues } = values;
+       
       // Validate all values
       const testConfig = { ...this.config.store, ...cleanValues };
       const { error } = this.schema.validate(testConfig);

@@ -36,7 +36,6 @@ class CacheManager {
    * Generate cache key with content fingerprinting
    */
   generateKey(diff) {
-    // More robust key generation that preserves semantic context
     const semanticFingerprint = this.extractSemanticFingerprint(diff);
     const structuralFingerprint = this.extractStructuralFingerprint(diff);
     const combined = `${semanticFingerprint}:${structuralFingerprint}`;
@@ -80,18 +79,17 @@ class CacheManager {
   async getValidated(diff) {
     try {
       const key = this.generateKey(diff);
-      const semanticFingerprint = this.extractSemanticFingerprint(diff);
 
       // Try memory cache first
-      let cached = this.memoryCache.get(key);
+      const cached = this.memoryCache.get(key);
       if (cached) {
         // Validate semantic similarity before returning
         if (this.validateSemanticSimilarity(diff, cached.diff || '')) {
           return cached.messages;
-        } else {
+        } 
           // Remove invalid cache entry
           this.memoryCache.del(key);
-        }
+        
       }
 
       // Try persistent cache
@@ -107,10 +105,10 @@ class CacheManager {
             // Add to memory cache for faster access
             this.memoryCache.set(key, cacheData);
             return cacheData.messages;
-          } else {
+          } 
             // Remove invalid cache file
             await fs.remove(cacheFile);
-          }
+          
         } else {
           // Remove expired cache file
           await fs.remove(cacheFile);
@@ -133,7 +131,7 @@ class CacheManager {
       const cacheData = {
         messages,
         timestamp: Date.now(),
-        diff: this.truncateDiff(diff), // Store truncated diff for validation
+        diff: this.truncateDiff(diff),
         semanticFingerprint: this.extractSemanticFingerprint(diff),
         structuralFingerprint: this.extractStructuralFingerprint(diff),
       };
@@ -153,7 +151,24 @@ class CacheManager {
    * Truncate diff for storage (keep more content for debugging)
    */
   truncateDiff(diff) {
-    return diff.length > 2000 ? diff.substring(0, 2000) + '...' : diff;
+    return diff.length > 2000 ? `${diff.substring(0, 2000)  }...` : diff;
+  }
+
+  /**
+   * Invalidate cache entry by diff
+   */
+  async invalidate(diff) {
+    try {
+      const key = this.generateKey(diff);
+      this.memoryCache.del(key);
+      
+      const cacheFile = path.join(this.cacheDir, `${key}.json`);
+      if (await fs.pathExists(cacheFile)) {
+        await fs.remove(cacheFile);
+      }
+    } catch (error) {
+      console.warn('Cache invalidation error:', error.message);
+    }
   }
 
   /**

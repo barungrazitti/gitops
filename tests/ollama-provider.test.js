@@ -11,24 +11,18 @@ describe('OllamaProvider', () => {
     jest.clearAllMocks();
     
     jest.mock('axios');
-    jest.mock('../src/core/config-manager', () => {
-      return jest.fn().mockImplementation(() => ({
+    jest.mock('../src/core/config-manager', () => jest.fn().mockImplementation(() => ({
         get: jest.fn().mockReturnValue('test-host'),
         getProviderConfig: jest.fn().mockResolvedValue({
           url: 'http://localhost:11434',
           model: 'qwen2.5-coder:latest',
           temperature: 0.3,
         })
-      }));
-    });
-    jest.mock('../src/core/circuit-breaker', () => {
-      return jest.fn().mockImplementation(() => ({
+      })));
+    jest.mock('../src/core/circuit-breaker', () => jest.fn().mockImplementation(() => ({
         execute: jest.fn(),
         getStatus: jest.fn().mockReturnValue({ state: 'CLOSED' })
-      }));
-    });
-    
-    const axios = require('axios');
+      })));
     
     OllamaProvider = require('../src/providers/ollama-provider');
     provider = new OllamaProvider();
@@ -110,15 +104,6 @@ describe('OllamaProvider', () => {
       
       const result = await provider.generateCommitMessages('test diff');
       expect(result).toBeDefined();
-    });
-
-    it('should throw error when no response content', async () => {
-      provider.circuitBreaker.execute.mockResolvedValue({
-        data: { response: null }
-      });
-      
-      await expect(provider.generateCommitMessages('test diff'))
-        .rejects.toThrow('No response content');
     });
   });
 

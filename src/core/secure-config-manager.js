@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const fs = require('fs-extra');
 const Joi = require('joi');
 const ConfigValidator = require('../utils/config-validator');
+
 const configValidator = new ConfigValidator();
 
 class SecureConfigManager {
@@ -33,13 +34,13 @@ class SecureConfigManager {
     
     if (fs.existsSync(keyPath)) {
       return Buffer.from(fs.readFileSync(keyPath, 'utf8'), 'hex');
-    } else {
+    } 
       // Generate a new key and save it
       const newKey = crypto.randomBytes(32); // 256-bit key
       fs.ensureDirSync(require('path').dirname(keyPath));
       fs.writeFileSync(keyPath, newKey.toString('hex'));
       return newKey;
-    }
+    
   }
 
   /**
@@ -286,7 +287,7 @@ class SecureConfigManager {
       }
 
       if (key === 'apiKey') {
-        this.config.set('encryptedApiKey', encryptedValue);
+        this.config.set('encryptedApiKey', this.encrypt(value));
       } else {
         this.config.set(key, value);
       }
@@ -403,7 +404,7 @@ class SecureConfigManager {
       const apiKey = await this.get('apiKey'); // Get decrypted API key
       
       const providerConfig = {
-        apiKey: apiKey,
+        apiKey,
         maxTokens: config.maxTokens,
         temperature: config.temperature,
         timeout: config.timeout,
@@ -507,8 +508,6 @@ class SecureConfigManager {
    * Validate API key for provider
    */
   async validateApiKey(provider) {
-    const config = await this.load();
-
     if (provider === 'ollama') {
       return true; // Ollama doesn't require API key
     }

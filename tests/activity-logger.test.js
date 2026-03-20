@@ -11,14 +11,12 @@ describe('ActivityLogger', () => {
     jest.clearAllMocks();
     
     // Mock conf
-    jest.mock('conf', () => {
-      return jest.fn().mockImplementation(() => ({
+    jest.mock('conf', () => jest.fn().mockImplementation(() => ({
         get: jest.fn((key) => {
           if (key === 'logLevel') return 'info';
           return null;
         }),
-      }));
-    });
+      })));
     
     // Mock fs-extra
     jest.mock('fs-extra', () => ({
@@ -57,8 +55,11 @@ describe('ActivityLogger', () => {
   });
 
   describe('shouldLog', () => {
-    it('should return true for debug when level is debug', () => {
-      expect(logger.shouldLog('debug')).toBe(true);
+    it('should return false for debug when level is info', () => {
+      expect(logger.shouldLog('debug')).toBe(false);
+    });
+
+    it('should return true for info when level is info', () => {
       expect(logger.shouldLog('info')).toBe(true);
     });
   });

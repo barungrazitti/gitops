@@ -2,9 +2,9 @@
  * Analysis Engine - Analyzes repository context and patterns
  */
 
-const GitManager = require('./git-manager');
 const fs = require('fs-extra');
 const path = require('path');
+const GitManager = require('./git-manager');
 const ProjectTypeDetector = require('../utils/project-type-detector');
 
 class AnalysisEngine {
@@ -17,12 +17,13 @@ class AnalysisEngine {
    */
   async analyzeRepository() {
     try {
-      const [repoInfo, commitPatterns, fileContext, projectType] =
+      const [repoInfo, commitPatterns, fileContext, projectType, recentCommits] =
         await Promise.all([
           this.gitManager.getRepositoryInfo(),
           this.gitManager.getCommitPatterns(),
           this.analyzeFileContext(),
           this.detectProjectType(),
+          this.getRecentCommits(5),
         ]);
 
       return {
@@ -30,6 +31,7 @@ class AnalysisEngine {
         patterns: commitPatterns,
         files: fileContext,
         project: projectType,
+        recentCommits,
         timestamp: Date.now(),
       };
     } catch (error) {
@@ -39,8 +41,21 @@ class AnalysisEngine {
         patterns: {},
         files: {},
         project: { type: 'unknown' },
+        recentCommits: [],
         timestamp: Date.now(),
       };
+    }
+  }
+
+  /**
+   * Get recent commits for style reference
+   */
+  async getRecentCommits(limit = 5) {
+    try {
+      const commits = await this.gitManager.getCommitHistory(limit);
+      return commits.map(c => c.message);
+    } catch (error) {
+      return [];
     }
   }
 
@@ -62,8 +77,9 @@ class AnalysisEngine {
           modified: fileStats.changed,
         },
         scope: this.inferScope(stagedFiles),
+        type: this.detectCommitType(stagedFiles),
         wordpress: this.detectWordPressContext(stagedFiles),
-        semantic: semanticContext, // Add semantic context
+        semantic: semanticContext,
       };
 
       return context;
@@ -74,6 +90,8 @@ class AnalysisEngine {
         fileTypes: {},
         changes: { insertions: 0, deletions: 0, modified: 0 },
         scope: 'unknown',
+        type: null,
+        wordpress: false,
         semantic: {},
       };
     }
@@ -233,6 +251,75 @@ class AnalysisEngine {
     }
 
     return topScope ? topScope[0] : 'general';
+  }
+
+  /**
+   * Detect commit type from file patterns
+   */
+  detectCommitType(files) {
+    const typePatterns = {
+      test: [
+        /\/tests?\//i, /\/specs?\//i, /__tests__\//i,
+        /\.test\./i, /\.spec\./i, /\/mocks?\//i, /\/fixtures?\//i,
+      ],
+      docs: [
+        /\/docs?\//i, /readme\.md/i, /changelog\.md/i, /\.md$/,
+        /\/guide|\/tutorial/i, /\/wiki\//i,
+      ],
+      chore: [
+        /package\.json/i, /yarn\.lock/i, /pnpm-lock\.yaml/i,
+        /\.env\./i, /\/config\//i, /tsconfig/i, /webpack/i, /vite/i,
+        /\.gitignore/i, /\.editorconfig/i,
+      ],
+      ci: [
+        /\.github\//i, /\.gitlab-ci\.yml/i, /jenkinsfile/i,
+        /\/workflows?\//i, /\/actions?\//i,
+      ],
+      style: [
+        /\.css$/, /\.scss$/, /\.sass$/, /\.less$/, /\.styl$/,
+        /\/styles?\//i, /\/themes?\//i,
+      ],
+      fix: [
+        /\/bug|fix|correct|repair\//i, /\.(bug|fix|correct)\./i,
+        /\/error|exception|fail\//i, /error\.js/i, /exception\.js/i,
+      ],
+      refactor: [
+        /\/refactor\//i, /\/cleanup\//i, /\/restructure\//i,
+      ],
+      perf: [
+        /\/performance\//i, /\/optimi[sz]e\//i, /\/cache\//i,
+        /\.perf\./i, /\/lazy\//i, /memo/i,
+      ],
+      build: [
+        /\/build\//i, /\/scripts\//i, /Makefile/i, /Dockerfile/i,
+        /webpack\.config/i, /vite\.config/i, /rollup\.config/i,
+      ],
+      feat: [
+        /\/components?\//i, /\/pages?\//i, /\/views?\//i, /\/routes?\//i,
+        /\/services?\//i, /\/handlers?\//i, /\/features?\//i, /\/modules?\//i,
+        /\.vue$/, /\.jsx$/, /\.tsx$/,
+      ],
+    };
+
+    const typeScores = {};
+
+    files.forEach((file) => {
+      for (const [type, patterns] of Object.entries(typePatterns)) {
+        for (const pattern of patterns) {
+          if (pattern.test(file)) {
+            typeScores[type] = (typeScores[type] || 0) + 1;
+            break;
+          }
+        }
+      }
+    });
+
+    if (Object.keys(typeScores).length === 0) {
+      return null;
+    }
+
+    const sorted = Object.entries(typeScores).sort((a, b) => b[1] - a[1]);
+    return sorted[0][0];
   }
 
   /**
@@ -448,6 +535,7 @@ class AnalysisEngine {
       );
     }
   }
+
   detectWordPressContext(files) {
     const context = {
       isWordPress: false,
@@ -771,7 +859,7 @@ class AnalysisEngine {
           changes.push({
             file: currentFile,
             type: line.startsWith('+') ? 'addition' : 'deletion',
-            content: content,
+            content,
             lineNum: -1 // Not tracking exact line numbers in diff analysis
           });
         }

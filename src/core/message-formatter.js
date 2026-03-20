@@ -475,7 +475,7 @@ class MessageFormatter {
 
     // If there's a body, add it back
     if (body) {
-      return formattedTitle + '\n\n' + body;
+      return `${formattedTitle  }\n\n${  body}`;
     }
 
     return formattedTitle;

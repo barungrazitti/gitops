@@ -3,7 +3,7 @@ function isValidDate(date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
-function formatDate(date, format = "YYYY-MM-DD") {
+function formatDate(date, _format = "YYYY-MM-DD") {
   if (!isValidDate(date)) return "";
   return date.toISOString().split("T")[0];
 }

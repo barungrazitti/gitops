@@ -6,10 +6,10 @@ jest.mock('groq-sdk');
 jest.mock('../src/core/config-manager');
 jest.mock('../src/core/circuit-breaker');
 
+const Groq = require('groq-sdk');
 const GroqProvider = require('../src/providers/groq-provider');
 const ConfigManager = require('../src/core/config-manager');
 const CircuitBreaker = require('../src/core/circuit-breaker');
-const Groq = require('groq-sdk');
 
 describe('GroqProvider', () => {
   let provider;

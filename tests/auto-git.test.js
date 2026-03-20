@@ -12,13 +12,11 @@ jest.mock('path', () => ({
   join: jest.fn((...args) => args.join('/')),
 }));
 
-const AutoGit = require('../src/auto-git');
-const AICommitGenerator = require('../src/index');
 const simpleGit = require('simple-git');
 const ora = require('ora');
 const inquirer = require('inquirer');
-const path = require('path');
-const chalk = require('chalk');
+const AICommitGenerator = require('../src/index');
+const AutoGit = require('../src/auto-git');
 
 describe('AutoGit', () => {
   let autoGit;
@@ -547,7 +545,6 @@ describe('AutoGit', () => {
 
   describe('resolveFileConflictsWithAI', () => {
     const fs = require('fs-extra');
-    const path = require('path');
 
     beforeEach(() => {
       mockGit.revparse.mockResolvedValue('/repo/root');

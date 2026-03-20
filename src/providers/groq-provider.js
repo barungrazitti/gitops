@@ -50,8 +50,7 @@ class GroqProvider extends BaseProvider {
     // Send full diff without chunking for fast processing
     const prompt = this.buildPrompt(diff, options);
 
-    return await this.withRetry(async () => {
-      return await this.circuitBreaker.execute(async () => {
+    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
         const response = await this.client.chat.completions.create({
           model: options.model || config.model || 'llama-3.1-8b-instant',
           messages: [
@@ -70,8 +69,7 @@ class GroqProvider extends BaseProvider {
 
         const messages = this.parseResponse(response);
         return messages.filter((msg) => this.validateMessage(msg));
-      }, { provider: 'groq' });
-    });
+      }, { provider: 'groq' }));
   }
 
   /**
@@ -104,9 +102,9 @@ class GroqProvider extends BaseProvider {
           options,
           config
         );
-      } else {
+      } 
         return await this.generateSingleResponse(fullPrompt, options, config);
-      }
+      
     } catch (error) {
       throw this.handleError(error, 'Groq');
     }
@@ -116,8 +114,7 @@ class GroqProvider extends BaseProvider {
    * Generate single response
    */
   async generateSingleResponse(prompt, options, config) {
-    return await this.withRetry(async () => {
-      return await this.circuitBreaker.execute(async () => {
+    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
         const response = await this.client.chat.completions.create({
           model: config.model || 'llama-3.1-8b-instant',
           messages: [
@@ -142,8 +139,7 @@ class GroqProvider extends BaseProvider {
         }
 
         return [content.trim()];
-      }, { provider: 'groq' });
-    });
+      }, { provider: 'groq' }));
   }
 
   /**

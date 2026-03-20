@@ -5,7 +5,7 @@
 const path = require('path');
 const chalk = require('chalk');
 const ora = require('ora');
-const inquirer = require('inquirer');
+const fs = require('fs-extra');
 const GitManager = require('./core/git-manager');
 const ConfigManager = require('./core/config-manager');
 const AIProviderFactory = require('./providers/ai-provider-factory');
@@ -16,9 +16,7 @@ const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
 const SecretScanner = require('./utils/secret-scanner');
-const fs = require('fs-extra');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
-const PerformanceUtils = require('./utils/performance-utils');
 const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
 
 class AICommitGenerator {
@@ -48,7 +46,7 @@ class AICommitGenerator {
       if (provider === 'ollama') {
         // For Ollama, we assume it's available if selected (user would have set it up)
         return true;
-      } else if (provider === 'groq') {
+      } if (provider === 'groq') {
         // For Groq, check if API key is configured
         const apiKey = config.apiKey || process.env.GROQ_API_KEY;
         return !!apiKey && apiKey.trim().length > 0;
@@ -119,7 +117,7 @@ Do not explain the error, just provide the solution.`;
     }).start();
     const startTime = Date.now();
     let mergedOptions = {};
-    let diff = '';
+    const diff = '';
 
     try {
       await this.activityLogger.info('generate_started', { options });
@@ -506,9 +504,9 @@ Do not explain the error, just provide the solution.`;
       // Save configuration
       await this.configManager.setMultiple({
         defaultProvider: provider,
-        apiKey: apiKey,
-        conventionalCommits: conventionalCommits,
-        language: language,
+        apiKey,
+        conventionalCommits,
+        language,
       });
 
       console.log(chalk.green('\n✅ Setup completed successfully!'));
@@ -551,14 +549,12 @@ Do not explain the error, just provide the solution.`;
     const estimateTokens = (text) => Math.ceil(text.length / 4);
 
     // Helper to detect semantic boundaries
-    const isSemanticBoundary = (line) => {
-      return line.startsWith('diff --git') ||
+    const isSemanticBoundary = (line) => line.startsWith('diff --git') ||
         line.startsWith('index ') ||
         line.startsWith('---') ||
         line.startsWith('+++') ||
         (line.startsWith('@@') && currentChunk.length > 10) || // New hunk with existing content
         (/^(function|class|def|const|let|var)\s+\w+/.test(line) && currentChunk.length > 5);
-    };
 
     // Helper to find good break point near token limit
     const findBreakPoint = (startIdx, maxTokens) => {
@@ -678,7 +674,7 @@ Do not explain the error, just provide the solution.`;
     }
 
     // Prefer reasonable length (not too short, not too long)
-    const length = message.length;
+    const {length} = message;
     if (length >= 20 && length <= 100) {
       score += 5;
     } else if (length >= 10 && length <= 150) {
@@ -978,7 +974,7 @@ Do not explain the error, just provide the solution.`;
     const scope = scopeMatch[1];
 
     // Extract file types from diff
-    const fileTypes = this.extractEntitiesFromDiff(diff).fileTypes;
+    const {fileTypes} = this.extractEntitiesFromDiff(diff);
 
     // Common scope-type mappings
     const scopeTypeMap = {
@@ -1277,9 +1273,7 @@ Do not explain the error, just provide the solution.`;
       '.lock', '.min.js', '.min.css', '.map'
     ];
 
-    const filteredChunks = fileChunks.filter(fc => {
-      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
-    });
+    const filteredChunks = fileChunks.filter(fc => !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern)));
 
     const scoredChunks = filteredChunks.map(fc => {
       const score = this.scoreFileChunk(fc, semanticContext);
@@ -1288,11 +1282,10 @@ Do not explain the error, just provide the solution.`;
 
     scoredChunks.sort((a, b) => b.score - a.score);
 
-    let selectedContent = [];
-    let preservedFiles = [];
-    let skippedFiles = [];
+    const selectedContent = [];
+    const preservedFiles = [];
+    const skippedFiles = [];
     let currentSize = 0;
-    const HEADER_BUDGET = Math.min(2000, maxSize * 0.05);
 
     for (const chunk of scoredChunks) {
       const headerSize = chunk.header.length;
@@ -1732,7 +1725,7 @@ RESOLVED CODE (output only):
       files.push({ fileA: match[1], fileB: match[2] });
     }
 
-    let cleanedDiff = diff;
+    const cleanedDiff = diff;
     let totalResolved = 0;
     let aiUsed = false;
 
@@ -1785,11 +1778,11 @@ RESOLVED CODE (output only):
                   const conflictBlockEnd = content.indexOf('>>>>>>>', conflictBlockStart) + content.substring(content.indexOf('>>>>>>>', conflictBlockStart)).indexOf('\n') + 1;
                   
                   if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
-                    cleanedContent = content.substring(0, conflictBlockStart) + resolved + '\n' + content.substring(conflictBlockEnd);
+                    cleanedContent = `${content.substring(0, conflictBlockStart) + resolved  }\n${  content.substring(conflictBlockEnd)}`;
                   } else {
                     cleanedContent = cleanedContent.replace(
                       `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                      resolved + '\n'
+                      `${resolved  }\n`
                     );
                   }
                   
@@ -1799,7 +1792,7 @@ RESOLVED CODE (output only):
                   // Fallback: use current version
                   cleanedContent = cleanedContent.replace(
                     `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                    conflict.currentVersion + '\n'
+                    `${conflict.currentVersion  }\n`
                   );
                 }
               }

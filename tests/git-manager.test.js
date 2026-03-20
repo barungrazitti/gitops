@@ -231,7 +231,7 @@ describe('GitManager', () => {
     it('should stash changes', async () => {
       mockGit.stash.mockResolvedValue({ saved: true });
 
-      const result = await gitManager.stashChanges();
+      await gitManager.stashChanges();
 
       expect(mockGit.stash).toHaveBeenCalled();
     });
@@ -241,7 +241,7 @@ describe('GitManager', () => {
     it('should pop stash', async () => {
       mockGit.stash.mockResolvedValue({ applied: true });
 
-      const result = await gitManager.popStash();
+      await gitManager.popStash();
 
       expect(mockGit.stash).toHaveBeenCalledWith(['pop']);
     });
@@ -308,13 +308,13 @@ describe('GitManager', () => {
       mockGit.branch.mockResolvedValue({ current: 'main' });
       mockGit.push.mockResolvedValue({ pushed: true });
 
-      const result = await gitManager.pushCommits();
+      await gitManager.pushCommits();
 
       expect(mockGit.push).toHaveBeenCalledWith('origin', 'main', '');
     });
 
     it('should push to specified branch', async () => {
-      const result = await gitManager.pushCommits('develop');
+      await gitManager.pushCommits('develop');
 
       expect(mockGit.push).toHaveBeenCalledWith('origin', 'develop', '');
     });

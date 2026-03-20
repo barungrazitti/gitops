@@ -21,6 +21,11 @@
 - **STAB-04**: Unit tests for error handling.
 - **QUAL-04**: Fix identified crash due to missing method.
 
+**Plans**: 3 plans
+- [x] 01-01-PLAN.md — Foundation & Error Identification (Wave 1)
+- [x] 01-02-PLAN.md — AI-Powered Troubleshooting (Wave 2)
+- [ ] 01-03-PLAN.md — Verification & Robustness (Wave 3)
+
 **Success Criteria**:
 1. Calling `this.provideErrorSuggestions()` in the catch block of `src/index.js` no longer crashes.
 2. AI-powered suggestions are displayed for common errors (e.g., "API key missing").
@@ -44,4 +49,4 @@
 3. `.eslintrc.json` and `.prettierrc` are present in the project root.
 
 ---
-*Roadmap created: 2026-03-20*
+*Roadmap updated: 2026-03-20*

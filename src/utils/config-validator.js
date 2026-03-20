@@ -159,7 +159,7 @@ class ConfigValidator {
 
       // Special validation for API key when provider is not ollama
       if (key === 'defaultProvider' && value !== 'ollama') {
-        const apiKey = config.apiKey;
+        const {apiKey} = config;
         if (!apiKey || apiKey.length < 10) {
           errors.push('API key is required when using providers other than ollama');
         }

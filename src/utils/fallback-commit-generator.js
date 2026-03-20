@@ -43,10 +43,10 @@ class FallbackCommitGenerator {
     // Generate message based on analysis
     if (analysis.primaryChangeType) {
       return this.generateMessageWithType(analysis);
-    } else {
+    } 
       // Fallback to generic message
       return this.generateGenericMessage(diff, analysis);
-    }
+    
   }
 
   /**
@@ -146,15 +146,15 @@ class FallbackCommitGenerator {
     
     if (functionsAdded > 0) {
       return `Add ${functionsAdded} function${functionsAdded > 1 ? 's' : ''}`;
-    } else if (classesAdded > 0) {
+    } if (classesAdded > 0) {
       return `Add ${classesAdded} class${classesAdded > 1 ? 'es' : ''}`;
-    } else if (filesModified > 0) {
+    } if (filesModified > 0) {
       return `Update ${filesModified} file${filesModified > 1 ? 's' : ''}`;
-    } else {
+    } 
       // Pick a random generic message
       const randomIndex = Math.floor(Math.random() * this.genericMessages.length);
       return this.genericMessages[randomIndex];
-    }
+    
   }
 
   /**

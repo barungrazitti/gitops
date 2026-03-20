@@ -7,7 +7,7 @@
 const { program } = require('commander');
 const chalk = require('chalk');
 const { version } = require('../package.json');
-const AICommitGenerator = require('../src/index.js');
+const AICommitGenerator = require('../src/index');
 
 // --- Action Handlers ---
 

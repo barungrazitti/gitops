@@ -20,11 +20,9 @@ describe('HookManager', () => {
       readdir: jest.fn().mockResolvedValue([]),
     }));
     
-    jest.mock('./git-manager', () => {
-      return jest.fn().mockImplementation(() => ({
+    jest.mock('../src/core/git-manager', () => jest.fn().mockImplementation(() => ({
         getRepositoryRoot: jest.fn().mockResolvedValue('/test/repo'),
-      }));
-    });
+      })));
     
     HookManager = require('../src/core/hook-manager');
     hookManager = new HookManager();

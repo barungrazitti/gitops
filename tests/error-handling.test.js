@@ -77,7 +77,6 @@ describe('AICommitGenerator Error Handling', () => {
 
         it('should handle AI timeout gracefully', async () => {
             // Mock a slow AI provider
-            const originalGenerateResponse = generator.aiProviderFactory?.create?.('groq')?.generateResponse;
             const mockProvider = {
                 generateResponse: jest.fn().mockImplementation(() => 
                     new Promise((resolve) => setTimeout(() => resolve(''), 100)) // 100ms delay

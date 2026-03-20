@@ -22,7 +22,7 @@ class SecretScanner {
       // GitHub personal access tokens (flexible length)
       {
         name: 'github_token',
-        pattern: /ghp_[A-Za-z0-9]{20,40}/g,
+        pattern: /ghp_[A-Za-z0-9_]{20,40}/g,
         replacement: '[REDACTED_GITHUB_TOKEN]',
         category: 'secret'
       },
@@ -307,6 +307,13 @@ class SecretScanner {
       detectedSecrets,
       count: detectedSecrets.length
     };
+  }
+
+  /**
+   * Get pattern info by name
+   */
+  getPatternInfo(name) {
+    return this.secretPatterns.find(p => p.name === name);
   }
 
   /**

@@ -4,6 +4,7 @@
 
 const path = require('path');
 const SecretScanner = require('./secret-scanner');
+
 const secretScanner = new SecretScanner();
 
 class InputSanitizer {

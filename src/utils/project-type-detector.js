@@ -84,7 +84,7 @@ class ProjectTypeDetector {
               detectedTypes.push('backend');
             }
             // Add WordPress-related Node.js dependencies
-            if (deps['@wordpress'] || deps['wpapi'] || deps['wordpress']) {
+            if (deps['@wordpress'] || deps.wpapi || deps.wordpress) {
               detectedTypes.push('wordpress-related');
             }
           } catch (error) {

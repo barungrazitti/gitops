@@ -3,13 +3,11 @@
  */
 
 // Mock the secret-scanner module
-jest.mock('../src/utils/secret-scanner', () => {
-  return class MockSecretScanner {
+jest.mock('../src/utils/secret-scanner', () => class MockSecretScanner {
     scanAndRedact(input) {
       return input;
     }
-  };
-});
+  });
 
 const InputSanitizer = require('../src/utils/input-sanitizer');
 

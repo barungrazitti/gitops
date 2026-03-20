@@ -75,7 +75,7 @@ class ProviderPerformanceManager {
   /**
    * Record a successful request
    */
-  recordSuccess(requestId, providerName, responseTime, result) {
+  recordSuccess(requestId, providerName, responseTime, _result) {
     this.initProvider(providerName);
     
     const stats = this.providerStats.get(providerName);

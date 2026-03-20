@@ -47,12 +47,10 @@ class OptimizedDiffProcessor {
   chunkDiffStream(diff, maxChunkSize, preserveContext = true) {
     const lines = diff.split('\n');
     const chunks = [];
-    let currentChunk = [];
-    let currentSize = 0;
+    const currentChunk = [];
     
     // Define semantic boundaries that should not be split
-    const isSemanticBoundary = (line) => {
-      return line.startsWith('diff --git') ||
+    const isSemanticBoundary = (line) => line.startsWith('diff --git') ||
              line.startsWith('index ') ||
              line.startsWith('--- ') ||
              line.startsWith('+++ ') ||
@@ -60,7 +58,6 @@ class OptimizedDiffProcessor {
              this.isFunctionDeclaration(line) ||
              this.isClassDeclaration(line) ||
              this.isImportStatement(line);
-    };
 
     // Look ahead to find good chunk boundaries
     const findNextBoundary = (startIndex, maxSize) => {
@@ -100,7 +97,7 @@ class OptimizedDiffProcessor {
         const contextContent = contextLines.join('\n');
         
         chunks.push({
-          content: chunkContent + '\n' + contextContent,
+          content: `${chunkContent  }\n${  contextContent}`,
           size: chunkContent.length + contextContent.length,
           estimatedTokens: this.estimateTokens(chunkContent + contextContent),
           startIndex: i,
@@ -208,13 +205,13 @@ class OptimizedDiffProcessor {
   determineProcessingStrategy(stats) {
     if (stats.totalSize < 5000) {
       return 'single-chunk'; // Small diff, process as one chunk
-    } else if (stats.fileCount === 1 && !stats.hasLargeFiles) {
+    } if (stats.fileCount === 1 && !stats.hasLargeFiles) {
       return 'adaptive-chunking'; // Single file, adaptive chunking
-    } else if (stats.hasLargeFiles) {
+    } if (stats.hasLargeFiles) {
       return 'aggressive-chunking'; // Has large files, aggressive chunking
-    } else {
+    } 
       return 'balanced-chunking'; // Balanced approach
-    }
+    
   }
 
   /**
@@ -252,7 +249,7 @@ class OptimizedDiffProcessor {
   /**
    * Process with adaptive chunking (for single large file)
    */
-  processWithAdaptiveChunking(diff, analysis) {
+  processWithAdaptiveChunking(diff, _analysis) {
     // For single file changes, chunk by logical sections (functions, classes, etc.)
     const chunks = [];
     const lines = diff.split('\n');
@@ -309,7 +306,7 @@ class OptimizedDiffProcessor {
   /**
    * Process with aggressive chunking (for large files)
    */
-  processWithAggressiveChunking(diff, analysis) {
+  processWithAggressiveChunking(diff, _analysis) {
     // Use smaller chunks and more aggressive splitting
     return this.chunkDiffStream(diff, this.config.maxTokensPerChunk / 2, true);
   }
@@ -317,7 +314,7 @@ class OptimizedDiffProcessor {
   /**
    * Process with balanced chunking (default approach)
    */
-  processWithBalancedChunking(diff, analysis) {
+  processWithBalancedChunking(diff, _analysis) {
     // Standard chunking with moderate settings
     return this.chunkDiffStream(diff, this.config.maxTokensPerChunk, true);
   }

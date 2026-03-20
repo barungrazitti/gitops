@@ -4,12 +4,9 @@
  */
 
 const chalk = require('chalk');
-const ora = require('ora');
 const inquirer = require('inquirer');
 const simpleGit = require('simple-git');
-const fs = require('fs-extra');
-const path = require('path');
-const AICommitGenerator = require('./index.js');
+const AICommitGenerator = require('./index');
 
 class AutoGit {
   constructor() {
@@ -173,7 +170,7 @@ class AutoGit {
   /**
    * Generate AI commit message
    */
-  async generateCommitMessage(options) {
+  async generateCommitMessage(_options) {
     try {
       // Get repository context for better AI generation
       const context = await this.aiCommit.analysisEngine.analyzeRepository();
@@ -231,7 +228,7 @@ class AutoGit {
   /**
    * Commit changes
    */
-  async commitChanges(message, options) {
+  async commitChanges(message, _options) {
     try {
       await this.git.commit(message);
       console.log(chalk.green(`✓ Committed: ${message}`));

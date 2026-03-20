@@ -14,8 +14,8 @@
 const { program } = require('commander');
 const chalk = require('chalk');
 const { version } = require('../package.json');
-const AutoGit = require('../src/auto-git.js');
-const AICommitGenerator = require('../src/index.js');
+const AutoGit = require('../src/auto-git');
+const AICommitGenerator = require('../src/index');
 
 // Configure CLI program
 program

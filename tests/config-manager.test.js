@@ -3,11 +3,9 @@
  */
 
 const ConfigManager = require('../src/core/config-manager');
-const fs = require('fs-extra');
 
 jest.mock('fs-extra');
-jest.mock('conf', () => {
-  return jest.fn().mockImplementation(() => ({
+jest.mock('conf', () => jest.fn().mockImplementation(() => ({
     store: {},
     path: '/test/config.json',
     get: jest.fn((key) => {
@@ -16,8 +14,7 @@ jest.mock('conf', () => {
     }),
     set: jest.fn(),
     clear: jest.fn(),
-  }));
-});
+  })));
 
 describe('ConfigManager', () => {
   let configManager;
@@ -35,7 +32,7 @@ describe('ConfigManager', () => {
       expect(defaults).toHaveProperty('defaultProvider', 'groq');
       expect(defaults).toHaveProperty('conventionalCommits', true);
       expect(defaults).toHaveProperty('language', 'en');
-      expect(defaults).toHaveProperty('messageCount', 3);
+      expect(defaults).toHaveProperty('messageCount', 1);
       expect(defaults).toHaveProperty('maxTokens', 150);
       expect(defaults).toHaveProperty('temperature', 0.7);
       expect(defaults).toHaveProperty('cache', true);

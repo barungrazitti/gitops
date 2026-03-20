@@ -185,7 +185,7 @@ class GitManager {
       };
 
       commits.forEach((commit) => {
-        const message = commit.message;
+        const {message} = commit;
         patterns.lengths.push(message.length);
 
         // Check for conventional commit format
@@ -312,7 +312,7 @@ class GitManager {
    */
   async pushCommits(branch = null, force = false) {
     try {
-      let targetBranch = branch || (await this.getCurrentBranch());
+      const targetBranch = branch || (await this.getCurrentBranch());
 
       // Validate branch name to prevent injection
       if (targetBranch && !InputSanitizer.validateGitReference(targetBranch)) {

@@ -215,12 +215,10 @@ class MemoryEfficientCacheManager {
    */
   calculateTextSimilarity(text1, text2) {
     // Normalize the texts
-    const normalize = (text) => {
-      return text.toLowerCase()
+    const normalize = (text) => text.toLowerCase()
         .replace(/\s+/g, ' ')
         .replace(/[^\w\s]/g, '')
         .trim();
-    };
 
     const norm1 = normalize(text1);
     const norm2 = normalize(text2);
@@ -305,7 +303,7 @@ class MemoryEfficientCacheManager {
     const usage = process.memoryUsage();
     return {
       cacheSize: this.currentSize,
-      cacheUtilization: (this.currentSize / this.options.maxSize * 100).toFixed(2) + '%',
+      cacheUtilization: `${(this.currentSize / this.options.maxSize * 100).toFixed(2)  }%`,
       heapUsed: usage.heapUsed,
       heapTotal: usage.heapTotal,
       rss: usage.rss

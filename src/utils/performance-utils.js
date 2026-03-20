@@ -54,8 +54,9 @@ class PerformanceUtils {
       const batch = tasks.slice(i, i + maxConcurrent);
       
       try {
+        const batchPromises = batch.map(task => task());
         const batchResults = await Promise.allSettled(
-          batch.map(task => this.withTimeout(task, timeout))
+          batchPromises.map(p => this.withTimeout(p, timeout))
         );
 
         batchResults.forEach((result, index) => {
@@ -157,7 +158,6 @@ class PerformanceUtils {
   static async batchProcess(items, processor, options = {}) {
     const {
       batchSize = 10,
-      concurrency = 3,
       delay = 0
     } = options;
 
@@ -209,8 +209,7 @@ class PerformanceUtils {
   static optimizeDiffProcessing(diff, options = {}) {
     const {
       maxDiffSize = 50000, // 50KB
-      maxLineLength = 500,
-      preserveContextLines = 5
+      maxLineLength = 500
     } = options;
 
     if (diff.length > maxDiffSize) {
@@ -233,7 +232,7 @@ class PerformanceUtils {
         
         // Truncate very long lines
         if (line.length > maxLineLength) {
-          processedLines.push(line.substring(0, maxLineLength) + '...[truncated]');
+          processedLines.push(`${line.substring(0, maxLineLength)  }...[truncated]`);
           continue;
         }
         

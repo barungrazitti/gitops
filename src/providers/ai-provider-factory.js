@@ -190,7 +190,7 @@ class AIProviderFactory {
 
         results[providerInfo.name] = {
           ...providerInfo,
-          models: models,
+          models,
           available: models.length > 0,
           lastChecked: new Date().toISOString(),
         };

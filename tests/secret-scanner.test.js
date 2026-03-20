@@ -41,7 +41,8 @@ describe('SecretScanner', () => {
     it('should redact database connection strings', () => {
       const content = 'mongodb://user:password@localhost:27017/mydb';
       const result = scanner.scanAndRedact(content);
-      expect(result).toContain('[REDACTED');
+      expect(result).toContain('[USER]');
+      expect(result).toContain('[PASSWORD]');
     });
 
     it('should redact passwords in URLs', () => {
@@ -76,7 +77,7 @@ describe('SecretScanner', () => {
 
   describe('getPatternInfo', () => {
     it('should return pattern info by name', () => {
-      const patternInfo = scanner.getPatternInfo('generic_api_key');
+      const patternInfo = scanner.getPatternInfo('jwt_token');
       expect(patternInfo).toBeDefined();
     });
 

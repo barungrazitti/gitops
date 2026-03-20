@@ -157,11 +157,11 @@ class ProgressTracker {
     
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
+    } if (minutes > 0) {
       return `${minutes}m ${seconds % 60}s`;
-    } else {
+    } 
       return `${seconds}s`;
-    }
+    
   }
 
   /**

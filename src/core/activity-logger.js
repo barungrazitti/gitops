@@ -83,7 +83,6 @@ class ActivityLogger {
       fileStats.sort((a, b) => b.created - a.created);
 
       const maxFiles = this.config.get('maxLogFiles');
-      const filesToKeep = fileStats.slice(0, maxFiles);
       const filesToDelete = fileStats.slice(maxFiles);
 
       // Delete files older than retention date
@@ -126,7 +125,7 @@ class ActivityLogger {
       },
     };
 
-    const logLine = JSON.stringify(logEntry) + '\n';
+    const logLine = `${JSON.stringify(logEntry)  }\n`;
 
     try {
       if (this.currentLogFile) {
@@ -226,9 +225,9 @@ class ActivityLogger {
       success,
       timestamp: Date.now(),
       // Log the actual prompt for analysis (truncated if too large)
-      prompt: prompt && prompt.length > 10000 ? prompt.substring(0, 10000) + '...[TRUNCATED]' : prompt,
+      prompt: prompt && prompt.length > 10000 ? `${prompt.substring(0, 10000)  }...[TRUNCATED]` : prompt,
       // Log the actual response for quality analysis (truncated if too large)
-      response: response && response.length > 2000 ? response.substring(0, 2000) + '...[TRUNCATED]' : response,
+      response: response && response.length > 2000 ? `${response.substring(0, 2000)  }...[TRUNCATED]` : response,
     });
   }
 
@@ -344,7 +343,7 @@ class ActivityLogger {
       hitRate,
       size: details.size,
       maxSize: details.maxSize,
-      utilization: details.maxSize ? (details.size / details.maxSize * 100).toFixed(2) + '%' : 'N/A',
+      utilization: details.maxSize ? `${(details.size / details.maxSize * 100).toFixed(2)  }%` : 'N/A',
       timestamp: Date.now(),
       ...details,
     });
@@ -430,7 +429,7 @@ class ActivityLogger {
     // Analyze provider usage
     const aiLogs = logs.filter(l => l.action === 'ai_interaction');
     aiLogs.forEach(log => {
-      const provider = log.data.provider;
+      const {provider} = log.data;
       analysis.providerUsage[provider] = (analysis.providerUsage[provider] || 0) + 1;
       
       if (log.data.responseTime) {
@@ -484,7 +483,7 @@ class ActivityLogger {
     
     if (format === 'csv') {
       return this.convertToCSV(logs);
-    } else if (format === 'json') {
+    } if (format === 'json') {
       return JSON.stringify(logs, null, 2);
     }
     

@@ -2,13 +2,11 @@
  * Unit tests for AICommitGenerator main class
  */
 
-const path = require('path');
 const fs = require('fs-extra');
 
 // Mock dependencies before requiring the module
 jest.mock('simple-git');
 jest.mock('fs-extra');
-jest.mock('inquirer');
 jest.mock('ora');
 jest.mock('chalk', () => ({
   blue: jest.fn((text) => text),
@@ -20,7 +18,6 @@ jest.mock('chalk', () => ({
 }));
 
 const simpleGit = require('simple-git');
-const inquirer = require('inquirer');
 const ora = require('ora');
 const AICommitGenerator = require('../src/index');
 
@@ -192,7 +189,7 @@ describe('AICommitGenerator', () => {
     });
 
     it('should handle very large diffs', () => {
-      const largeDiff = 'diff --git a/file1.js b/file1.js\n' + 'line 1\n'.repeat(2000);
+      const largeDiff = `diff --git a/file1.js b/file1.js\n${  'line 1\n'.repeat(2000)}`;
       const result = generator.chunkDiff(largeDiff, 6000);
 
       expect(Array.isArray(result)).toBe(true);
@@ -273,7 +270,7 @@ describe('AICommitGenerator', () => {
     });
 
     it('should truncate very large diffs', () => {
-      const largeDiff = 'diff --git a/test.js b/test.js\n' + 'a'.repeat(500000);
+      const largeDiff = `diff --git a/test.js b/test.js\n${  'a'.repeat(500000)}`;
       const result = generator.manageDiffForAI(largeDiff);
 
       expect(result.strategy).toBe('smart-truncated');
@@ -338,7 +335,7 @@ console.log('${i}');
 ${largeFileContent}`);
       }
       
-      const largeDiff = files.join('\n') + `
+      const largeDiff = `${files.join('\n')  }
 diff --git a/wp-content/plugins/wordpress-seo/plugin.php b/wp-content/plugins/wordpress-seo/plugin.php
 --- a/wp-content/plugins/wordpress-seo/plugin.php
 +++ b/wp-content/plugins/wordpress-seo/plugin.php

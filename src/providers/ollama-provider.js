@@ -30,12 +30,11 @@ class OllamaProvider extends BaseProvider {
     // Add context isolation to prevent hallucination
     const isolatedPrompt = `CRITICAL: Output ONLY commit messages. No instructions, warnings, or explanations. Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
 
-    return await this.withRetry(async () => {
-      return await this.circuitBreaker.execute(async () => {
+    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
         const response = await axios.post(
           `${this.baseURL}/api/generate`,
           {
-            model: model,
+            model,
             prompt: isolatedPrompt,
             stream: false,
             options: {
@@ -55,8 +54,7 @@ class OllamaProvider extends BaseProvider {
 
         const messages = this.parseResponse(content);
         return messages.filter((msg) => this.validateMessage(msg));
-      }, { provider: 'ollama' });
-    });
+      }, { provider: 'ollama' }));
   }
 
   /**
@@ -68,12 +66,11 @@ class OllamaProvider extends BaseProvider {
 
     const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
 
-    return await this.withRetry(async () => {
-      return await this.circuitBreaker.execute(async () => {
+    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
         const response = await axios.post(
           `${this.baseURL}/api/generate`,
           {
-            model: model,
+            model,
             prompt: fullPrompt,
             stream: false,
             options: {
@@ -92,8 +89,7 @@ class OllamaProvider extends BaseProvider {
         }
 
         return [content.trim()];
-      }, { provider: 'ollama' });
-    });
+      }, { provider: 'ollama' }));
   }
 
   /**
@@ -134,7 +130,7 @@ class OllamaProvider extends BaseProvider {
       const response = await axios.post(
         `${this.baseURL}/api/generate`,
         {
-          model: model,
+          model,
           prompt: 'Say "test successful" if you can read this.',
           stream: false,
           options: {
@@ -154,7 +150,7 @@ class OllamaProvider extends BaseProvider {
       return {
         success: true,
         message: 'Ollama connection successful',
-        model: model,
+        model,
         response: content.trim(),
         availableModels: availableModels.map((m) => m.name),
       };
@@ -264,7 +260,7 @@ class OllamaProvider extends BaseProvider {
 
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${sizes[i]}`;
+    return `${(bytes / 1024**i).toFixed(1)} ${sizes[i]}`;
   }
 
   /**

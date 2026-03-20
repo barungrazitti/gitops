@@ -2,9 +2,9 @@
  * Base AI Provider - Abstract class for all AI providers
  */
 
-const ConfigManager = require('../core/config-manager');
 const fs = require('fs');
 const path = require('path');
+const ConfigManager = require('../core/config-manager');
 
 class BaseProvider {
   constructor() {
@@ -66,7 +66,7 @@ class BaseProvider {
           
           if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
             assetFiles.push(filePath);
-            filteredLines.push(`# Asset file added: ${filePath}`);
+            processedLines.push(`# Asset file added: ${filePath}`);
             
             // Skip ahead to next diff --git (don't include asset content)
             while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
@@ -107,7 +107,7 @@ class BaseProvider {
 
     // Combine lines to preserve full context
     processedLines.push(...importantLines);
-    processedLines.push(...contextLines.map((line) => ' ' + line));
+    processedLines.push(...contextLines.map((line) => ` ${  line}`));
 
     // Only limit if extremely large (preserve much more content)
     const maxLines = 1000; // Increased from 250 to 1000
@@ -145,7 +145,7 @@ class BaseProvider {
         ...context.slice(0, maxLines - headers.length - changes.length),
       ];
 
-      processed = finalLines.join('\n') + '\n... (diff truncated for size)';
+      processed = `${finalLines.join('\n')  }\n... (diff truncated for size)`;
     } else {
       processed = processedLines.join('\n');
     }
@@ -468,7 +468,7 @@ class BaseProvider {
 
     if (error.response) {
       // HTTP error response
-      const status = error.response.status;
+      const {status} = error.response;
       const message =
         error.response.data?.error?.message || error.response.statusText;
 
@@ -575,7 +575,7 @@ class BaseProvider {
         // Generate messages
         const messages = await this.generateCommitMessages(diff, {
           ...options,
-          attempt: attempt
+          attempt
         });
         
         // Validate each message and score relevance
@@ -627,7 +627,7 @@ class BaseProvider {
           if (this.activityLogger) {
             await this.activityLogger.info('commit_message_validation', {
               provider: this.name,
-              attempt: attempt,
+              attempt,
               validMessages: validMessages.length,
               invalidMessages: invalidMessages.length,
               totalMessages: messages.length
@@ -640,8 +640,8 @@ class BaseProvider {
         // If all messages are invalid, log and prepare for retry
         const errorDetails = {
           provider: this.name,
-          attempt: attempt,
-          invalidMessages: invalidMessages,
+          attempt,
+          invalidMessages,
           allExplanatory: invalidMessages.every(m => m.isExplanatory),
           allGeneric: invalidMessages.every(m => m.isGeneric)
         };
@@ -668,8 +668,8 @@ class BaseProvider {
         if (this.activityLogger) {
           await this.activityLogger.debug('commit_generation_retry', {
             provider: this.name,
-            attempt: attempt,
-            maxRetries: maxRetries,
+            attempt,
+            maxRetries,
             error: error.message,
             willRetry: attempt < maxRetries
           });
@@ -681,7 +681,7 @@ class BaseProvider {
         }
         
         // Wait before retry with exponential backoff
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        const delay = Math.min(1000 * 2**(attempt - 1), 5000);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -739,8 +739,6 @@ class BaseProvider {
    * Generate commit messages with enhanced prompt for problematic cases
    */
   async generateCommitMessagesWithEnhancedPrompt(diff, options = {}) {
-    const originalOptions = { ...options };
-    
     // If this is a retry or fallback, use enhanced prompt
     if (options.attempt > 1 || options.isFallback) {
       options.enhancedPrompt = true;
@@ -805,7 +803,7 @@ Use: "config: update database connection settings for production"
         if (attempt < maxRetries) {
           // Use exponential backoff
           await new Promise((resolve) =>
-            setTimeout(resolve, delay * Math.pow(2, attempt - 1))
+            setTimeout(resolve, delay * 2**(attempt - 1))
           );
         }
       }
@@ -1121,27 +1119,23 @@ Use: "config: update database connection settings for production"
   inferLikelyPurpose(changes) {
     if (changes.some(change => change.file && change.file.includes('test'))) {
       return 'test-related changes';
-    } else if (changes.some(change => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file))) {
+    } if (changes.some(change => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file))) {
       return 'javascript/typescript changes';
-    } else if (changes.some(change => change.file && /\.(py)$/.test(change.file))) {
+    } if (changes.some(change => change.file && /\.(py)$/.test(change.file))) {
       return 'python changes';
-    } else if (changes.some(change => change.file && /\.(php)$/.test(change.file))) {
+    } if (changes.some(change => change.file && /\.(php)$/.test(change.file))) {
       return 'php changes';
-    } else if (changes.some(change => {
-      return change.changes && change.changes.some(c => 
+    } if (changes.some(change => change.changes && change.changes.some(c => 
         c.content && /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
-      );
-    })) {
+      ))) {
       return 'bug fix';
-    } else if (changes.some(change => {
-      return change.changes && change.changes.some(c => 
+    } if (changes.some(change => change.changes && change.changes.some(c => 
         c.content && /\b(feature|add|implement|create|new)\b/i.test(c.content)
-      );
-    })) {
+      ))) {
       return 'feature addition';
-    } else {
+    } 
       return 'general modification';
-    }
+    
   }
 
   /**
@@ -1158,7 +1152,7 @@ Use: "config: update database connection settings for production"
         ...options,
         chunkIndex: i,
         totalChunks: chunks.length,
-        isLastChunk: isLastChunk,
+        isLastChunk,
         chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle'
       };
 
@@ -1201,7 +1195,7 @@ Use: "config: update database connection settings for production"
    */
   async makeDirectAPIRequest(endpoint, params = {}) {
     try {
-      const config = await this.getConfig();
+      await this.getConfig();
       return await this.sendHTTPRequest(`${this.baseURL}${endpoint}`, params);
     } catch (error) {
       throw new Error(`Direct API request failed: ${error.message}`);
