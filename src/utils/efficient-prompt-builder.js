@@ -2,10 +2,13 @@
  * Efficient Prompt Builder - Optimized prompt generation with semantic context
  */
 
+const TokenCounter = require('./token-counter');
+
 class EfficientPromptBuilder {
   constructor(options = {}) {
     this.maxPromptLength = options.maxPromptLength || 8000;
     this.preserveContext = options.preserveContext || true;
+    this.tokenCounter = new TokenCounter();
   }
 
   /**
@@ -143,7 +146,7 @@ REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE. NO WARNINGS. NO INSTRUCTIONS. NO DEPLO
 Single best commit message:`;
 
     // Compress if still too long
-    if (prompt.length > this.maxPromptLength) {
+    if (this.tokenCounter.countTokens(prompt) > this.maxPromptLength) {
       prompt = this.compressPrompt(prompt, diff, count, conventional, isWordPressFile);
     }
 
