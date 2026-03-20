@@ -16,6 +16,8 @@
     "test:verbose": "VERBOSE_TESTS=1 jest --verbose",
     "lint": "eslint src/ tests/ bin/ scripts/",
     "lint:fix": "eslint src/ tests/ bin/ scripts/ --fix",
+    "format": "prettier --write \"src/**/*.js\" \"tests/**/*.js\" \"bin/**/*.js\" \"scripts/**/*.js\"",
+    "format:check": "prettier --check \"src/**/*.js\" \"tests/**/*.js\" \"bin/**/*.js\" \"scripts/**/*.js\"",
     "build:prod": "./scripts/build.sh",
     "deploy": "./scripts/deploy.sh",
     "deploy:publish": "./scripts/deploy.sh --publish"
@@ -68,6 +70,7 @@
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "prettier": "^3.8.1"
   }
 }
