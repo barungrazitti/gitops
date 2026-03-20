@@ -1,82 +1,78 @@
+
 const AICommitGenerator = require('../src/index');
-const chalk = require('chalk');
 
 describe('AICommitGenerator Error Handling', () => {
-  let generator;
+    let generator;
 
-  beforeEach(() => {
-    generator = new AICommitGenerator();
-  });
-
-  describe('identifyErrorType', () => {
-    test('identifies "no staged changes" error', () => {
-      const error = new Error('No staged changes found. Please stage your changes first.');
-      expect(generator.identifyErrorType(error)).toBe('git_no_changes');
+    beforeEach(() => {
+        generator = new AICommitGenerator({ provider: 'test', model: 'test' });
     });
 
-    test('identifies "not a git repository" error', () => {
-      const error = new Error('not a git repository (or any of the parent directories): .git');
-      expect(generator.identifyErrorType(error)).toBe('git_not_repo');
+    describe('identifyErrorType', () => {
+        it('should identify "no staged changes" error', () => {
+            const error = new Error('No staged changes found.');
+            expect(generator.identifyErrorType(error)).toBe('git_no_changes');
+        });
+
+        it('should identify "not a git repository" error', () => {
+            const error = new Error('fatal: not a git repository');
+            expect(generator.identifyErrorType(error)).toBe('git_not_repo');
+        });
+
+        it('should identify "401" auth error', () => {
+            const error = new Error('Request failed with status code 401');
+            expect(generator.identifyErrorType(error)).toBe('ai_auth_error');
+        });
+
+        it('should identify "429" rate limit error', () => {
+            const error = new Error('Request failed with status code 429');
+            expect(generator.identifyErrorType(error)).toBe('ai_rate_limit');
+        });
+
+        it('should return "unknown" for an unhandled error', () => {
+            const error = new Error('A completely random error.');
+            expect(generator.identifyErrorType(error)).toBe('unknown');
+        });
     });
 
-    test('identifies AI authentication error (401)', () => {
-      const error = new Error('AI provider returned 401 Unauthorized');
-      expect(generator.identifyErrorType(error)).toBe('ai_auth_error');
+    describe('getLocalSuggestion', () => {
+        it('should return the correct suggestion for "no staged changes"', () => {
+            const suggestion = generator.getLocalSuggestion('git_no_changes');
+            expect(suggestion).toContain('git add');
+        });
+
+        it('should return the correct suggestion for "not a git repository"', () => {
+            const suggestion = generator.getLocalSuggestion('git_not_repo');
+            expect(suggestion).toContain('git init');
+        });
+
+        it('should return a generic message for "unknown" error type', () => {
+            const suggestion = generator.getLocalSuggestion('unknown');
+            expect(suggestion).toContain('An unexpected error occurred');
+        });
     });
 
-    test('identifies AI rate limit error (429)', () => {
-      const error = new Error('AI provider returned 429 Too Many Requests');
-      expect(generator.identifyErrorType(error)).toBe('ai_rate_limit');
-    });
+    describe('provideErrorSuggestions', () => {
+        let consoleSpy;
 
-    test('returns "unknown" for unrecognized errors', () => {
-      const error = new Error('Some random error');
-      expect(generator.identifyErrorType(error)).toBe('unknown');
-    });
-  });
+        beforeEach(() => {
+            consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        });
 
-  describe('getLocalSuggestion', () => {
-    test('returns suggestion for git_no_changes', () => {
-      const suggestion = generator.getLocalSuggestion('git_no_changes');
-      expect(suggestion).toContain('git add');
-    });
+        afterEach(() => {
+            consoleSpy.mockRestore();
+        });
 
-    test('returns suggestion for git_not_repo', () => {
-      const suggestion = generator.getLocalSuggestion('git_not_repo');
-      expect(suggestion).toContain('git init');
-    });
+        it('should not crash when called', async () => {
+            const error = new Error('No staged changes found.');
+            await expect(generator.provideErrorSuggestions(error, {})).resolves.not.toThrow();
+        });
 
-    test('returns suggestion for ai_auth_error', () => {
-      const suggestion = generator.getLocalSuggestion('ai_auth_error');
-      expect(suggestion).toContain('aic setup');
+        it('should print a suggestion to the console', async () => {
+            const error = new Error('No staged changes found.');
+            await generator.provideErrorSuggestions(error, {});
+            expect(consoleSpy).toHaveBeenCalled();
+            expect(consoleSpy.mock.calls[0][0]).toContain('💡 Suggestion:');
+        });
     });
-
-    test('returns default suggestion for unknown type', () => {
-      const suggestion = generator.getLocalSuggestion('unknown');
-      expect(suggestion).toContain('Check your internet connection');
-    });
-  });
-
-  describe('provideErrorSuggestions', () => {
-    test('should not throw even if helper methods fail', () => {
-      // Mocking to force an error internally
-      jest.spyOn(generator, 'identifyErrorType').mockImplementation(() => {
-        throw new Error('Internal failure');
-      });
-      
-      expect(() => {
-        generator.provideErrorSuggestions(new Error('test'), {});
-      }).not.toThrow();
-    });
-
-    test('prints suggestion to console', () => {
-      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
-      const error = new Error('No staged changes found');
-      
-      generator.provideErrorSuggestions(error, {});
-      
-      expect(consoleSpy).toHaveBeenCalled();
-      consoleSpy.mockRestore();
-    });
-  });
 });

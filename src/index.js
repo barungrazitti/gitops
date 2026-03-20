@@ -36,6 +36,80 @@ class AICommitGenerator {
   }
 
   /**
+   * Check if AI provider is available and configured
+   */
+  isAIAvailable(options = {}) {
+    try {
+      // Merge options with config to get effective configuration
+      const config = this.configManager.getAll(); // Synchronous version for this check
+      const provider = options.provider || config.defaultProvider || 'groq';
+      
+      // Check if provider is configured
+      if (provider === 'ollama') {
+        // For Ollama, we assume it's available if selected (user would have set it up)
+        return true;
+      } else if (provider === 'groq') {
+        // For Groq, check if API key is configured
+        const apiKey = config.apiKey || process.env.GROQ_API_KEY;
+        return !!apiKey && apiKey.trim().length > 0;
+      }
+      
+      // For other providers, check if they have configuration
+      return true;
+    } catch (error) {
+      // If we can't check configuration, assume not available to be safe
+      return false;
+    }
+  }
+
+  /**
+   * Get AI-powered suggestion for an error
+   */
+  async getAISuggestion(error, options = {}) {
+    try {
+      // Get effective configuration
+      const config = await this.configManager.getAll();
+      const providerName = options.provider || config.defaultProvider || 'groq';
+      
+      // Create provider instance
+      const provider = AIProviderFactory.create(providerName);
+      
+      // Build prompt for AI suggestion
+      const prompt = `I encountered an error while trying to generate a git commit message.
+Error: ${error.message}
+Operation: ${options.operation || 'generate_commit'}
+Context: ${providerName} provider was being used.
+
+Please provide a short, 1-sentence actionable suggestion for the developer to fix this.
+Do not explain the error, just provide the solution.`;
+
+      // Generate response from AI provider
+      const response = await provider.generateResponse(prompt, { maxTokens: 100 });
+      
+      // Extract and clean the suggestion
+      if (response && typeof response === 'string') {
+        // Clean up any extra whitespace or formatting
+        let suggestion = response.trim();
+        // Remove any numbering or bullet points that might be added
+        suggestion = suggestion.replace(/^\d+\.?\s*/, '').replace(/^[-*]\s*/, '');
+        // Ensure it's a reasonable length
+        if (suggestion.length > 0 && suggestion.length < 200) {
+          return suggestion;
+        }
+      }
+      
+      return null;
+    } catch (aiError) {
+      // Log AI failure for debugging but don't throw - we'll fall back to local suggestions
+      await this.activityLogger.debug('ai_suggestion_failed', { 
+        error: aiError.message,
+        provider: options.provider || 'unknown'
+      });
+      return null;
+    }
+  }
+
+  /**
    * Generate AI commit messages
    */
   async generate(options = {}) {
@@ -261,14 +335,29 @@ class AICommitGenerator {
   /**
    * Provide helpful suggestions based on error type
    */
-  provideErrorSuggestions(error, options = {}) {
+  async provideErrorSuggestions(error, options = {}) {
     try {
       // 1. Identify error type
       const errorType = this.identifyErrorType(error);
 
-      // 2. Fallback to local suggestions (AI-powered suggestions will be added in the next plan)
+      // 2. Try AI-powered suggestion if possible
+      if (this.isAIAvailable(options)) {
+        try {
+          const suggestion = await this.getAISuggestion(error, options);
+          if (suggestion) {
+            console.log(chalk.yellow(`\n💡 AI Suggestion: ${suggestion}`));
+            return;
+          }
+        } catch (aiError) {
+          // Silently fall back to local suggestions
+          await this.activityLogger.debug('ai_suggestion_failed_in_provide', { 
+            error: aiError.message 
+          });
+        }
+      }
+
+      // 3. Fallback to local suggestions
       const localSuggestion = this.getLocalSuggestion(errorType);
-      
       if (localSuggestion) {
         console.log(chalk.yellow(`\n💡 Suggestion: ${localSuggestion}`));
       }
