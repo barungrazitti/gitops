@@ -48,15 +48,22 @@
 2. Code is automatically formatted on save/manual run via Prettier.
 3. `.eslintrc.json` and `.prettierrc` are present in the project root.
 
-### Phase 3: improve the relevance of the git commit messages for small and large diffs
+### Phase 3: Improve the relevance of the git commit messages for small and large diffs
 
-**Goal:** [To be planned]
+**Goal:** Implement diff-size-aware strategies for more relevant commit messages
 **Requirements**: TBD
 **Depends on:** Phase 2
-**Plans:** 0 plans
+**Plans:** 1/4 plans executed
 
-Plans:
-- [ ] TBD (run /gsd:plan-phase 3 to break down)
+**Plans:**
+- [x] 03-01-PLAN.md — Accurate token counting and diff categorization (2026-03-20)
+  - Implemented tiktoken-based token counting
+  - Created diff categorizer with hybrid metrics (tokens, files, entities)
+  - Added user-configurable thresholds
+- [ ] 03-02-PLAN.md — Small diff prompt strategy (entity-centric)
+- [ ] 03-03-PLAN.md — Large diff prompt strategy (hierarchical summarization)
+- [ ] 03-04-PLAN.md — Relevance evaluation and metrics
 
 ---
 *Roadmap updated: 2026-03-20*
+
