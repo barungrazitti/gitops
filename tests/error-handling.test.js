@@ -74,5 +74,76 @@ describe('AICommitGenerator Error Handling', () => {
             expect(consoleSpy).toHaveBeenCalled();
             expect(consoleSpy.mock.calls[0][0]).toContain('💡 Suggestion:');
         });
+
+        it('should handle AI timeout gracefully', async () => {
+            // Mock a slow AI provider
+            const originalGenerateResponse = generator.aiProviderFactory?.create?.('groq')?.generateResponse;
+            const mockProvider = {
+                generateResponse: jest.fn().mockImplementation(() => 
+                    new Promise((resolve) => setTimeout(() => resolve(''), 100)) // 100ms delay
+                )
+            };
+            
+            // Temporarily replace the factory method
+            const factory = generator.aiProviderFactory;
+            generator.aiProviderFactory = {
+                create: () => mockProvider
+            };
+            
+            try {
+                const error = new Error('API connection timeout');
+                await generator.provideErrorSuggestions(error, { provider: 'groq' });
+                // Should still print a local suggestion even if AI times out
+                expect(consoleSpy).toHaveBeenCalled();
+                expect(consoleSpy.mock.calls[0][0]).toContain('💡 Suggestion:');
+            } finally {
+                // Restore original factory
+                generator.aiProviderFactory = factory;
+            }
+        });
+
+        it('should handle AI returning empty response', async () => {
+            // Mock a provider that returns empty response
+            const mockProvider = {
+                generateResponse: jest.fn().mockResolvedValue('')
+            };
+            
+            // Temporarily replace the factory method
+            const factory = generator.aiProviderFactory;
+            generator.aiProviderFactory = {
+                create: () => mockProvider
+            };
+            
+            try {
+                const error = new Error('API error');
+                await generator.provideErrorSuggestions(error, { provider: 'groq' });
+                // Should fall back to local suggestion
+                expect(consoleSpy).toHaveBeenCalled();
+                expect(consoleSpy.mock.calls[0][0]).toContain('💡 Suggestion:');
+            } finally {
+                // Restore original factory
+                generator.aiProviderFactory = factory;
+            }
+        });
+
+        it('should handle nested errors without infinite recursion', async () => {
+            // Mock a logger that throws an error
+            const originalActivityLogger = generator.activityLogger;
+            generator.activityLogger = {
+                debug: jest.fn().mockImplementation(() => { throw new Error('Logger failed'); })
+            };
+            
+            try {
+                const error = new Error('Test error');
+                // This should not cause infinite recursion
+                await generator.provideErrorSuggestions(error, {});
+                // Should still print a local suggestion
+                expect(consoleSpy).toHaveBeenCalled();
+                expect(consoleSpy.mock.calls[0][0]).toContain('💡 Suggestion:');
+            } finally {
+                // Restore original logger
+                generator.activityLogger = originalActivityLogger;
+            }
+        });
     });
 });
