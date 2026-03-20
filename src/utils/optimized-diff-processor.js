@@ -2,23 +2,27 @@
  * Optimized Diff Processor - Efficiently processes git diffs with performance optimizations
  */
 
+const TokenCounter = require('./token-counter');
+
 class OptimizedDiffProcessor {
   constructor() {
     // Configuration for optimization
     this.config = {
       maxTokensPerChunk: 6000,
       minChunkSize: 1000, // Minimum size before considering chunking
-      tokenEstimateFactor: 4, // Characters per token estimation
+      tokenEstimateFactor: 4, // Characters per token estimation (legacy, kept for config compatibility)
       preserveContextLines: 5, // Lines of context to preserve around changes
     };
+
+    this.tokenCounter = new TokenCounter();
   }
 
   /**
-   * Estimate token count for a string
+   * Estimate token count for a string (now uses accurate counting)
    */
   estimateTokens(text) {
     if (!text) return 0;
-    return Math.ceil(text.length / this.config.tokenEstimateFactor);
+    return this.tokenCounter.countTokens(text);
   }
 
   /**
