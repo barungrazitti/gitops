@@ -90,6 +90,20 @@ class ConfigManager {
         simple: '{description}',
         detailed: '{type}({scope}): {description}\n\n{body}',
       },
+
+      // Diff categorization thresholds
+      categorization: {
+        small: {
+          tokens: 100,
+          files: 2,
+          entities: 5,
+        },
+        medium: {
+          tokens: 2000,
+          files: 10,
+          entities: 20,
+        },
+      },
     };
   }
 
@@ -141,6 +155,18 @@ class ConfigManager {
       }),
       scopes: Joi.array().items(Joi.string()),
       templates: Joi.object(),
+      categorization: Joi.object({
+        small: Joi.object({
+          tokens: Joi.number().integer().min(0),
+          files: Joi.number().integer().min(1),
+          entities: Joi.number().integer().min(0),
+        }),
+        medium: Joi.object({
+          tokens: Joi.number().integer().min(0),
+          files: Joi.number().integer().min(1),
+          entities: Joi.number().integer().min(0),
+        }),
+      }),
     });
   }
 
@@ -175,10 +201,15 @@ class ConfigManager {
   }
 
   /**
-   * Get a specific configuration value
+   * Get a specific configuration value (supports dot notation)
+   * @param {string} key - Configuration key (supports 'categorization.small.tokens')
+   * @returns {*} Configuration value
    */
   async get(key) {
     try {
+      if (key.includes('.')) {
+        return this.getNestedValue(this.config.store, key);
+      }
       return this.config.get(key);
     } catch (error) {
       throw new Error(`Failed to get configuration value: ${error.message}`);
@@ -186,19 +217,35 @@ class ConfigManager {
   }
 
   /**
-   * Set a configuration value
+   * Set a configuration value (supports dot notation)
+   * @param {string} key - Configuration key (supports 'categorization.small.tokens')
+   * @param {*} value - Value to set
    */
   async set(key, value) {
     try {
-      // Validate the key-value pair
-      const testConfig = { ...this.config.store, [key]: value };
+      let testConfig;
+
+      if (key.includes('.')) {
+        // For dot notation, build the nested structure
+        testConfig = this.buildNestedObject(key, value);
+        // Merge with existing config
+        testConfig = this.mergeConfig(this.config.store, testConfig);
+      } else {
+        testConfig = { ...this.config.store, [key]: value };
+      }
+
+      // Validate the updated configuration
       const { error } = this.schema.validate(testConfig);
 
       if (error) {
         throw new Error(`Invalid configuration value: ${error.message}`);
       }
 
-      this.config.set(key, value);
+      if (key.includes('.')) {
+        this.setNestedValue(this.config.store, key, value);
+      } else {
+        this.config.set(key, value);
+      }
     } catch (error) {
       throw new Error(`Failed to set configuration value: ${error.message}`);
     }
@@ -424,7 +471,7 @@ class ConfigManager {
     if (!override) return base;
 
     const result = { ...base };
-    
+
     for (const [key, value] of Object.entries(override)) {
       if (value !== undefined && value !== null) {
         if (typeof value === 'object' && value !== null && !Array.isArray(value) && typeof result[key] === 'object' && result[key] !== null) {
@@ -435,6 +482,52 @@ class ConfigManager {
       }
     }
 
+    return result;
+  }
+
+  /**
+   * Get nested value using dot notation
+   * @param {object} obj - Object to traverse
+   * @param {string} path - Dot-notation path (e.g., 'categorization.small.tokens')
+   * @returns {*} Nested value or undefined
+   */
+  getNestedValue(obj, path) {
+    return path.split('.').reduce((current, key) => (current && current[key] !== undefined ? current[key] : undefined), obj);
+  }
+
+  /**
+   * Set nested value using dot notation
+   * @param {object} obj - Object to modify
+   * @param {string} path - Dot-notation path (e.g., 'categorization.small.tokens')
+   * @param {*} value - Value to set
+   */
+  setNestedValue(obj, path, value) {
+    const keys = path.split('.');
+    const lastKey = keys.pop();
+    const target = keys.reduce((current, key) => {
+      if (!current[key] || typeof current[key] !== 'object') {
+        current[key] = {};
+      }
+      return current[key];
+    }, obj);
+    target[lastKey] = value;
+  }
+
+  /**
+   * Build nested object from dot notation path
+   * @param {string} path - Dot-notation path
+   * @param {*} value - Value to set
+   * @returns {object} Nested object
+   */
+  buildNestedObject(path, value) {
+    const keys = path.split('.');
+    const result = {};
+    let current = result;
+    for (let i = 0; i < keys.length - 1; i++) {
+      current[keys[i]] = {};
+      current = current[keys[i]];
+    }
+    current[keys[keys.length - 1]] = value;
     return result;
   }
 }
