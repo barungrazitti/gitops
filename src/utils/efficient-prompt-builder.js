@@ -3,12 +3,14 @@
  */
 
 const TokenCounter = require('./token-counter');
+const DiffCategorizer = require('./diff-categorizer');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
     this.maxPromptLength = options.maxPromptLength || 8000;
     this.preserveContext = options.preserveContext || true;
     this.tokenCounter = new TokenCounter();
+    this.diffCategorizer = new DiffCategorizer();
   }
 
   /**
@@ -34,6 +36,13 @@ class EfficientPromptBuilder {
     // Analyze diff for change type and impact
     const changeAnalysis = this.analyzeDiffForSpecialization(diff);
     const impactAnalysis = this.analyzeChangeImpact(diff, context);
+
+    // Categorize diff by size
+    const diffCategory = this.diffCategorizer.categorizeDiff(diff, options.categorizationThresholds);
+    options.diffCategory = diffCategory;
+
+    // Log category for debugging
+    console.log(`Diff category: ${diffCategory.category}`);
 
     // Detect problematic cases (large WordPress files, etc.)
     const isProblematicCase = this.detectProblematicCase(diff, context);
