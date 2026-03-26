@@ -143,6 +143,9 @@ tmp_code_*
 # Local config files (for development)
 *.local.json
 config.json
+
+# GSD planning config (committed)
+!.planning/config.json
 CON.json
 
 # FIT files
