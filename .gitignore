@@ -144,8 +144,11 @@ tmp_code_*
 *.local.json
 config.json
 
-# GSD planning config (committed)
-!.planning/config.json
+# GSD planning
+.planning/
+
+# AI tool configs
+.qwen/
 CON.json
 
 # FIT files
