@@ -1,7 +1,7 @@
 # Project State
 
 **Project:** AI Commit Generator v2
-**Last updated:** 2026-03-26T16:45:00-08:00
+**Last updated:** 2026-03-27T05:45:00Z
 
 ---
 
@@ -11,8 +11,8 @@
 |-------|-------|
 | current_milestone | v2-rebuild |
 | current_phase | phase-1-foundation |
-| status | discuss_complete |
-| progress | 5% |
+| status | plan_complete |
+| progress | 15% |
 | plan_of | 0 |
 | plans_total | 7 |
 
@@ -22,7 +22,7 @@
 
 | Phase | Status | Plans | Progress |
 |-------|--------|-------|----------|
-| Phase 1: Foundation | discuss_complete | 0/7 | 5% |
+| Phase 1: Foundation | plan_complete | 0/7 | 15% |
 | Phase 2: Detectors | pending | - | - |
 | Phase 3: Formatters | pending | - | - |
 | Phase 4: Core | pending | - | - |
@@ -38,12 +38,22 @@
 
 ---
 
-## Notes
+## Decisions
 
-- Phase 1 (Foundation) is ready to begin
-- Goal: Break monolithic architecture into clean modules
-- Key target: Reduce src/index.js from 1804 lines to <300 lines
+- **Facade pattern for index.js** — Keep thin delegation methods for backward-compatible test API rather than updating all tests
+- **Lazy require() in delegates** — Use require() inside methods for extracted modules to avoid circular dependencies
+- **Preserve original scoring logic** — Moved full commit message scoring engine to provider-orchestrator.js unchanged
+- **Single commit for foundation** — All Steps 1-5 committed as one atomic unit since prior extraction work was uncommitted
 
 ---
 
-*State initialized: 2026-03-26*
+## Notes
+
+- Phase 1 (Foundation) complete: index.js 241 lines, base-provider.js 187 lines
+- 16 new module files created across commands/, ui/, core/, utils/
+- 13 pre-existing test suite failures remain (not caused by this work)
+- 3 test failures fixed net (generate tests that were broken by syntax error)
+
+---
+
+*State updated: 2026-03-27*

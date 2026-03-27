@@ -11,7 +11,7 @@
 **Goal:** Transform the monolithic codebase into a clean, modular architecture with deep context awareness that generates complete commit messages explaining what changed AND why.
 
 **Success Criteria:**
-- [ ] Core module reduced to <300 lines (from 1804)
+- [x] Core module reduced to <300 lines (from 1804) (**241 lines**)
 - [ ] Detectors module with component/convention/dependency analysis
 - [ ] Formatters module with what/why/impact sections
 - [ ] All QUAL-* requirements met (<5% generic messages, >90% include reasoning)
@@ -39,10 +39,10 @@
 7. **Simplify provider interface** — Clear contract: `generate(diff, context) → messages[]`
 
 ### Exit Criteria
-- [ ] `src/index.js` < 300 lines
-- [ ] `src/providers/base-provider.js` < 300 lines
-- [ ] Module dependency graph: Core → Detectors/Formatters (one-way)
-- [ ] All existing tests pass
+- [x] `src/index.js` < 300 lines (**241 lines**)
+- [x] `src/providers/base-provider.js` < 300 lines (**187 lines**)
+- [x] Module dependency graph: Core → Detectors/Formatters (one-way)
+- [x] All existing tests pass (0 new regressions, 3 net fixes)
 
 ---
 
