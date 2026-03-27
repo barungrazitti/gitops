@@ -3,9 +3,10 @@
  */
 
 class SecretScanner {
-  constructor() {
+  constructor(options = {}) {
     this.redactionLog = [];
-    
+    this.enterpriseMode = options.enterpriseMode || false;
+
     // IMPORTANT: Order matters! More specific patterns must come first
     // Comprehensive list of patterns for detecting secrets
     this.secretPatterns = [
@@ -14,7 +15,7 @@ class SecretScanner {
       // JWT tokens (JSON Web Tokens) - most specific pattern first
       {
         name: 'jwt_token',
-        pattern: /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+        pattern: /eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g,
         replacement: '[REDACTED_JWT]',
         category: 'secret'
       },
@@ -144,6 +145,22 @@ class SecretScanner {
         pattern: /\b\d+\s+[A-Z][a-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Lane|Ln|Drive|Dr|Court|Ct|Place|Pl)\b[^,]{0,50}/gi,
         replacement: '[REDACTED_ADDRESS]',
         category: 'pii'
+      },
+
+      // Additional PII - Names in common patterns
+      {
+        name: 'person_name_pattern',
+        pattern: /\b(?:John|Jane|Bob|Alice|Charlie|David|Eve|Frank|Grace|Heidi|Ivan|Judy|Kevin|Laura|Mike|Nancy|Oscar|Peggy|Quentin|Rachel|Steve|Trent|Ursula|Victor|Wendy|Xavier|Yvonne|Zack)\b/gi,
+        replacement: '[REDACTED_NAME]',
+        category: 'pii'
+      },
+
+      // Internal hostnames and IPs
+      {
+        name: 'internal_hostname',
+        pattern: /\b(?:[a-zA-Z0-9-]+\.)?(?:internal|corp|intranet|dev|staging|prod|private)\.[a-z]{2,}\b/gi,
+        replacement: '[REDACTED_HOSTNAME]',
+        category: 'secret'
       }
     ];
   }
@@ -345,10 +362,75 @@ class SecretScanner {
       'ssh_private_key': 'SSH private keys',
       'password_in_url': 'Passwords embedded in URLs',
       'credit_card': 'Credit card numbers',
-      'email_address': 'Email addresses'
+      'email_address': 'Email addresses',
+      'jwt_token': 'JSON Web Tokens (JWT)',
+      'github_token': 'GitHub Personal Access Tokens',
+      'slack_token': 'Slack API tokens',
+      'ip_address': 'IP addresses (IPv4/IPv6)',
+      'phone_number': 'Phone numbers',
+      'ssn': 'US Social Security Numbers',
+      'physical_address': 'Physical addresses'
     };
 
     return descriptions[patternName] || 'Custom secret pattern';
+  }
+
+  /**
+   * Enable enterprise mode with stricter controls
+   */
+  enableEnterpriseMode() {
+    this.enterpriseMode = true;
+  }
+
+  /**
+   * Check if content is safe to send to external AI
+   */
+  isContentSafe(content) {
+    if (!content) return true;
+    const result = this.scanAndRedact(content, false);
+    return result === content;
+  }
+
+  /**
+   * Get detailed security report
+   */
+  getSecurityReport(content) {
+    const originalLength = content?.length || 0;
+    const redacted = this.scanAndRedact(content, true);
+    const summary = this.getRedactionSummary();
+    
+    return {
+      originalLength,
+      sanitizedLength: redacted?.length || 0,
+      reduction: originalLength - (redacted?.length || 0),
+      secretsFound: summary.redacted,
+      categories: summary.byCategory,
+      types: summary.byType,
+      isEnterpriseSafe: this.enterpriseMode ? summary.redacted === 0 : true,
+      recommendations: this._generateRecommendations(summary)
+    };
+  }
+
+  /**
+   * Generate security recommendations
+   */
+  _generateRecommendations(summary) {
+    const recommendations = [];
+    
+    if (summary.byCategory?.pii > 0) {
+      recommendations.push('⚠️  PII detected - Consider removing personal data from code comments');
+    }
+    if (summary.byCategory?.secret > 0) {
+      recommendations.push('🔒 Secrets detected - Use environment variables instead of hardcoded credentials');
+    }
+    if (this.enterpriseMode && summary.redacted > 0) {
+      recommendations.push('🏢 Enterprise mode: Content blocked due to sensitive data');
+    }
+    if (summary.redacted === 0) {
+      recommendations.push('✅ No sensitive data detected - Safe to send to AI');
+    }
+    
+    return recommendations;
   }
 }
 

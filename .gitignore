@@ -143,6 +143,12 @@ tmp_code_*
 # Local config files (for development)
 *.local.json
 config.json
+
+# GSD planning
+.planning/
+
+# AI tool configs
+.qwen/
 CON.json
 
 # FIT files

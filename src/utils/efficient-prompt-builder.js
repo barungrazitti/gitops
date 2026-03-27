@@ -23,7 +23,8 @@ class EfficientPromptBuilder {
       chunkContext,
       enhancedPrompt,
       promptInstructions,
-      strictValidation
+      strictValidation,
+      diffFacts
     } = options;
 
     // Handle null/undefined diff
@@ -54,11 +55,28 @@ class EfficientPromptBuilder {
 
     // Add relevance-focused instructions
     prompt += `\n\nRELEVANCE REQUIREMENTS:
- - Focus on BUSINESS VALUE and USER IMPACT
- - Use functional scopes (auth, ui, api, theme) not file names
- - Be specific about WHAT changed, not implementation details
- - Avoid technical jargon unless necessary
- - Consider: "What does this enable for users?"`;
+  - Focus on BUSINESS VALUE and USER IMPACT
+  - Use functional scopes (auth, ui, api, theme) not file names
+  - Be specific about WHAT changed, not implementation details
+  - Avoid technical jargon unless necessary
+  - Consider: "What does this enable for users?"`;
+
+    // Add diff facts as hard constraints (prevents hallucination)
+    if (diffFacts) {
+      prompt += `\n\n${this.buildDiffFactConstraints(diffFacts)}`;
+    }
+
+    // Add anti-hallucination instructions
+    prompt += `\n\nANTI-HALLUCINATION RULES (CRITICAL):
+  - ONLY describe what is ACTUALLY in the +/- lines of this diff
+  - Do NOT reference the purpose of a file/module unless the diff changes that functionality
+  - If only console.log lines were removed, do NOT say "improved AI handling" or "enhanced error handling"
+  - If only config files changed, do NOT say "implemented feature" or "added functionality"
+  - If only docs changed, do NOT say "added feature" - say "updated documentation"
+  - Do NOT use "feat" unless new functions, classes, or significant logic was ADDED
+  - Do NOT fabricate intent - describe the mechanical change, not your guess at motivation
+  - Example WRONG: diff removes console.logs → "feat: improve error handling"
+  - Example RIGHT:  diff removes console.logs → "refactor: remove debug console statements"`;
 
     // Add change-specific guidance
     prompt += this.buildChangeSpecificGuidance(changeAnalysis, impactAnalysis);
@@ -681,6 +699,14 @@ ${this.buildPrompt(diff, options)}`;
     }
 
     return examples.slice(0, 2).join(', ');
+  }
+
+  /**
+   * Build constraint text from diff facts analysis
+   */
+  buildDiffFactConstraints(diffFacts) {
+    const DiffFactAnalyzer = require('./diff-fact-analyzer');
+    return new DiffFactAnalyzer().buildPromptConstraints(diffFacts);
   }
 
   /**

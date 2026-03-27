@@ -215,7 +215,7 @@ class AIProviderFactory {
     const allModels = await this.getAllAvailableModels(configs);
 
     // Priority order for providers (best to worst for commit messages)
-    const providerPriority = ['ollama', 'groq'];
+    const providerPriority = ['groq', 'ollama'];
 
     for (const providerName of providerPriority) {
       const providerData = allModels[providerName];
