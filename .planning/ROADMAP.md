@@ -55,13 +55,13 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — ComponentDetector (DET-01) and ConventionDetector (DET-02)
-- [ ] 02-02-PLAN.md — FileTypeDetector (DET-03) and DependencyMapper (DET-04)
+- [x] 02-01-PLAN.md — ComponentDetector (DET-01) and ConventionDetector (DET-02)
+- [x] 02-02-PLAN.md — FileTypeDetector (DET-03) and DependencyMapper (DET-04)
 
 ### Exit Criteria
-- [ ] All detectors return consistent context objects
-- [ ] Detectors have no dependency on Formatters
-- [ ] Unit tests for each detector
+- [x] All detectors return consistent context objects
+- [x] Detectors have no dependency on Formatters
+- [x] Unit tests for each detector (92 tests total)
 - [ ] Integration with CommitGenerator context enrichment
 
 ---
