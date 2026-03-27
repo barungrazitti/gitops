@@ -63,19 +63,19 @@ class GenerateCommand {
       }
 
       // SECURITY: Sanitize diff to remove secrets and PII before sending to AI
-      const secretScanner = new SecretScanner();
+      const secretScanner = new SecretScanner({ enterpriseMode: mergedOptions.enterpriseMode });
       const shouldSanitize = mergedOptions.sanitize !== false; // Default: true
-      
+
       if (shouldSanitize) {
         spinner.text = chalk.blue('🔒 Scanning for sensitive information...');
         const originalLength = diff.length;
-        
+
         diff = secretScanner.scanAndRedact(diff, true);
         const redactionSummary = secretScanner.getRedactionSummary();
-        
+
         if (redactionSummary.found) {
           console.log(chalk.yellow(`\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`));
-          
+
           // Group by category for cleaner output
           const categories = Object.entries(redactionSummary.byCategory || {});
           if (categories.length > 0) {
@@ -84,7 +84,22 @@ class GenerateCommand {
               console.log(chalk.gray(`   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`));
             });
           }
-          
+
+          // In enterprise mode, block if any secrets found
+          if (mergedOptions.enterpriseMode && redactionSummary.redacted > 0) {
+            spinner.fail(chalk.red('🏢 Enterprise mode: Sensitive data detected - commit blocked'));
+            console.log(chalk.yellow('\n💡 Recommendations:'));
+            const recommendations = secretScanner._generateRecommendations(redactionSummary);
+            recommendations.forEach(rec => console.log(chalk.gray(`   ${rec}`)));
+            
+            await this.activityLogger.warn('enterprise_mode_blocked', {
+              redacted: redactionSummary.redacted,
+              byCategory: redactionSummary.byCategory,
+              byType: redactionSummary.byType
+            });
+            return;
+          }
+
           // Log to activity logger for audit trail
           await this.activityLogger.warn('sensitive_data_redacted', {
             redacted: redactionSummary.redacted,
@@ -93,12 +108,12 @@ class GenerateCommand {
             originalSize: originalLength,
             sanitizedSize: diff.length
           });
-          
+
           spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
         } else {
           await this.activityLogger.info('no_secrets_found', { diffLength: diff.length });
         }
-        
+
         secretScanner.clearRedactionLog();
       }
 
