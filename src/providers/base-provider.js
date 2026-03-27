@@ -36,12 +36,17 @@ class BaseProvider {
   // ── Delegated methods ────────────────────────────────────────────
 
   buildPrompt(diff, options = {}) {
-    const PromptBuilder = require('../utils/prompt-builder');
-    const promptBuilder = new PromptBuilder({
+    const DiffFactAnalyzer = require('../utils/diff-fact-analyzer');
+    const EfficientPromptBuilder = require('../utils/efficient-prompt-builder');
+
+    const diffFactAnalyzer = new DiffFactAnalyzer();
+    const promptBuilder = new EfficientPromptBuilder({
       maxPromptLength: this.config?.maxPromptLength || 8000,
       preserveContext: true
     });
-    return promptBuilder.buildPrompt(diff, options);
+
+    const diffFacts = diffFactAnalyzer.analyze(diff);
+    return promptBuilder.buildPrompt(diff, { ...options, diffFacts });
   }
 
   analyzeDiffContent(diff) {
