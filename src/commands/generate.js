@@ -144,9 +144,12 @@ class GenerateCommand {
 
       spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
-      // Format messages
+      // Format messages with context enrichment (Phase 3: Formatters Module)
       const formattedMessages = messages.map((msg) =>
-        this.messageFormatter.format(msg, mergedOptions)
+        this.messageFormatter.formatWithContext(msg, context, {
+          conventional: mergedOptions.conventional || config.conventionalCommits,
+          includeSections: ['what', 'why', 'impact']
+        })
       );
 
       // Show interactive selection

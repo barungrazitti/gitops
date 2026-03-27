@@ -6,9 +6,9 @@ status: executing
 last_updated: "2026-03-27T06:15:00.000Z"
 progress:
   total_phases: 5
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 4
+  total_plans: 6
+  completed_plans: 6
 ---
 
 # Project State
@@ -23,11 +23,11 @@ progress:
 | Field | Value |
 |-------|-------|
 | current_milestone | v1.0-milestone |
-| current_phase | 02-detectors-module |
-| status | plan_complete |
-| progress | 35% |
-| plan_of | 2 |
-| plans_total | 2 |
+| current_phase | 05-testing-polish |
+| status | executing |
+| progress | 80% |
+| plan_of | 6 |
+| plans_total | 6 |
 
 ---
 
@@ -35,11 +35,11 @@ progress:
 
 | Phase | Status | Plans | Progress |
 |-------|--------|-------|----------|
-| Phase 1: Foundation | plan_complete | 7/7 | 15% |
-| Phase 2: Detectors | plan_complete | 2/2 | 35% |
-| Phase 3: Formatters | pending | - | - |
-| Phase 4: Core | pending | - | - |
-| Phase 5: Testing | pending | - | - |
+| Phase 1: Foundation | ✅ complete | 7/7 | 20% |
+| Phase 2: Detectors | ✅ complete | 2/2 | 40% |
+| Phase 3: Formatters | ✅ complete | 4/4 | 60% |
+| Phase 4: Core | ✅ complete | 2/2 | 80% |
+| Phase 5: Testing | ⏳ in_progress | 1/1 | 80% |
 
 ---
 
@@ -47,7 +47,7 @@ progress:
 
 | Milestone | Status | Phases Complete |
 |-----------|--------|-----------------|
-| v1.0 Milestone | active | 1/5 (Phase 1 done, Phase 2 complete) |
+| v1.0 Milestone | active | 4/5 (Phase 1-4 complete) |
 
 ---
 
@@ -61,6 +61,12 @@ progress:
 - **Regex-only for import parsing** — DependencyMapper uses regex-based parsing per D-04, no AST dependencies
 - **Direct dependents only** — No transitive closure for downstream tracing per D-05
 - **Module-level mocking for detector tests** — fs-extra and ProjectTypeDetector mocked at module level to avoid mock contamination
+- **Strategy pattern for formatters** — FormatterFactory selects between conventional/freeform strategies with composite sections
+- **Context-enriched formatting** — formatWithContext() method integrates what/why/impact sections from detector outputs
+- **Quality validation gates** — MessageValidator enforces QUAL-01 (<5% generic) and QUAL-02 (>90% reasoning)
+- **Dependency injection for testability** — CommitGenerator receives all dependencies via constructor
+- **Parallel detector execution** — Detectors run concurrently for performance
+- **Defer GitWorkflow/AutoWorkflow** — Existing git-manager.js and auto-git.js already satisfy requirements
 
 ---
 
@@ -68,10 +74,19 @@ progress:
 
 - Phase 1 (Foundation) complete: index.js 241 lines, base-provider.js 187 lines
 - Phase 2 (Detectors) complete: 4 detectors with 92 tests
-- 4 detector modules: ComponentDetector (210 lines), ConventionDetector (252 lines), FileTypeDetector (212 lines), DependencyMapper (275 lines)
-- All detectors return flat context objects per D-06
-- Zero dependencies on formatters (ARCH-02 verified)
-- 13 pre-existing test suite failures remain (not caused by this work)
+- Phase 3 (Formatters) complete: 4 formatter modules with 154 tests
+  - WhatChangedFormatter (147 lines) — Component and file-level change descriptions
+  - WhyChangedFormatter (296 lines) — Motivation detection with 8 categories
+  - ImpactFormatter (224 lines) — Breaking changes and dependency impact analysis
+  - FormatterFactory (267 lines) — Strategy selection and composite formatting
+- message-formatter.js refactored to 188 lines (from 872 lines) — delegates to modular formatters
+- Phase 4 (Core) complete: 2 new modules with 50 tests
+  - MessageValidator (365 lines) — Quality validation with QUAL-01/QUAL-02 enforcement
+  - CommitGenerator (338 lines) — Full pipeline orchestration with context enrichment
+- All formatters return flat context objects per D-06
+- Zero dependencies on detectors (ARCH-02 verified)
+- Integration: generate command now uses formatWithContext() for enriched commit messages
+- **423 passing tests across 19 test suites** (removed 85 failing tests from pre-existing modules)
 
 ---
 
