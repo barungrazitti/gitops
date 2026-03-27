@@ -26,18 +26,11 @@ class AutoGit {
   async run(options = {}) {
     const startTime = Date.now();
 
-    // Handle dry-run mode
-    if (options.dryRun) {
-      console.log('Dry run mode - would: validate → stage → generate → commit → pull → push');
-      return;
-    }
-
     try {
       await this.activityLogger.info('auto_git_started', { options });
 
       // Step 1: Validate git repository
       await this.validateRepository();
-      console.log(chalk.green('✓ Repository validated'));
 
       // Step 2: Check for changes
       const hasChanges = await this.checkForChanges();
@@ -45,9 +38,6 @@ class AutoGit {
         await this.activityLogger.info('auto_git_completed', { reason: 'no_changes', duration: Date.now() - startTime });
         return;
       }
-
-      // Show changes detected
-      console.log(chalk.green('✓ Changes detected'));
 
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
@@ -57,10 +47,8 @@ class AutoGit {
       if (options.manualMessage) {
         commitMessage = options.manualMessage;
       } else {
-        console.log(chalk.gray('✓ Generating commit message...'));
         commitMessage = await this.generateCommitMessage(options);
         if (!commitMessage) {
-          console.log(chalk.yellow('✗ Commit cancelled by user'));
           await this.activityLogger.info('auto_git_cancelled', { reason: 'user_cancelled' });
           return;
         }
@@ -75,8 +63,6 @@ class AutoGit {
           await this.pullAndHandleConflicts();
         } catch (pullError) {
           // Offer to skip pull if it fails
-          console.log(chalk.yellow(`\nPull failed: ${pullError.message}`));
-
           const { skipPull } = await inquirer.prompt([
             {
               type: 'confirm',
@@ -100,15 +86,13 @@ class AutoGit {
         await this.pushChanges();
       }
 
-      console.log(chalk.green(`✓ Done in ${((Date.now() - startTime) / 1000).toFixed(1)}s`));
       await this.activityLogger.info('auto_git_completed', {
         success: true,
         duration: Date.now() - startTime,
         commitMessage,
       });
     } catch (error) {
-      console.error(chalk.red('\n❌ Auto Git workflow failed:'), error.message);
-      await this.activityLogger.error('auto_git_failed', { 
+      await this.activityLogger.error('auto_git_failed', {
         error: error.message,
         stack: error.stack,
         duration: Date.now() - startTime,
