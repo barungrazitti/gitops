@@ -4,10 +4,10 @@
 
 ### Testing
 
-- `npm test` - Run full Jest test suite (1-3s)
+- `npm test` - Run full Jest test suite (423 tests, 19 suites)
 - `npx jest tests/aicommit-cli.test.js` - Run single test file
 - `npm run test:coverage` - Jest with coverage report
-- `npm run test:watch` - Jest in watch mode for development
+- `npm run test:watch` - Jest in watch mode
 
 ### Setup Commands
 
@@ -71,6 +71,7 @@ No linting/formatting tools - removed per user request.
 - AI providers in `src/providers/` (only Groq + Ollama)
 - Binaries in `bin/`
 - Tests in `tests/`
+- Documentation in `docs/`
 - Keep related functionality in separate modules
 
 ## Key Features Implemented
@@ -113,7 +114,7 @@ No linting/formatting tools - removed per user request.
 - **Visual Indicators**: Shows 🔌 plugin icon when plugin update is detected
 - **Selective Processing**: Only non-plugin updates get chunked when large
 
-### Improved Git Merge Handling with AI
+### Git Merge Handling with AI
 
 - **AI-Powered Resolution**: Uses Ollama/Groq to intelligently resolve merge conflicts
 - **Chunking Support**: Handles large conflicts by splitting into manageable chunks
@@ -128,6 +129,21 @@ No linting/formatting tools - removed per user request.
 - **Context-Aware**: Analyzes original, current, and incoming changes for intelligent merging
 - **Large File Support**: Automatically chunks large conflicts for AI processing
 
+### Security & PII Protection (NEW)
+
+- **20+ Detection Patterns**: Secrets (15+) and PII (8+)
+- **Auto-Redaction**: All code sanitized BEFORE sending to AI
+- **Enterprise Mode**: Block commits with ANY sensitive data
+- **Audit Logging**: All security events logged for compliance
+- **Security Report**: Detailed analysis of detected secrets/PII
+
+### Quality Gates (NEW)
+
+- **QUAL-01**: <5% generic messages enforced
+- **QUAL-02**: >90% messages with reasoning
+- **MessageValidator**: 31 tests, 365 lines
+- **CommitGenerator**: 19 tests, 338 lines
+
 ### Core Modules
 
 - `analysis-engine.js`: Advanced repository context analysis
@@ -138,6 +154,9 @@ No linting/formatting tools - removed per user request.
 - `stats-manager.js`: Usage tracking and analytics
 - `auto-git.js`: AI-powered conflict resolution and workflow automation
 - `activity-logger.js`: Comprehensive activity logging and analysis
+- `secret-scanner.js`: Advanced secret and PII detection (NEW)
+- `message-validator.js`: Quality validation for commit messages (NEW)
+- `commit-generator.js`: Full pipeline orchestration (NEW)
 
 ## Removed Functionality
 
@@ -158,3 +177,58 @@ The codebase now focuses on:
 3. **Highly relevant** commit message generation
 4. **Semantic analysis** for better context understanding
 5. **AI-powered git conflict resolution** with intelligent merging and chunking support
+6. **Enterprise-grade security** with PII protection and secret scanning
+7. **Quality validation** with enforced quality gates
+
+## Project Status
+
+| Metric | Status |
+|--------|--------|
+| Test Coverage | 423 tests, 19 suites ✅ |
+| Security Patterns | 23 detection patterns ✅ |
+| Quality Gates | QUAL-01, QUAL-02 enforced ✅ |
+| Documentation | Complete with 20+ guides ✅ |
+| Console Noise | Minimal (cleaned up) ✅ |
+
+## Documentation
+
+All documentation is organized in the `docs/` directory:
+
+- `docs/INDEX.md` - Documentation index
+- `docs/user-guide/` - User documentation
+- `docs/developer-guide/` - Developer documentation
+- `docs/security/` - Security documentation
+- `docs/architecture/` - Architecture documentation
+- `docs/enterprise/` - Enterprise features
+
+## Recent Changes (2026-03-27)
+
+### Phase 4 Complete: Core Module
+
+- ✅ MessageValidator (365 lines, 31 tests)
+- ✅ CommitGenerator (338 lines, 19 tests)
+- ✅ Quality gates (QUAL-01, QUAL-02)
+- ✅ Context enrichment from detectors
+
+### Security Enhancements
+
+- ✅ Enterprise mode for strict security
+- ✅ 20+ secret/PII detection patterns
+- ✅ Auto-redaction before AI
+- ✅ Security reports and recommendations
+
+### Console Noise Reduction
+
+- ✅ Removed ~50 console outputs
+- ✅ Activity logging only (review with `aic stats --analyze`)
+- ✅ Clean, minimal output
+
+### Documentation Reorganization
+
+- ✅ All non-code docs moved to `docs/`
+- ✅ 20+ documentation files created
+- ✅ Organized by audience (user, developer, enterprise)
+
+---
+
+*Last updated: 2026-03-27*
