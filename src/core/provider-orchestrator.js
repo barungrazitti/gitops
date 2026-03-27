@@ -15,7 +15,7 @@ class ProviderOrchestrator {
     const { preferredProvider, context, ...generationOptions } = options;
 
     // Determine providers to use - preferred first, then fallback
-    const allProviders = ['ollama', 'groq'];
+    const allProviders = ['groq', 'ollama'];
     const providers = preferredProvider ?
       [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
       allProviders;

@@ -80,7 +80,7 @@ No linting/formatting tools - removed per user request.
 
 - **Groq First**: Tries Groq (cloud AI) first for fast inference
 - **Ollama Fallback**: Falls back to Ollama (local AI) if Groq fails
-- **Default Model**: `llama-3.3-70b-versatile` (Groq)
+- **Default Model**: `llama-3.1-8b-instant` (Groq)
 - **No Parallel Overhead**: Simpler, faster single-provider approach
 - **Smart Context**: Uses semantic analysis for better commit messages
 - **Diff Truncation**: Auto-truncates at 15KB to fit AI token limits (Groq's 6K TPM)
