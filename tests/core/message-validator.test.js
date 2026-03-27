@@ -380,4 +380,91 @@ describe('MessageValidator', () => {
       expect(suggestions.length).toBeGreaterThan(2);
     });
   });
+
+  describe('checkRelevance()', () => {
+    const deletionOnlyFacts = {
+      patterns: { isDeletionOnly: true, isConfigOnly: false, isDocsOnly: false, isMostlyRemovals: false, isFileDeletion: false, detectedOperations: [] },
+      recommendation: { type: 'chore', confidence: 0.9 },
+      stats: { totalAdditions: 0, totalDeletions: 10 }
+    };
+
+    const configOnlyFacts = {
+      patterns: { isDeletionOnly: false, isConfigOnly: true, isDocsOnly: false, isMostlyRemovals: false, isFileDeletion: false, detectedOperations: [] },
+      recommendation: { type: 'chore', confidence: 0.85 },
+      stats: { totalAdditions: 2, totalDeletions: 0 }
+    };
+
+    const docsOnlyFacts = {
+      patterns: { isDeletionOnly: false, isConfigOnly: false, isDocsOnly: true, isMostlyRemovals: false, isFileDeletion: false, detectedOperations: [] },
+      recommendation: { type: 'docs', confidence: 0.9 },
+      stats: { totalAdditions: 5, totalDeletions: 0 }
+    };
+
+    const consoleRemovalFacts = {
+      patterns: { isDeletionOnly: true, isConfigOnly: false, isDocsOnly: false, isMostlyRemovals: true, isFileDeletion: false, detectedOperations: [{ type: 'remove-console-logs', description: 'removed console statements' }] },
+      recommendation: { type: 'refactor', confidence: 0.9 },
+      stats: { totalAdditions: 0, totalDeletions: 22 }
+    };
+
+    const fileDeletionFacts = {
+      patterns: { isDeletionOnly: true, isConfigOnly: false, isDocsOnly: false, isMostlyRemovals: true, isFileDeletion: true, detectedOperations: [] },
+      recommendation: { type: 'chore', confidence: 0.9 },
+      stats: { totalAdditions: 0, totalDeletions: 30 }
+    };
+
+    it('should return no penalty for null facts', () => {
+      const result = validator.checkRelevance('feat: add new feature', null);
+      expect(result.penalty).toBe(0);
+    });
+
+    it('should penalize feat for deletion-only diffs', () => {
+      const result = validator.checkRelevance('feat: add new functionality', deletionOnlyFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('type-mismatch-deletion');
+    });
+
+    it('should penalize fix for deletion-only diffs', () => {
+      const result = validator.checkRelevance('fix: resolve issue', deletionOnlyFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('type-mismatch-deletion');
+    });
+
+    it('should not penalize refactor/chore for deletion-only diffs', () => {
+      const refactorResult = validator.checkRelevance('refactor: clean up code', deletionOnlyFacts);
+      expect(refactorResult.penalty).toBe(0);
+
+      const choreResult = validator.checkRelevance('chore: remove unused code', deletionOnlyFacts);
+      expect(choreResult.penalty).toBe(0);
+    });
+
+    it('should penalize feat for config-only changes', () => {
+      const result = validator.checkRelevance('feat: add configuration', configOnlyFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('type-mismatch-config');
+    });
+
+    it('should penalize feat for docs-only changes', () => {
+      const result = validator.checkRelevance('feat: add documentation', docsOnlyFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('type-mismatch-docs');
+    });
+
+    it('should penalize "improved" for console.log removal', () => {
+      const result = validator.checkRelevance('feat(auto-git): Improve error handling', consoleRemovalFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('hallucinated-improvement');
+    });
+
+    it('should penalize feat for file deletion', () => {
+      const result = validator.checkRelevance('feat: remove old files', fileDeletionFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('type-mismatch-file-deletion');
+    });
+
+    it('should penalize when overriding high-confidence recommendation', () => {
+      const result = validator.checkRelevance('refactor: clean up', docsOnlyFacts);
+      expect(result.penalty).toBeGreaterThan(0);
+      expect(result.issues).toContain('type-override');
+    });
+  });
 });
