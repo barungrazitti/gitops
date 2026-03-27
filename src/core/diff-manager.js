@@ -28,8 +28,6 @@ class DiffManager {
       };
     }
 
-    console.log(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), applying smart truncation`);
-
     const smartTruncated = this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
     return {
       strategy: 'smart-truncated',

@@ -20,9 +20,6 @@ class ProviderOrchestrator {
       [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
       allProviders;
 
-    const mode = preferredProvider ? 'sequential fallback' : 'parallel';
-    console.log(chalk.blue(`🤖 Using ${mode} provider mode...`));
-
     // Enrich options with context first
     const enrichedOptions = {
       ...generationOptions,
@@ -37,8 +34,6 @@ class ProviderOrchestrator {
 
     // Step 1: Intelligent diff management with semantic context
     const diffManagement = await this.manageDiffForAI(diff, enrichedOptions);
-    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
-    console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
 
     // Step 2: Use sequential fallback mode
     return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers, activityLogger, statsManager);
@@ -66,8 +61,6 @@ class ProviderOrchestrator {
         }
       };
     }
-
-    console.log(chalk.yellow(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), applying smart truncation`));
 
     const smartTruncated = await this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
     return {
@@ -369,12 +362,6 @@ class ProviderOrchestrator {
           actualPrompt = prompt;
         } else {
           // Complex case: chunked processing
-          console.log(
-            chalk.blue(
-              `📦 Processing ${diffManagement.chunks} chunks with ${providerName}...`
-            )
-          );
-
           const chunkMessages = [];
 
           for (let i = 0; i < diffManagement.data.length; i++) {
@@ -430,10 +417,6 @@ class ProviderOrchestrator {
         if (messages && messages.length > 0) {
           await statsManager.recordCommit(providerName);
 
-          console.log(
-            chalk.green(`✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`)
-          );
-
           // Log the actual interaction with full prompt
           await activityLogger.logAIInteraction(
             providerName,
@@ -452,21 +435,10 @@ class ProviderOrchestrator {
             success: true
           });
 
-          // Log context usage for debugging
-          if (options.context.hasSemanticContext) {
-            console.log(
-              chalk.blue(`🧠 Used semantic context for ${providerName}`)
-            );
-          }
-
           return messages;
         }
       } catch (error) {
         const responseTime = Date.now() - startTime;
-
-        console.warn(
-          chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
-        );
 
         // Log failed interaction
         await activityLogger.logAIInteraction(
