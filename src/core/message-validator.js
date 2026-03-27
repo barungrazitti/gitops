@@ -84,7 +84,7 @@ class MessageValidator {
     const trimmed = message.trim();
     const issues = [];
     const suggestions = [];
-    let score = 50; // Start at neutral score
+    let score = 50;
 
     // Check banned patterns (instant low score)
     for (const pattern of this.bannedPatterns) {
@@ -134,20 +134,33 @@ class MessageValidator {
     }
 
     if (!hasReasoning && !isGeneric) {
-      // Only flag if not already generic (avoid double penalty)
       issues.push('no-reasoning');
       suggestions.push('Add why: "to fix X bug", "enables Y feature", "improves Z performance"');
+    }
+
+    // Relevance check against diff facts
+    if (context && context.diffFacts) {
+      const relevanceCheck = this.checkRelevance(trimmed, context.diffFacts);
+      if (relevanceCheck.penalty > 0) {
+        score -= relevanceCheck.penalty;
+        if (relevanceCheck.issues.length > 0) {
+          issues.push(...relevanceCheck.issues);
+        }
+        if (relevanceCheck.suggestions.length > 0) {
+          suggestions.push(...relevanceCheck.suggestions);
+        }
+      }
     }
 
     // Check component scope (if context provided and components detected)
     if (context.components && context.components.length > 0) {
       const hasScope = this._checkComponentScope(trimmed, context.components);
       if (!hasScope) {
-        score += 5; // Small penalty, just a warning
+        score += 5;
         issues.push('no-scope');
         suggestions.push(`Consider adding scope: "feat(${context.components[0]}): ..."`);
       } else {
-        score += 10; // Reward for matching scope
+        score += 10;
       }
     }
 
@@ -336,6 +349,84 @@ class MessageValidator {
     }
 
     return suggestions;
+  }
+
+  /**
+   * Check if message is relevant to the actual diff facts
+   * @param {string} message - Commit message
+   * @param {Object} diffFacts - Output from DiffFactAnalyzer.analyze()
+   * @returns {Object} { penalty, issues, suggestions }
+   */
+  checkRelevance(message, diffFacts) {
+    const result = { penalty: 0, issues: [], suggestions: [] };
+    if (!diffFacts || !diffFacts.patterns || !diffFacts.recommendation) {
+      return result;
+    }
+
+    const { patterns, recommendation, stats } = diffFacts;
+    const typeMatch = message.match(/^([a-z]+)(\(.+\))?:/i);
+    const msgType = typeMatch ? typeMatch[1].toLowerCase() : '';
+    const msgBody = typeMatch ? message.substring(typeMatch[0].length).toLowerCase() : message.toLowerCase();
+
+    if (patterns.isDeletionOnly && (msgType === 'feat' || msgType === 'fix')) {
+      result.penalty += 40;
+      result.issues.push('type-mismatch-deletion');
+      result.suggestions.push(`Diff contains ONLY deletions. Use "chore" or "refactor", not "${msgType}".`);
+    }
+
+    if (patterns.isConfigOnly && msgType === 'feat') {
+      result.penalty += 30;
+      result.issues.push('type-mismatch-config');
+      result.suggestions.push('Only config files changed. Use "chore", not "feat".');
+    }
+
+    if (patterns.isDocsOnly && msgType === 'feat') {
+      result.penalty += 30;
+      result.issues.push('type-mismatch-docs');
+      result.suggestions.push('Only documentation changed. Use "docs", not "feat".');
+    }
+
+    if (patterns.isMostlyRemovals && !patterns.isDeletionOnly) {
+      const featWords = ['improve', 'enhance', 'implement', 'add', 'introduce', 'enable'];
+      if (featWords.some(w => msgBody.includes(w))) {
+        result.penalty += 20;
+        result.issues.push('claims-addition-for-deletion');
+        result.suggestions.push('Diff is predominantly deletions. Describe what was removed, not what was "improved".');
+      }
+    }
+
+    const hasConsoleRemoval = patterns.detectedOperations &&
+      patterns.detectedOperations.some(op => op.type === 'remove-console-logs');
+    if (hasConsoleRemoval && stats.totalAdditions <= 5) {
+      const hallucinationPatterns = [
+        /improve.*(?:handling|processing|resolution|experience)/i,
+        /enhance.*(?:handling|processing|resolution|experience)/i,
+        /better.*(?:handling|processing|resolution)/i
+      ];
+      if (hallucinationPatterns.some(p => p.test(message))) {
+        result.penalty += 25;
+        result.issues.push('hallucinated-improvement');
+        result.suggestions.push('Only console.log statements were removed. Describe the removal, not an "improvement".');
+      }
+    }
+
+    if (patterns.isFileDeletion && msgType === 'feat') {
+      result.penalty += 35;
+      result.issues.push('type-mismatch-file-deletion');
+      result.suggestions.push('Files were deleted. Use "chore", not "feat".');
+    }
+
+    const validAlternatives = patterns.isDeletionOnly && recommendation.type === 'chore'
+      ? ['chore', 'refactor']
+      : [recommendation.type];
+
+    if (recommendation.confidence >= 0.85 && !validAlternatives.includes(msgType)) {
+      result.penalty += 10;
+      result.issues.push('type-override');
+      result.suggestions.push(`Recommended type "${recommendation.type}" (${recommendation.reason}).`);
+    }
+
+    return result;
   }
 
   /**
