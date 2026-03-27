@@ -10,23 +10,23 @@ describe('AnalysisEngine', () => {
     jest.resetModules();
     jest.clearAllMocks();
     
-    jest.mock('./git-manager', () => {
-      return jest.fn().mockImplementation(() => ({
-        getRepositoryInfo: jest.fn().mockResolvedValue({ branch: 'main' }),
-        getCommitPatterns: jest.fn().mockResolvedValue({ mostUsedTypes: ['feat'] }),
-        getStagedFiles: jest.fn().mockResolvedValue(['src/index.js']),
-        getFileStats: jest.fn().mockResolvedValue({ insertions: 10, deletions: 5 }),
-      }));
-    });
+     jest.mock('../src/core/git-manager', () => {
+       return jest.fn().mockImplementation(() => ({
+         getRepositoryInfo: jest.fn().mockResolvedValue({ branch: 'main' }),
+         getCommitPatterns: jest.fn().mockResolvedValue({ mostUsedTypes: ['feat'] }),
+         getStagedFiles: jest.fn().mockResolvedValue(['src/index.js']),
+         getFileStats: jest.fn().mockResolvedValue({ insertions: 10, deletions: 5 }),
+       }));
+     });
     
     jest.mock('fs-extra', () => ({
       pathExists: jest.fn().mockResolvedValue(true),
       readFile: jest.fn().mockResolvedValue('content'),
     }));
     
-    jest.mock('../utils/project-type-detector', () => ({
-      detectProjectType: jest.fn().mockResolvedValue({ primary: 'nodejs' }),
-    }));
+     jest.mock('../src/utils/project-type-detector', () => ({
+       detectProjectType: jest.fn().mockResolvedValue({ primary: 'nodejs' }),
+     }));
     
     AnalysisEngine = require('../src/core/analysis-engine');
     engine = new AnalysisEngine();
