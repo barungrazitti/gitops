@@ -350,18 +350,12 @@ class AutoGit {
    * Resolve conflicts using AI with intelligent merging
    */
   async resolveConflictsWithAI(conflictedFiles) {
-    console.log(chalk.blue('\n🤖 Using AI to intelligently resolve conflicts...'));
     const resolutionStartTime = Date.now();
-    
+
     for (const file of conflictedFiles) {
-      console.log(chalk.cyan(`\n📄 Processing ${file}...`));
-      
       try {
         await this.resolveFileConflictsWithAI(file);
-        console.log(chalk.green(`✅ Resolved conflicts in ${file}`));
       } catch (error) {
-        console.log(chalk.red(`❌ Failed to resolve ${file}: ${error.message}`));
-        
         const { fallback } = await inquirer.prompt([
           {
             type: 'list',
@@ -374,13 +368,13 @@ class AutoGit {
             ],
           },
         ]);
-        
+
         if (fallback === 'cancel') {
           await this.activityLogger.logConflictResolution(
-            conflictedFiles, 
-            'ai', 
-            false, 
-            { 
+            conflictedFiles,
+            'ai',
+            false,
+            {
               error: error.message,
               file,
               fallbackUsed: fallback,
@@ -389,27 +383,23 @@ class AutoGit {
           );
           throw new Error('Operation cancelled due to resolution failure');
         }
-        
+
         await this.git.raw(['checkout', `--${fallback}`, '--', file]);
-        console.log(chalk.yellow(`⚠️  Used fallback strategy for ${file}`));
       }
     }
-    
+
     // Stage all resolved files
     await this.git.add('.');
     await this.git.commit('AI-resolved merge conflicts with intelligent merging');
-    
-    this.spinner.succeed(`AI resolved conflicts in ${conflictedFiles.length} file(s)`);
-    console.log(chalk.green('✨ AI-powered conflict resolution completed!'));
-    
+
     await this.activityLogger.logConflictResolution(
-      conflictedFiles, 
-      'ai', 
-      true, 
-      { 
+      conflictedFiles,
+      'ai',
+      true,
+      {
         resolutionTime: Date.now() - resolutionStartTime,
         fallbackUsed: false,
-        chunkingUsed: false, // Simplified for test
+        chunkingUsed: false,
       }
     );
   }
