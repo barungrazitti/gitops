@@ -52,36 +52,11 @@
 
 **Requirements:** DET-01, DET-02, DET-03, DET-04
 
-### Plan: Component Boundary Detection
+**Plans:** 2 plans
 
-1. **Create ComponentDetector** — `src/detectors/component-detector.js`
-   - Parse file paths to map to modules/services/packages
-   - Detect monorepo boundaries (package.json, go.mod)
-   - Support custom component mappings via config
-   - Return: `{ component: 'auth-service', scope: 'api', boundary: 'package' }`
-
-### Plan: Convention Analysis
-
-2. **Create ConventionDetector** — `src/detectors/convention-detector.js`
-   - Detect naming patterns (camelCase, snake_case, kebab-case)
-   - Analyze file structure patterns (flat, nested, feature-based)
-   - Identify import/export conventions
-   - Return: `{ naming: 'camelCase', structure: 'feature-based', imports: 'relative' }`
-
-### Plan: File Type Identification
-
-3. **Create FileTypeDetector** — `src/detectors/file-type-detector.js`
-   - Categorize files by language, config, docs, assets
-   - Extend existing `project-type-detector.js` functionality
-   - Return: `{ type: 'source', language: 'typescript', framework: 'react' }`
-
-### Plan: Dependency Mapping
-
-4. **Create DependencyMapper** — `src/detectors/dependency-mapper.js`
-   - Parse import/export statements
-   - Build dependency graph for changed files
-   - Detect downstream effects
-   - Return: `{ imports: [...], exports: [...], affected: [...] }`
+Plans:
+- [ ] 02-01-PLAN.md — ComponentDetector (DET-01) and ConventionDetector (DET-02)
+- [ ] 02-02-PLAN.md — FileTypeDetector (DET-03) and DependencyMapper (DET-04)
 
 ### Exit Criteria
 - [ ] All detectors return consistent context objects
