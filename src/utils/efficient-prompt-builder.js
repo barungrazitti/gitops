@@ -401,7 +401,7 @@ REQUIREMENTS:
    */
   truncateDiff(diff) {
     const lines = diff.split('\n');
-    const maxLines = 500; // Limit lines to preserve space for instructions
+    const maxLines = 200; // Limit lines to stay within ~6K TPM budget for Groq free tier
     
     if (lines.length <= maxLines) {
       return diff;

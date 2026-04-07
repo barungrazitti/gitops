@@ -287,14 +287,14 @@ new file mode 100644
 +++ b/new-feature/new-file.js
 @@ -0,0 +1,500 @@
 +console.log('new file');
-+${Array(500).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
++${Array(700).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
 diff --git a/old-file.js b/old-file.js
 --- a/old-file.js
 +++ b/old-file.js
 @@ -1,3 +1,503 @@
  const x = 1;
 +const added = 'change';
-+${Array(500).fill(0).map((_, i) => `+const y${i} = ${i};`).join('\n')}
++${Array(700).fill(0).map((_, i) => `+const y${i} = ${i};`).join('\n')}
  const y = 2;`;
       const result = generator.manageDiffForAI(newFileDiff);
       expect(result.info.strategy).toBe('smart-truncated');
@@ -307,7 +307,7 @@ diff --git a/old-file.js b/old-file.js
 +++ b/src/main.js
 @@ -1,2 +1,1000 @@
  console.log('hello');
-+${Array(1000).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
++${Array(1400).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
 diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 --- a/node_modules/some-lib/index.js
 +++ b/node_modules/some-lib/index.js
@@ -415,7 +415,7 @@ diff --git a/src/utils.js b/src/utils.js
 +++ b/src/main.js
 @@ -1,2 +1,1000 @@
  console.log('hello');
-+${Array(1000).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
++${Array(1400).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
 diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 --- a/node_modules/some-lib/index.js
 +++ b/node_modules/some-lib/index.js

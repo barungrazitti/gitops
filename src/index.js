@@ -1224,7 +1224,7 @@ Do not explain the error, just provide the solution.`;
     */
   manageDiffForAI(diff, options = {}) {
     const diffSize = diff.length;
-    const MAX_SAFE_SIZE = 60000; // ~20K tokens, safe for modern Groq (131K context) and Ollama
+    const MAX_SAFE_SIZE = 24000; // ~6K tokens, safe for Groq free-tier TPM (6K) with prompt overhead headroom
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {
