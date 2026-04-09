@@ -44,6 +44,12 @@ class EfficientPromptBuilder {
     const changeAnalysis = this.analyzeDiffForSpecialization(diff);
     const impactAnalysis = this.analyzeChangeImpact(diff, context);
 
+    // Add most relevant context (prioritized) - moved before usage
+    const relevantContext = this.extractRelevantContext(
+      context,
+      changeAnalysis
+    );
+
     // Categorize diff by size
     const diffCategory = this.diffCategorizer.categorizeDiff(
       diff,
@@ -158,12 +164,6 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
         prompt += `\n\nDetected type hint: ${context.files.type} (based on changed files)`;
       }
     }
-
-    // Add most relevant context (prioritized)
-    const relevantContext = this.extractRelevantContext(
-      context,
-      changeAnalysis
-    );
 
     // Check for asset summary in diff
     const hasAssetSummary = diff.includes('# ASSETS SUMMARY:');
