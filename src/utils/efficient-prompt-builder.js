@@ -11,7 +11,7 @@ const OptimizedDiffProcessor = require('./optimized-diff-processor');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
-    this.maxPromptLength = options.maxPromptLength || 8000;
+    this.maxPromptLength = options.maxPromptLength || 5000;
     this.preserveContext = options.preserveContext || true;
     this.tokenCounter = new TokenCounter();
     this.diffCategorizer = new DiffCategorizer();
@@ -583,7 +583,7 @@ REQUIREMENTS:
 
     // Smart diff truncation for WordPress files
     let processedDiff = diff;
-    if (diff.length > this.maxPromptLength * 0.6) {
+    if (diff.length > 2500) {
       if (isWordPressFile) {
         processedDiff = this.truncateWordPressDiff(diff);
       } else {
@@ -678,7 +678,7 @@ REQUIREMENTS:
    */
   truncateDiff(diff) {
     const lines = diff.split('\n');
-    const maxLines = 200; // Limit lines to stay within ~6K TPM budget for Groq free tier
+    const maxLines = 150; // Limit lines to stay within ~4K tokens for Groq free tier
 
     if (lines.length <= maxLines) {
       return diff;

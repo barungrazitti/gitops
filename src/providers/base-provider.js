@@ -62,14 +62,38 @@ class BaseProvider {
           const ext = filePath.split('.').pop().toLowerCase();
 
           // Check if it's an asset file (images, fonts, media, etc.)
-          const assetExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'mp3', 'pdf', 'zip', 'tar', 'gz'];
-          
-          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
+          const assetExtensions = [
+            'svg',
+            'png',
+            'jpg',
+            'jpeg',
+            'gif',
+            'webp',
+            'ico',
+            'woff',
+            'woff2',
+            'ttf',
+            'eot',
+            'mp4',
+            'mp3',
+            'pdf',
+            'zip',
+            'tar',
+            'gz',
+          ];
+
+          if (
+            assetExtensions.includes(ext) ||
+            /^Binary files/.test(lines[i + 1] || '')
+          ) {
             assetFiles.push(filePath);
             processedLines.push(`# Asset file added: ${filePath}`);
-            
+
             // Skip ahead to next diff --git (don't include asset content)
-            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
+            while (
+              i + 1 < lines.length &&
+              !lines[i + 1].startsWith('diff --git')
+            ) {
               i++;
             }
             continue;
@@ -107,7 +131,7 @@ class BaseProvider {
 
     // Combine lines to preserve full context
     processedLines.push(...importantLines);
-    processedLines.push(...contextLines.map((line) => ` ${  line}`));
+    processedLines.push(...contextLines.map((line) => ` ${line}`));
 
     // Only limit if extremely large (preserve much more content)
     const maxLines = 1000; // Increased from 250 to 1000
@@ -145,7 +169,7 @@ class BaseProvider {
         ...context.slice(0, maxLines - headers.length - changes.length),
       ];
 
-      processed = `${finalLines.join('\n')  }\n... (diff truncated for size)`;
+      processed = `${finalLines.join('\n')}\n... (diff truncated for size)`;
     } else {
       processed = processedLines.join('\n');
     }
@@ -217,7 +241,7 @@ class BaseProvider {
 
     // Group by type
     const byType = {};
-    assetFiles.forEach(file => {
+    assetFiles.forEach((file) => {
       const ext = file.split('.').pop().toLowerCase();
       const type = this.getAssetType(ext);
       byType[type] = (byType[type] || 0) + 1;
@@ -237,7 +261,16 @@ class BaseProvider {
    * Get asset type from extension
    */
   getAssetType(ext) {
-    const imageTypes = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'];
+    const imageTypes = [
+      'svg',
+      'png',
+      'jpg',
+      'jpeg',
+      'gif',
+      'webp',
+      'ico',
+      'bmp',
+    ];
     const fontTypes = ['woff', 'woff2', 'ttf', 'eot', 'otf'];
     const mediaTypes = ['mp4', 'mp3', 'wav', 'ogg', 'webm', 'avi', 'mov'];
 
@@ -253,8 +286,8 @@ class BaseProvider {
   buildPrompt(diff, options = {}) {
     const EfficientPromptBuilder = require('../utils/efficient-prompt-builder');
     const promptBuilder = new EfficientPromptBuilder({
-      maxPromptLength: this.config?.maxPromptLength || 8000,
-      preserveContext: true
+      maxPromptLength: this.config?.maxPromptLength || 5000,
+      preserveContext: true,
     });
 
     return promptBuilder.buildPrompt(diff, options);
@@ -348,7 +381,8 @@ class BaseProvider {
       'error handling': /error|exception|try|catch|throw|validation|sanitize/i,
       performance: /performance|optimize|cache|lazy|memo|async|await|promise/i,
       security: /security|sanitize|validate|escape|encrypt|hash|bcrypt|crypto/i,
-      wordpress: /wordpress|wp_config|wp-|add_action|add_filter|add_shortcode|wp_enqueue|wp_localize|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php|style\.css|index\.php|single\.php|page\.php|category\.php|tag\.php|archive\.php|search\.php|404\.php|comments\.php|header\.php|footer\.php|sidebar\.php/i,
+      wordpress:
+        /wordpress|wp_config|wp-|add_action|add_filter|add_shortcode|wp_enqueue|wp_localize|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php|style\.css|index\.php|single\.php|page\.php|category\.php|tag\.php|archive\.php|search\.php|404\.php|comments\.php|header\.php|footer\.php|sidebar\.php/i,
       typescript: /interface|type\s+\w+|enum|namespace|declare/i,
     };
 
@@ -381,7 +415,9 @@ class BaseProvider {
         purpose: 'test coverage or test logic change',
       },
       {
-        patterns: [/wordpress.*hook|wp.*filter|add_action|add_filter|add_shortcode|wp_enqueue|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php/i],
+        patterns: [
+          /wordpress.*hook|wp.*filter|add_action|add_filter|add_shortcode|wp_enqueue|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php/i,
+        ],
         purpose: 'WordPress functionality modification',
       },
       {
@@ -468,32 +504,32 @@ class BaseProvider {
 
     if (error.response) {
       // HTTP error response
-      const {status} = error.response;
+      const { status } = error.response;
       const message =
         error.response.data?.error?.message || error.response.statusText;
 
       switch (status) {
-      case 401:
-        throw new Error(
-          `Authentication failed for ${providerName}. Please check your API key.`
-        );
-      case 403:
-        throw new Error(
-          `Access forbidden for ${providerName}. Please check your permissions.`
-        );
-      case 429:
-        throw new Error(
-          `Rate limit exceeded for ${providerName}. Please try again later.`
-        );
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        throw new Error(
-          `${providerName} service is temporarily unavailable. Please try again later.`
-        );
-      default:
-        throw new Error(`${providerName} API error (${status}): ${message}`);
+        case 401:
+          throw new Error(
+            `Authentication failed for ${providerName}. Please check your API key.`
+          );
+        case 403:
+          throw new Error(
+            `Access forbidden for ${providerName}. Please check your permissions.`
+          );
+        case 429:
+          throw new Error(
+            `Rate limit exceeded for ${providerName}. Please try again later.`
+          );
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          throw new Error(
+            `${providerName} service is temporarily unavailable. Please try again later.`
+          );
+        default:
+          throw new Error(`${providerName} API error (${status}): ${message}`);
       }
     } else if (error.code === 'ECONNREFUSED') {
       throw new Error(
@@ -522,7 +558,11 @@ class BaseProvider {
       content = response;
     } else if (response && typeof response === 'object') {
       // Handle Groq response format (with choices)
-      if (response.choices && Array.isArray(response.choices) && response.choices.length > 0) {
+      if (
+        response.choices &&
+        Array.isArray(response.choices) &&
+        response.choices.length > 0
+      ) {
         content = response.choices[0]?.message?.content;
       } else {
         // If it's an object but not expected Groq format
@@ -564,35 +604,37 @@ class BaseProvider {
   async generateCommitMessagesWithValidation(diff, options = {}) {
     const MessageFormatter = require('../core/message-formatter');
     const messageFormatter = new MessageFormatter();
-    
+
     let lastError;
     const maxRetries = options.maxRetries || 2;
     const enableFallback = options.enableFallback !== false;
-    
+
     // Try with current provider first
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Generate messages
         const messages = await this.generateCommitMessages(diff, {
           ...options,
-          attempt
+          attempt,
         });
-        
+
         // Validate each message and score relevance
         const validMessages = [];
         const invalidMessages = [];
         const messageScores = [];
-        
+
         for (const message of messages) {
-          const validation = messageFormatter.getCommitMessageValidation(message);
-          const relevanceScore = messageFormatter.calculateRelevanceScore(message);
-          
+          const validation =
+            messageFormatter.getCommitMessageValidation(message);
+          const relevanceScore =
+            messageFormatter.calculateRelevanceScore(message);
+
           messageScores.push({
             message,
             validation,
-            relevanceScore
+            relevanceScore,
           });
-          
+
           if (validation.isValid && relevanceScore >= 60) {
             validMessages.push(message);
           } else {
@@ -601,26 +643,29 @@ class BaseProvider {
               issues: validation.issues,
               isExplanatory: validation.isExplanatory,
               isGeneric: validation.isGeneric,
-              relevanceScore
+              relevanceScore,
             });
           }
         }
-        
+
         // Sort messages by relevance score (highest first)
         messageScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
-        
+
         // If no valid messages, try to improve the best ones
         if (validMessages.length === 0 && messageScores.length > 0) {
           const bestMessage = messageScores[0];
           if (bestMessage.relevanceScore >= 40) {
             // Try to get suggestions for improvement
-            const suggestions = messageFormatter.getImprovedMessageSuggestions(bestMessage.message, options.context);
+            const suggestions = messageFormatter.getImprovedMessageSuggestions(
+              bestMessage.message,
+              options.context
+            );
             if (suggestions.length > 0) {
               validMessages.push(suggestions[0]); // Use the best suggestion
             }
           }
         }
-        
+
         // If we have valid messages, return them
         if (validMessages.length > 0) {
           // Log successful validation
@@ -630,40 +675,49 @@ class BaseProvider {
               attempt,
               validMessages: validMessages.length,
               invalidMessages: invalidMessages.length,
-              totalMessages: messages.length
+              totalMessages: messages.length,
             });
           }
-          
+
           return validMessages;
         }
-        
+
         // If all messages are invalid, log and prepare for retry
         const errorDetails = {
           provider: this.name,
           attempt,
           invalidMessages,
-          allExplanatory: invalidMessages.every(m => m.isExplanatory),
-          allGeneric: invalidMessages.every(m => m.isGeneric)
+          allExplanatory: invalidMessages.every((m) => m.isExplanatory),
+          allGeneric: invalidMessages.every((m) => m.isGeneric),
         };
-        
+
         // Log validation failure
         if (this.activityLogger) {
-          await this.activityLogger.warn('commit_message_validation_failed', errorDetails);
+          await this.activityLogger.warn(
+            'commit_message_validation_failed',
+            errorDetails
+          );
         }
-        
+
         // Create error for retry logic
-        const error = new Error(`All generated commit messages are invalid: ${invalidMessages.map(m => m.issues.join('; ')).join(' | ')}`);
+        const error = new Error(
+          `All generated commit messages are invalid: ${invalidMessages.map((m) => m.issues.join('; ')).join(' | ')}`
+        );
         error.validationDetails = errorDetails;
         throw error;
-        
       } catch (error) {
         lastError = error;
-        
+
         // Don't retry on authentication or permission errors
-        if (error.message.includes('Authentication') || error.message.includes('permission') || error.message.includes('401') || error.message.includes('403')) {
+        if (
+          error.message.includes('Authentication') ||
+          error.message.includes('permission') ||
+          error.message.includes('401') ||
+          error.message.includes('403')
+        ) {
           throw error;
         }
-        
+
         // Log retry attempt
         if (this.activityLogger) {
           await this.activityLogger.debug('commit_generation_retry', {
@@ -671,21 +725,21 @@ class BaseProvider {
             attempt,
             maxRetries,
             error: error.message,
-            willRetry: attempt < maxRetries
+            willRetry: attempt < maxRetries,
           });
         }
-        
+
         // If this is the last attempt for this provider, break
         if (attempt === maxRetries) {
           break;
         }
-        
+
         // Wait before retry with exponential backoff
-        const delay = Math.min(1000 * 2**(attempt - 1), 5000);
-        await new Promise(resolve => setTimeout(resolve, delay));
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 5000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
-    
+
     // If we get here, all retries failed
     if (enableFallback && this.name !== 'groq') {
       // Try fallback to Groq
@@ -694,43 +748,44 @@ class BaseProvider {
           await this.activityLogger.info('fallback_to_groq', {
             originalProvider: this.name,
             originalError: lastError.message,
-            attempts: maxRetries
+            attempts: maxRetries,
           });
         }
-        
+
         const GroqProvider = require('./groq-provider');
         const groqProvider = new GroqProvider();
-        
+
         // Copy activity logger if available
         if (this.activityLogger) {
           groqProvider.activityLogger = this.activityLogger;
         }
-        
+
         // Try with Groq (single attempt to avoid infinite loops)
         return await groqProvider.generateCommitMessagesWithValidation(diff, {
           ...options,
           maxRetries: 1,
           enableFallback: false, // Prevent infinite fallback loops
-          isFallback: true
+          isFallback: true,
         });
-        
       } catch (fallbackError) {
         if (this.activityLogger) {
           await this.activityLogger.error('fallback_to_groq_failed', {
             originalProvider: this.name,
             originalError: lastError.message,
-            fallbackError: fallbackError.message
+            fallbackError: fallbackError.message,
           });
         }
-        
+
         // Combine errors for better context
-        const combinedError = new Error(`Primary provider (${this.name}) failed after ${maxRetries} attempts: ${lastError.message}. Fallback to Groq also failed: ${fallbackError.message}`);
+        const combinedError = new Error(
+          `Primary provider (${this.name}) failed after ${maxRetries} attempts: ${lastError.message}. Fallback to Groq also failed: ${fallbackError.message}`
+        );
         combinedError.originalError = lastError;
         combinedError.fallbackError = fallbackError;
         throw combinedError;
       }
     }
-    
+
     // No fallback or fallback failed, throw the last error
     throw lastError;
   }
@@ -743,7 +798,7 @@ class BaseProvider {
     if (options.attempt > 1 || options.isFallback) {
       options.enhancedPrompt = true;
       options.strictValidation = true;
-      
+
       // Add specific instructions for problematic cases
       if (options.validationDetails?.allExplanatory) {
         options.promptInstructions = `
@@ -776,7 +831,7 @@ Use: "config: update database connection settings for production"
 `;
       }
     }
-    
+
     return await this.generateCommitMessages(diff, options);
   }
 
@@ -803,7 +858,7 @@ Use: "config: update database connection settings for production"
         if (attempt < maxRetries) {
           // Use exponential backoff
           await new Promise((resolve) =>
-            setTimeout(resolve, delay * 2**(attempt - 1))
+            setTimeout(resolve, delay * 2 ** (attempt - 1))
           );
         }
       }
@@ -865,47 +920,71 @@ Use: "config: update database connection settings for production"
    */
   preprocessDiff(diff, maxChunkSize = 4000) {
     if (!diff) return '';
-    
+
     // First, filter assets regardless of size
     const lines = diff.split('\n');
     const filteredLines = [];
     const assetFiles = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
+
       // Detect file headers - check for assets
       if (line.startsWith('diff --git')) {
         const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
         if (fileMatch) {
           const filePath = fileMatch[2];
           const ext = filePath.split('.').pop().toLowerCase();
-          const assetExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'mp3', 'pdf', 'zip', 'tar', 'gz'];
-          
-          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
+          const assetExtensions = [
+            'svg',
+            'png',
+            'jpg',
+            'jpeg',
+            'gif',
+            'webp',
+            'ico',
+            'woff',
+            'woff2',
+            'ttf',
+            'eot',
+            'mp4',
+            'mp3',
+            'pdf',
+            'zip',
+            'tar',
+            'gz',
+          ];
+
+          if (
+            assetExtensions.includes(ext) ||
+            /^Binary files/.test(lines[i + 1] || '')
+          ) {
             assetFiles.push(filePath);
             filteredLines.push(`# Asset file added: ${filePath}`);
-            
+
             // Skip ahead to next diff --git (don't include asset content)
-            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
+            while (
+              i + 1 < lines.length &&
+              !lines[i + 1].startsWith('diff --git')
+            ) {
               i++;
             }
             continue;
           }
         }
       }
-      
+
       filteredLines.push(line);
     }
-    
+
     let filtered = filteredLines.join('\n');
-    
+
     // Add asset summary at the beginning if assets were filtered
     if (assetFiles.length > 0) {
       const assetSummary = this.generateAssetSummary(assetFiles);
       filtered = assetSummary + filtered;
     }
-    
+
     // Then check if diff is already reasonable size
     if (filtered.length < maxChunkSize) {
       return filtered;
@@ -973,7 +1052,7 @@ Use: "config: update database connection settings for production"
     const changes = [];
     let currentFile = null;
 
-    lines.forEach(line => {
+    lines.forEach((line) => {
       // Look for file headers
       const fileMatch = line.match(/diff --git a\/(.+) b\/(.+)/);
       if (fileMatch) {
@@ -981,7 +1060,7 @@ Use: "config: update database connection settings for production"
           file: fileMatch[2],
           additions: 0,
           deletions: 0,
-          changes: []
+          changes: [],
         };
         changes.push(currentFile);
       }
@@ -990,10 +1069,16 @@ Use: "config: update database connection settings for production"
       if (currentFile) {
         if (line.startsWith('+') && !line.startsWith('+++')) {
           currentFile.additions++;
-          currentFile.changes.push({ type: 'addition', content: line.substring(1) });
+          currentFile.changes.push({
+            type: 'addition',
+            content: line.substring(1),
+          });
         } else if (line.startsWith('-') && !line.startsWith('---')) {
           currentFile.deletions++;
-          currentFile.changes.push({ type: 'deletion', content: line.substring(1) });
+          currentFile.changes.push({
+            type: 'deletion',
+            content: line.substring(1),
+          });
         }
       }
     });
@@ -1002,7 +1087,7 @@ Use: "config: update database connection settings for production"
     const summary = {
       files: changes.length,
       additions: changes.reduce((sum, file) => sum + file.additions, 0),
-      deletions: changes.reduce((sum, file) => sum + file.deletions, 0)
+      deletions: changes.reduce((sum, file) => sum + file.deletions, 0),
     };
 
     return {
@@ -1010,7 +1095,7 @@ Use: "config: update database connection settings for production"
       changes,
       keyChanges: this.extractKeyChanges(changes),
       semanticChanges: this.extractSemanticChanges(diff),
-      likelyPurpose: this.inferLikelyPurpose(changes)
+      likelyPurpose: this.inferLikelyPurpose(changes),
     };
   }
 
@@ -1019,8 +1104,8 @@ Use: "config: update database connection settings for production"
    */
   extractKeyChanges(changes) {
     const keyChanges = [];
-    
-    changes.forEach(change => {
+
+    changes.forEach((change) => {
       if (change.additions > 0 && change.deletions === 0) {
         keyChanges.push(`new file: ${change.file}`);
       } else if (change.additions > 0 && change.deletions > 0) {
@@ -1029,7 +1114,7 @@ Use: "config: update database connection settings for production"
         keyChanges.push(`deletions in: ${change.file}`);
       }
     });
-    
+
     return keyChanges;
   }
 
@@ -1049,67 +1134,89 @@ Use: "config: update database connection settings for production"
       wordpressChanges: [],
       wordpressTemplateChanges: [],
     };
-    
+
     const lines = diff.split('\n');
-    
+
     for (const line of lines) {
       if (line.startsWith('+')) {
         const content = line.substring(1);
-        
+
         // Match new functions
         const funcMatch = content.match(/\b(?:function|const|let|var)\s+(\w+)/);
         if (funcMatch) {
           semanticChanges.newFunctions.push(funcMatch[1]);
         }
-        
+
         // Match new classes
         const classMatch = content.match(/\bclass\s+(\w+)/);
         if (classMatch) {
           semanticChanges.newClasses.push(classMatch[1]);
         }
-        
+
         // Match API changes
-        const apiMatch = content.match(/app\.(get|post|put|delete|patch)\(['"`](.+?)['"`]/);
+        const apiMatch = content.match(
+          /app\.(get|post|put|delete|patch)\(['"`](.+?)['"`]/
+        );
         if (apiMatch) {
-          semanticChanges.apiChanges.push(`${apiMatch[1].toUpperCase()} ${apiMatch[2]}`);
+          semanticChanges.apiChanges.push(
+            `${apiMatch[1].toUpperCase()} ${apiMatch[2]}`
+          );
         }
-        
+
         // Match config changes
         if (/require\(['"`]config|import.*config|process\.env/.test(content)) {
           semanticChanges.configChanges.push(content.trim());
         }
-        
+
         // Match test changes
         if (/\b(describe|it|test|expect|assert)\b/.test(content)) {
           semanticChanges.testChanges.push(content.trim());
         }
-        
+
         // Match potential breaking changes
         if (/\b(?:removed|deleted|breaking|BREAKING)\b/.test(content)) {
           semanticChanges.breakingChanges.push(content.trim());
         }
-        
+
         // Match WordPress-specific changes
-        if (content.includes('add_action') || content.includes('add_filter') || content.includes('add_shortcode')) {
-          const wpHookMatch = content.match(/(?:add_action|add_filter|add_shortcode)\s*\(\s*['"`]([^'"`]+)['"`]/);
+        if (
+          content.includes('add_action') ||
+          content.includes('add_filter') ||
+          content.includes('add_shortcode')
+        ) {
+          const wpHookMatch = content.match(
+            /(?:add_action|add_filter|add_shortcode)\s*\(\s*['"`]([^'"`]+)['"`]/
+          );
           if (wpHookMatch) {
-            semanticChanges.wordpressHooks = semanticChanges.wordpressHooks || [];
+            semanticChanges.wordpressHooks =
+              semanticChanges.wordpressHooks || [];
             semanticChanges.wordpressHooks.push(wpHookMatch[1]);
           }
         }
 
-        if (content.includes('wp_enqueue') || content.includes('wp_localize_script') || content.includes('wp_localize')) {
-          semanticChanges.wordpressChanges = semanticChanges.wordpressChanges || [];
+        if (
+          content.includes('wp_enqueue') ||
+          content.includes('wp_localize_script') ||
+          content.includes('wp_localize')
+        ) {
+          semanticChanges.wordpressChanges =
+            semanticChanges.wordpressChanges || [];
           semanticChanges.wordpressChanges.push(content.trim());
         }
 
-        if (content.includes('get_template_part') || content.includes('get_header') || content.includes('get_footer') || content.includes('get_sidebar')) {
-          semanticChanges.wordpressTemplateChanges = semanticChanges.wordpressTemplateChanges || [];
+        if (
+          content.includes('get_template_part') ||
+          content.includes('get_header') ||
+          content.includes('get_footer') ||
+          content.includes('get_sidebar')
+        ) {
+          semanticChanges.wordpressTemplateChanges =
+            semanticChanges.wordpressTemplateChanges || [];
           semanticChanges.wordpressTemplateChanges.push(content.trim());
         }
       }
     }
-    
+
     return semanticChanges;
   }
 
@@ -1117,25 +1224,49 @@ Use: "config: update database connection settings for production"
    * Infer likely purpose of changes
    */
   inferLikelyPurpose(changes) {
-    if (changes.some(change => change.file && change.file.includes('test'))) {
+    if (changes.some((change) => change.file && change.file.includes('test'))) {
       return 'test-related changes';
-    } if (changes.some(change => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file))) {
+    }
+    if (
+      changes.some(
+        (change) => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file)
+      )
+    ) {
       return 'javascript/typescript changes';
-    } if (changes.some(change => change.file && /\.(py)$/.test(change.file))) {
+    }
+    if (changes.some((change) => change.file && /\.(py)$/.test(change.file))) {
       return 'python changes';
-    } if (changes.some(change => change.file && /\.(php)$/.test(change.file))) {
+    }
+    if (changes.some((change) => change.file && /\.(php)$/.test(change.file))) {
       return 'php changes';
-    } if (changes.some(change => change.changes && change.changes.some(c => 
-        c.content && /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
-      ))) {
+    }
+    if (
+      changes.some(
+        (change) =>
+          change.changes &&
+          change.changes.some(
+            (c) =>
+              c.content &&
+              /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
+          )
+      )
+    ) {
       return 'bug fix';
-    } if (changes.some(change => change.changes && change.changes.some(c => 
-        c.content && /\b(feature|add|implement|create|new)\b/i.test(c.content)
-      ))) {
+    }
+    if (
+      changes.some(
+        (change) =>
+          change.changes &&
+          change.changes.some(
+            (c) =>
+              c.content &&
+              /\b(feature|add|implement|create|new)\b/i.test(c.content)
+          )
+      )
+    ) {
       return 'feature addition';
-    } 
-      return 'general modification';
-    
+    }
+    return 'general modification';
   }
 
   /**
@@ -1153,7 +1284,7 @@ Use: "config: update database connection settings for production"
         chunkIndex: i,
         totalChunks: chunks.length,
         isLastChunk,
-        chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle'
+        chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
       };
 
       try {
@@ -1176,11 +1307,11 @@ Use: "config: update database connection settings for production"
     try {
       const config = await this.getConfig();
       const axios = require('axios');
-      
+
       // Set default timeout and merge with user options
       const requestOptions = {
         timeout: config.timeout || 120000,
-        ...options
+        ...options,
       };
 
       const response = await axios(url, requestOptions);
