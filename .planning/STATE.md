@@ -9,17 +9,17 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Phase Progress
 
-| #   | Phase                            | Status | Progress        |
-| --- | -------------------------------- | ------ | --------------- |
-| 1   | Stability & Error Recovery       | ✓      | 100%            |
-| 2   | Quality & Standards              | ✓      | 100%            |
-| 3   | Improve Commit Message Relevance | ○      | 75% (3/4 plans) |
+| #   | Phase                            | Status | Progress         |
+| --- | -------------------------------- | ------ | ---------------- |
+| 1   | Stability & Error Recovery       | ✓      | 100%             |
+| 2   | Quality & Standards              | ✓      | 100%             |
+| 3   | Improve Commit Message Relevance | ✓      | 100% (4/4 plans) |
 
 ## Current Context
 
 - **Active Phase**: 3 - Improve Commit Message Relevance
-- **Active Plan**: 03-04 (next: implement medium diff strategies)
-- **Recent Completion**: 03-03 - Hierarchical summarization for large diffs (parse-diff, chunk combine)
+- **Active Plan**: Phase 3 complete
+- **Recent Completion**: 03-04 - Message quality metrics scoring
 - **Active Plan**: 03-03 (next: implement medium/large diff strategies)
 - **Recent Completion**: 03-02 - Entity-centric prompts for small diffs (entity extraction, handlebars templates, context limiting)
 
@@ -47,10 +47,11 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 - **ContextLimiting**: Max 3 lines surrounding changes for small diffs
 - **DiffSummarizer**: parse-diff integration for hierarchical summarization
 - **ChunkCombination**: Merge chunk summaries into one commit message
+- **MetricsScorer**: Quality scoring (specificity, conventional, length)
 
 ---
 
-_Last activity: 2026-04-09 - Completed 03-03: Hierarchical summarization for large diffs_
+_Last activity: 2026-04-09 - Completed Phase 03: Improve Commit Message Relevance (4/4 plans)_
 
 ### Quick Tasks Completed
 
