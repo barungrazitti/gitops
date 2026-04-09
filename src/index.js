@@ -18,6 +18,7 @@ const ActivityLogger = require('./core/activity-logger');
 const SecretScanner = require('./utils/secret-scanner');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
 const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
+const MetricsScorer = require('./utils/metrics-scorer');
 
 class AICommitGenerator {
   constructor() {
@@ -31,6 +32,7 @@ class AICommitGenerator {
     this.activityLogger = new ActivityLogger();
     this.efficientPromptBuilder = new EfficientPromptBuilder();
     this.diffProcessor = new OptimizedDiffProcessor();
+    this.metricsScorer = new MetricsScorer();
   }
 
   /**
@@ -41,17 +43,18 @@ class AICommitGenerator {
       // Merge options with config to get effective configuration
       const config = this.configManager.getAll(); // Synchronous version for this check
       const provider = options.provider || config.defaultProvider || 'groq';
-      
+
       // Check if provider is configured
       if (provider === 'ollama') {
         // For Ollama, we assume it's available if selected (user would have set it up)
         return true;
-      } if (provider === 'groq') {
+      }
+      if (provider === 'groq') {
         // For Groq, check if API key is configured
         const apiKey = config.apiKey || process.env.GROQ_API_KEY;
         return !!apiKey && apiKey.trim().length > 0;
       }
-      
+
       // For other providers, check if they have configuration
       return true;
     } catch (error) {
@@ -68,10 +71,10 @@ class AICommitGenerator {
       // Get effective configuration
       const config = await this.configManager.getAll();
       const providerName = options.provider || config.defaultProvider || 'groq';
-      
+
       // Create provider instance
       const provider = AIProviderFactory.create(providerName);
-      
+
       // Build prompt for AI suggestion
       const prompt = `I encountered an error while trying to generate a git commit message.
 Error: ${error.message}
@@ -82,26 +85,30 @@ Please provide a short, 1-sentence actionable suggestion for the developer to fi
 Do not explain the error, just provide the solution.`;
 
       // Generate response from AI provider
-      const response = await provider.generateResponse(prompt, { maxTokens: 100 });
-      
+      const response = await provider.generateResponse(prompt, {
+        maxTokens: 100,
+      });
+
       // Extract and clean the suggestion
       if (response && typeof response === 'string') {
         // Clean up any extra whitespace or formatting
         let suggestion = response.trim();
         // Remove any numbering or bullet points that might be added
-        suggestion = suggestion.replace(/^\d+\.?\s*/, '').replace(/^[-*]\s*/, '');
+        suggestion = suggestion
+          .replace(/^\d+\.?\s*/, '')
+          .replace(/^[-*]\s*/, '');
         // Ensure it's a reasonable length
         if (suggestion.length > 0 && suggestion.length < 200) {
           return suggestion;
         }
       }
-      
+
       return null;
     } catch (aiError) {
       // Log AI failure for debugging but don't throw - we'll fall back to local suggestions
-      await this.activityLogger.debug('ai_suggestion_failed', { 
+      await this.activityLogger.debug('ai_suggestion_failed', {
         error: aiError.message,
-        provider: options.provider || 'unknown'
+        provider: options.provider || 'unknown',
       });
       return null;
     }
@@ -113,7 +120,7 @@ Do not explain the error, just provide the solution.`;
   async generate(options = {}) {
     const spinner = ora({
       text: chalk.blue('🚀 Initializing AI commit generator...'),
-      spinner: 'clock'
+      spinner: 'clock',
     }).start();
     const startTime = Date.now();
     let mergedOptions = {};
@@ -129,7 +136,9 @@ Do not explain the error, just provide the solution.`;
       // Validate git repository
       spinner.text = chalk.blue('🔍 Checking git repository...');
       await this.gitManager.validateRepository();
-      await this.activityLogger.logGitOperation('validate_repository', { success: true });
+      await this.activityLogger.logGitOperation('validate_repository', {
+        success: true,
+      });
 
       // Get staged changes
       spinner.text = chalk.blue('📋 Analyzing staged changes...');
@@ -137,52 +146,65 @@ Do not explain the error, just provide the solution.`;
 
       if (!diff || diff.trim().length === 0) {
         spinner.fail(
-          chalk.red('❌ No staged changes found. Please stage your changes first.')
+          chalk.red(
+            '❌ No staged changes found. Please stage your changes first.'
+          )
         );
-        await this.activityLogger.warn('generate_failed', { reason: 'no_staged_changes' });
+        await this.activityLogger.warn('generate_failed', {
+          reason: 'no_staged_changes',
+        });
         return;
       }
 
       // SECURITY: Sanitize diff to remove secrets and PII before sending to AI
       const secretScanner = new SecretScanner();
       const shouldSanitize = mergedOptions.sanitize !== false; // Default: true
-      
+
       if (shouldSanitize) {
         spinner.text = chalk.blue('🔒 Scanning for sensitive information...');
         const originalLength = diff.length;
-        
+
         diff = secretScanner.scanAndRedact(diff, true);
         const redactionSummary = secretScanner.getRedactionSummary();
-        
+
         if (redactionSummary.found) {
-          console.log(chalk.yellow(`\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`));
-          
+          console.log(
+            chalk.yellow(
+              `\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`
+            )
+          );
+
           // Group by category for cleaner output
           const categories = Object.entries(redactionSummary.byCategory || {});
           if (categories.length > 0) {
             categories.forEach(([category, count]) => {
               const categoryEmoji = category === 'pii' ? '👤' : '🔑';
-              console.log(chalk.gray(`   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`));
+              console.log(
+                chalk.gray(
+                  `   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`
+                )
+              );
             });
           }
-          
+
           // Log to activity logger for audit trail
           await this.activityLogger.warn('sensitive_data_redacted', {
             redacted: redactionSummary.redacted,
             byCategory: redactionSummary.byCategory,
             byType: redactionSummary.byType,
             originalSize: originalLength,
-            sanitizedSize: diff.length
+            sanitizedSize: diff.length,
           });
-          
+
           spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
         } else {
-          await this.activityLogger.info('no_secrets_found', { diffLength: diff.length });
+          await this.activityLogger.info('no_secrets_found', {
+            diffLength: diff.length,
+          });
         }
-        
+
         secretScanner.clearRedactionLog();
       }
-
 
       // Advanced cache check with semantic similarity
       let messages = [];
@@ -190,10 +212,14 @@ Do not explain the error, just provide the solution.`;
         spinner.text = chalk.blue('💾 Checking for cached results...');
         messages = await this.cacheManager.getValidated(diff);
         if (messages && messages.length > 0) {
-          await this.activityLogger.debug('cache_hit', { diffLength: diff.length });
+          await this.activityLogger.debug('cache_hit', {
+            diffLength: diff.length,
+          });
           spinner.succeed(chalk.green('✅ Found cached results'));
         } else {
-          await this.activityLogger.debug('cache_miss', { diffLength: diff.length });
+          await this.activityLogger.debug('cache_miss', {
+            diffLength: diff.length,
+          });
         }
       }
 
@@ -205,15 +231,15 @@ Do not explain the error, just provide the solution.`;
 
         // Generate commit messages with sequential fallback
         spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
-          messages = await this.generateWithSequentialFallback(diff, {
-            context,
-            count: parseInt(mergedOptions.count) || 1,
-            type: mergedOptions.type,
-            language: mergedOptions.language || 'en',
-            conventional:
-              mergedOptions.conventional || config.conventionalCommits,
-            preferredProvider: mergedOptions.provider || config.defaultProvider,
-          });
+        messages = await this.generateWithSequentialFallback(diff, {
+          context,
+          count: parseInt(mergedOptions.count) || 1,
+          type: mergedOptions.type,
+          language: mergedOptions.language || 'en',
+          conventional:
+            mergedOptions.conventional || config.conventionalCommits,
+          preferredProvider: mergedOptions.provider || config.defaultProvider,
+        });
 
         // Cache results
         if (mergedOptions.cache !== false) {
@@ -221,7 +247,9 @@ Do not explain the error, just provide the solution.`;
         }
       }
 
-      spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
+      spinner.succeed(
+        chalk.green('✅ Commit messages generated successfully!')
+      );
 
       // Format messages
       const formattedMessages = messages.map((msg) =>
@@ -234,11 +262,16 @@ Do not explain the error, just provide the solution.`;
         formattedMessages.forEach((msg, index) => {
           console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
         });
-        await this.activityLogger.info('dry_run_completed', { messagesCount: formattedMessages.length });
+        await this.activityLogger.info('dry_run_completed', {
+          messagesCount: formattedMessages.length,
+        });
         return;
       }
 
-      const selectedMessage = await this.selectMessage(formattedMessages);
+      const selectedMessage = await this.selectMessage(
+        formattedMessages,
+        mergedOptions
+      );
 
       if (selectedMessage) {
         await this.gitManager.commit(selectedMessage);
@@ -250,24 +283,28 @@ Do not explain the error, just provide the solution.`;
         );
 
         // Log successful commit
-        await this.activityLogger.logGitOperation('commit', { 
+        await this.activityLogger.logGitOperation('commit', {
           message: selectedMessage,
           success: true,
           duration: Date.now() - startTime,
         });
 
         // Update commit generation log with selected message
-        await this.activityLogger.info('commit_completed', { 
+        await this.activityLogger.info('commit_completed', {
           selectedMessage,
           messagesGenerated: messages.length,
         });
       }
     } catch (error) {
-      spinner.fail(chalk.red(`❌ Failed to generate commit message: ${error.message}`));
+      spinner.fail(
+        chalk.red(`❌ Failed to generate commit message: ${error.message}`)
+      );
       await this.activityLogger.logDetailedError(error, {
         operation: 'generate_commit',
         duration: Date.now() - startTime,
-        provider: mergedOptions?.provider || (await this.configManager.get('defaultProvider')),
+        provider:
+          mergedOptions?.provider ||
+          (await this.configManager.get('defaultProvider')),
         diffLength: diff?.length,
         cacheEnabled: mergedOptions?.cache !== false,
         conventionalCommits: mergedOptions?.conventional,
@@ -294,11 +331,19 @@ Do not explain the error, just provide the solution.`;
       return 'git_not_repo';
     }
 
-    if (message.includes('401') || message.includes('unauthorized') || message.includes('api key')) {
+    if (
+      message.includes('401') ||
+      message.includes('unauthorized') ||
+      message.includes('api key')
+    ) {
       return 'ai_auth_error';
     }
 
-    if (message.includes('429') || message.includes('too many requests') || message.includes('rate limit')) {
+    if (
+      message.includes('429') ||
+      message.includes('too many requests') ||
+      message.includes('rate limit')
+    ) {
       return 'ai_rate_limit';
     }
 
@@ -306,7 +351,10 @@ Do not explain the error, just provide the solution.`;
       return 'ai_connection_error';
     }
 
-    if (message.includes('context length exceeded') || message.includes('too large')) {
+    if (
+      message.includes('context length exceeded') ||
+      message.includes('too large')
+    ) {
       return 'ai_context_limit';
     }
 
@@ -318,13 +366,20 @@ Do not explain the error, just provide the solution.`;
    */
   getLocalSuggestion(type) {
     const suggestions = {
-      git_no_changes: 'No changes are staged. Use "git add <file>" to stage changes before running aic.',
-      git_not_repo: 'This directory is not a git repository. Run "git init" to initialize one.',
-      ai_auth_error: 'AI provider authentication failed. Run "aic setup" to configure your API key.',
-      ai_rate_limit: 'AI provider rate limit reached. Please wait a moment or switch providers with "aic setup".',
-      ai_connection_error: 'Could not connect to AI provider. Check your internet connection or ensure Ollama is running.',
-      ai_context_limit: 'The diff is too large for the AI provider. Try staging fewer files or smaller changes.',
-      unknown: 'An unexpected error occurred. Check your internet connection and try again.'
+      git_no_changes:
+        'No changes are staged. Use "git add <file>" to stage changes before running aic.',
+      git_not_repo:
+        'This directory is not a git repository. Run "git init" to initialize one.',
+      ai_auth_error:
+        'AI provider authentication failed. Run "aic setup" to configure your API key.',
+      ai_rate_limit:
+        'AI provider rate limit reached. Please wait a moment or switch providers with "aic setup".',
+      ai_connection_error:
+        'Could not connect to AI provider. Check your internet connection or ensure Ollama is running.',
+      ai_context_limit:
+        'The diff is too large for the AI provider. Try staging fewer files or smaller changes.',
+      unknown:
+        'An unexpected error occurred. Check your internet connection and try again.',
     };
 
     return suggestions[type] || suggestions.unknown;
@@ -348,8 +403,8 @@ Do not explain the error, just provide the solution.`;
           }
         } catch (aiError) {
           // Silently fall back to local suggestions
-          await this.activityLogger.debug('ai_suggestion_failed_in_provide', { 
-            error: aiError.message 
+          await this.activityLogger.debug('ai_suggestion_failed_in_provide', {
+            error: aiError.message,
           });
         }
       }
@@ -367,28 +422,42 @@ Do not explain the error, just provide the solution.`;
   /**
    * Interactive message selection
    */
-  async selectMessage(messages) {
+  async selectMessage(messages, options = {}) {
     const readline = require('readline');
     const rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout
+      output: process.stdout,
     });
 
-    const question = (prompt) => new Promise(resolve => {
-      rl.question(prompt, resolve);
-    });
+    const question = (prompt) =>
+      new Promise((resolve) => {
+        rl.question(prompt, resolve);
+      });
 
     try {
       console.log(chalk.cyan('\n📝 Generated commit messages:'));
+
+      const showScores = options.quiet !== true;
+      const diff = options.diff || '';
+
       messages.forEach((msg, index) => {
         console.log(chalk.green(`${index + 1}. ${msg}`));
+        if (showScores) {
+          const score = this.metricsScorer.calculateOverallScore(msg, diff);
+          const { category, color } = this.metricsScorer.categorizeScore(score);
+          console.log(chalk[color](`   └─ Score: ${score}/100 (${category})`));
+        }
       });
-      
+
       console.log(chalk.gray(`${messages.length + 1}. 🔄 Regenerate messages`));
-      console.log(chalk.gray(`${messages.length + 2}. ✏️  Write custom message`));
+      console.log(
+        chalk.gray(`${messages.length + 2}. ✏️  Write custom message`)
+      );
       console.log(chalk.gray(`${messages.length + 3}. ❌ Cancel`));
 
-      const choice = await question(`\nSelect option (1-${messages.length + 3}, default: 1): `);
+      const choice = await question(
+        `\nSelect option (1-${messages.length + 3}, default: 1): `
+      );
       const choiceNum = parseInt(choice) || 1;
 
       if (choiceNum === messages.length + 3) {
@@ -404,7 +473,9 @@ Do not explain the error, just provide the solution.`;
       }
 
       if (choiceNum === messages.length + 2) {
-        const customMessage = await question('Enter your custom commit message: ');
+        const customMessage = await question(
+          'Enter your custom commit message: '
+        );
         if (!customMessage.trim()) {
           console.log(chalk.red('Message cannot be empty'));
           return null;
@@ -439,7 +510,10 @@ Do not explain the error, just provide the solution.`;
     } else if (options.get) {
       const value = await this.configManager.get(options.get);
       console.log(`${options.get}: ${value || 'not set'}`);
-    } else if (options.list || !options.set && !options.get && !options.reset) {
+    } else if (
+      options.list ||
+      (!options.set && !options.get && !options.reset)
+    ) {
       const config = await this.configManager.load();
       console.log(chalk.cyan('Current configuration:'));
       Object.entries(config).forEach(([key, value]) => {
@@ -461,18 +535,19 @@ Do not explain the error, just provide the solution.`;
     const readline = require('readline');
     const rl = readline.createInterface({
       input: process.stdin,
-      output: process.stdout
+      output: process.stdout,
     });
 
-    const question = (prompt) => new Promise(resolve => {
-      rl.question(prompt, resolve);
-    });
+    const question = (prompt) =>
+      new Promise((resolve) => {
+        rl.question(prompt, resolve);
+      });
 
     try {
       console.log('Select your preferred AI provider:');
       console.log('1. Groq (Fast Cloud)');
       console.log('2. Ollama (Local)');
-      
+
       const providerChoice = await question('Enter choice (1-2, default: 1): ');
       const provider = providerChoice === '2' ? 'ollama' : 'groq';
 
@@ -486,7 +561,9 @@ Do not explain the error, just provide the solution.`;
         }
       }
 
-      const conventionalChoice = await question('Use conventional commit format? (Y/n, default: Y): ');
+      const conventionalChoice = await question(
+        'Use conventional commit format? (Y/n, default: Y): '
+      );
       const conventionalCommits = conventionalChoice.toLowerCase() !== 'n';
 
       console.log('Select commit message language:');
@@ -496,9 +573,16 @@ Do not explain the error, just provide the solution.`;
       console.log('4. German');
       console.log('5. Chinese');
       console.log('6. Japanese');
-      
+
       const langChoice = await question('Enter choice (1-6, default: 1): ');
-      const languages = { '1': 'en', '2': 'es', '3': 'fr', '4': 'de', '5': 'zh', '6': 'ja' };
+      const languages = {
+        1: 'en',
+        2: 'es',
+        3: 'fr',
+        4: 'de',
+        5: 'zh',
+        6: 'ja',
+      };
       const language = languages[langChoice] || 'en';
 
       // Save configuration
@@ -510,7 +594,9 @@ Do not explain the error, just provide the solution.`;
       });
 
       console.log(chalk.green('\n✅ Setup completed successfully!'));
-      console.log(chalk.cyan('You can now use "aic" to generate commit messages.'));
+      console.log(
+        chalk.cyan('You can now use "aic" to generate commit messages.')
+      );
     } catch (error) {
       console.error(chalk.red('Setup failed:'), error.message);
     } finally {
@@ -549,31 +635,33 @@ Do not explain the error, just provide the solution.`;
     const estimateTokens = (text) => Math.ceil(text.length / 4);
 
     // Helper to detect semantic boundaries
-    const isSemanticBoundary = (line) => line.startsWith('diff --git') ||
-        line.startsWith('index ') ||
-        line.startsWith('---') ||
-        line.startsWith('+++') ||
-        (line.startsWith('@@') && currentChunk.length > 10) || // New hunk with existing content
-        (/^(function|class|def|const|let|var)\s+\w+/.test(line) && currentChunk.length > 5);
+    const isSemanticBoundary = (line) =>
+      line.startsWith('diff --git') ||
+      line.startsWith('index ') ||
+      line.startsWith('---') ||
+      line.startsWith('+++') ||
+      (line.startsWith('@@') && currentChunk.length > 10) || // New hunk with existing content
+      (/^(function|class|def|const|let|var)\s+\w+/.test(line) &&
+        currentChunk.length > 5);
 
     // Helper to find good break point near token limit
     const findBreakPoint = (startIdx, maxTokens) => {
       let tokenCount = 0;
       let bestBreakIdx = startIdx;
-      
+
       for (let i = startIdx; i < lines.length; i++) {
         tokenCount += estimateTokens(lines[i]);
-        
+
         if (tokenCount > maxTokens) {
           break;
         }
-        
+
         // Prefer breaking at semantic boundaries
         if (isSemanticBoundary(lines[i])) {
           bestBreakIdx = i;
         }
       }
-      
+
       return bestBreakIdx;
     };
 
@@ -608,7 +696,7 @@ Do not explain the error, just provide the solution.`;
       if (currentTokens + lineTokens > maxTokens && currentChunk.length > 0) {
         // Find a good break point if possible
         const breakIdx = findBreakPoint(i, maxTokens - currentTokens);
-        
+
         if (breakIdx > i) {
           // Add lines up to break point
           for (; i <= breakIdx && i < lines.length; i++) {
@@ -616,7 +704,7 @@ Do not explain the error, just provide the solution.`;
             currentTokens += estimateTokens(lines[i]);
           }
         }
-        
+
         chunks.push(currentChunk.join('\n'));
         currentChunk = [];
         currentTokens = 0;
@@ -674,7 +762,7 @@ Do not explain the error, just provide the solution.`;
     }
 
     // Prefer reasonable length (not too short, not too long)
-    const {length} = message;
+    const { length } = message;
     if (length >= 20 && length <= 100) {
       score += 5;
     } else if (length >= 10 && length <= 150) {
@@ -762,7 +850,10 @@ Do not explain the error, just provide the solution.`;
     const messageKeywords = this.extractKeywordsFromMessage(message);
 
     // Calculate overlap between diff entities and message
-    const entityOverlap = this.calculateEntityOverlap(entitiesFromDiff, messageKeywords);
+    const entityOverlap = this.calculateEntityOverlap(
+      entitiesFromDiff,
+      messageKeywords
+    );
     relevanceScore += entityOverlap * 8; // Weight entity overlap heavily
 
     // Check if the commit type matches the diff type
@@ -795,7 +886,7 @@ Do not explain the error, just provide the solution.`;
       variables: [],
       filenames: [],
       fileTypes: [],
-      methods: []
+      methods: [],
     };
 
     // Extract file names from diff
@@ -813,27 +904,36 @@ Do not explain the error, just provide the solution.`;
     }
 
     // Extract function/class definitions from diff
-    const functionMatches = diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const functionMatches =
+      diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of functionMatches) {
       const funcName = match.replace(/function\s+|def\s+/, '').trim();
       if (funcName) entities.functions.push(funcName);
     }
 
-    const classMatches = diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const classMatches =
+      diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of classMatches) {
-      const className = match.replace('class\s+', '').replace('class ', '').trim();
+      const className = match
+        .replace('class\s+', '')
+        .replace('class ', '')
+        .trim();
       if (className) entities.classes.push(className);
     }
 
     // Extract variable declarations
-    const varMatches = diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const varMatches =
+      diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of varMatches) {
       const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
       if (varName) entities.variables.push(varName);
     }
 
     // Extract method definitions in diff
-    const methodMatches = diff.match(/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g) || [];
+    const methodMatches =
+      diff.match(
+        /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
+      ) || [];
     for (const match of methodMatches) {
       const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
       if (methodName && !entities.functions.includes(methodName)) {
@@ -842,9 +942,13 @@ Do not explain the error, just provide the solution.`;
     }
 
     // Extract import/module statements
-    const importMatches = diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
+    const importMatches =
+      diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
     for (const match of importMatches) {
-      const importName = match.replace(/(?:import|from|require)\s*/, '').replace(/['"`].*?['"`]/, '').trim();
+      const importName = match
+        .replace(/(?:import|from|require)\s*/, '')
+        .replace(/['"`].*?['"`]/, '')
+        .trim();
       if (importName) entities.variables.push(importName);
     }
 
@@ -859,10 +963,11 @@ Do not explain the error, just provide the solution.`;
     const content = message.replace(/^[a-z]+(\([^)]+\))?:\s*/, '');
 
     // Extract words that could be relevant
-    const words = content.toLowerCase()
+    const words = content
+      .toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter(word => word.length > 2 && !this.isCommonStopWord(word));
+      .filter((word) => word.length > 2 && !this.isCommonStopWord(word));
 
     return [...new Set(words)]; // Remove duplicates
   }
@@ -872,14 +977,84 @@ Do not explain the error, just provide the solution.`;
    */
   isCommonStopWord(word) {
     const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
-      'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we',
-      'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its',
-      'our', 'their', 'what', 'which', 'who', 'when', 'where', 'why', 'how',
-      'if', 'then', 'else', 'so', 'than', 'too', 'very', 'just', 'now', 'up',
-      'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once'
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'should',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+      'me',
+      'him',
+      'her',
+      'us',
+      'them',
+      'my',
+      'your',
+      'his',
+      'its',
+      'our',
+      'their',
+      'what',
+      'which',
+      'who',
+      'when',
+      'where',
+      'why',
+      'how',
+      'if',
+      'then',
+      'else',
+      'so',
+      'than',
+      'too',
+      'very',
+      'just',
+      'now',
+      'up',
+      'down',
+      'out',
+      'off',
+      'over',
+      'under',
+      'again',
+      'further',
+      'then',
+      'once',
     ]);
 
     return stopWords.has(word.toLowerCase());
@@ -894,9 +1069,11 @@ Do not explain the error, just provide the solution.`;
     // Check for function name matches
     for (const func of entities.functions) {
       const funcName = func.toLowerCase();
-      if (messageKeywords.some(keyword =>
-        funcName.includes(keyword) || keyword.includes(funcName)
-      )) {
+      if (
+        messageKeywords.some(
+          (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
+        )
+      ) {
         overlapCount++;
       }
     }
@@ -904,9 +1081,12 @@ Do not explain the error, just provide the solution.`;
     // Check for class name matches
     for (const cls of entities.classes) {
       const className = cls.toLowerCase();
-      if (messageKeywords.some(keyword =>
-        className.includes(keyword) || keyword.includes(className)
-      )) {
+      if (
+        messageKeywords.some(
+          (keyword) =>
+            className.includes(keyword) || keyword.includes(className)
+        )
+      ) {
         overlapCount++;
       }
     }
@@ -914,9 +1094,12 @@ Do not explain the error, just provide the solution.`;
     // Check for variable name matches
     for (const varName of entities.variables) {
       const varNameLower = varName.toLowerCase();
-      if (messageKeywords.some(keyword =>
-        varNameLower.includes(keyword) || keyword.includes(varNameLower)
-      )) {
+      if (
+        messageKeywords.some(
+          (keyword) =>
+            varNameLower.includes(keyword) || keyword.includes(varNameLower)
+        )
+      ) {
         overlapCount++;
       }
     }
@@ -927,9 +1110,11 @@ Do not explain the error, just provide the solution.`;
       const fileNameParts = fileName.split(/[\/\\]/); // Split by path separators
 
       for (const part of fileNameParts) {
-        if (messageKeywords.some(keyword =>
-          part.includes(keyword) || keyword.includes(part)
-        )) {
+        if (
+          messageKeywords.some(
+            (keyword) => part.includes(keyword) || keyword.includes(part)
+          )
+        ) {
           overlapCount++;
           break;
         }
@@ -952,11 +1137,18 @@ Do not explain the error, just provide the solution.`;
     // Determine what type of changes are in the diff
     const diffIndicators = {
       feat: /(\+.*function|\+.*class|\+.*def|\+.*export|\+.*import)/.test(diff),
-      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(diff),
+      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(
+        diff
+      ),
       docs: /(\+.*\.(md|txt|rst)|\+.*README|\+.*documentation)/i.test(diff),
-      refactor: /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
-      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(diff),
-      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(diff),
+      refactor:
+        /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
+      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(
+        diff
+      ),
+      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(
+        diff
+      ),
     };
 
     // Check if the type matches the detected change pattern
@@ -974,27 +1166,27 @@ Do not explain the error, just provide the solution.`;
     const scope = scopeMatch[1];
 
     // Extract file types from diff
-    const {fileTypes} = this.extractEntitiesFromDiff(diff);
+    const { fileTypes } = this.extractEntitiesFromDiff(diff);
 
     // Common scope-type mappings
     const scopeTypeMap = {
-      'api': ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
-      'ui': ['jsx', 'tsx', 'vue', 'html', 'css', 'scss', 'sass', 'less'],
-      'auth': ['js', 'ts', 'py', 'php', 'java', 'go'],
-      'db': ['sql', 'js', 'ts', 'py', 'php'],
-      'config': ['json', 'yaml', 'yml', 'env', 'xml', 'toml', 'conf'],
-      'test': ['test.js', 'spec.js', 'test.ts', 'spec.ts', 'test.py', 'spec.rb'],
-      'docs': ['md', 'txt', 'rst', 'adoc', 'tex'],
-      'build': ['js', 'ts', 'json', 'lock', 'yml', 'yaml', 'sh', 'gradle', 'xml'],
-      'ci': ['yml', 'yaml', 'sh', 'json'],
-      'utils': ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
-      'types': ['ts', 'js', 'py', 'java', 'go'],
-      'perf': ['js', 'ts', 'py', 'java', 'go', 'php'],
-      'deps': ['json', 'lock', 'yml', 'yaml', 'xml', 'txt']
+      api: ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
+      ui: ['jsx', 'tsx', 'vue', 'html', 'css', 'scss', 'sass', 'less'],
+      auth: ['js', 'ts', 'py', 'php', 'java', 'go'],
+      db: ['sql', 'js', 'ts', 'py', 'php'],
+      config: ['json', 'yaml', 'yml', 'env', 'xml', 'toml', 'conf'],
+      test: ['test.js', 'spec.js', 'test.ts', 'spec.ts', 'test.py', 'spec.rb'],
+      docs: ['md', 'txt', 'rst', 'adoc', 'tex'],
+      build: ['js', 'ts', 'json', 'lock', 'yml', 'yaml', 'sh', 'gradle', 'xml'],
+      ci: ['yml', 'yaml', 'sh', 'json'],
+      utils: ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
+      types: ['ts', 'js', 'py', 'java', 'go'],
+      perf: ['js', 'ts', 'py', 'java', 'go', 'php'],
+      deps: ['json', 'lock', 'yml', 'yaml', 'xml', 'txt'],
     };
 
     if (scopeTypeMap[scope]) {
-      return fileTypes.some(type => scopeTypeMap[scope].includes(type));
+      return fileTypes.some((type) => scopeTypeMap[scope].includes(type));
     }
 
     return false;
@@ -1006,17 +1198,23 @@ Do not explain the error, just provide the solution.`;
   isMessageTooGenericForDiff(message, diff) {
     // If diff contains specific function/class names but message is generic
     const entities = this.extractEntitiesFromDiff(diff);
-    const hasSpecificEntities = entities.functions.length > 0 ||
-                                entities.classes.length > 0 ||
-                                entities.variables.length > 0;
+    const hasSpecificEntities =
+      entities.functions.length > 0 ||
+      entities.classes.length > 0 ||
+      entities.variables.length > 0;
 
     const genericTerms = [
-      /\bchanges?\b/i, /\bupdates?\b/i, /\bfixes?\b/i,
-      /\bstuff\b/i, /\bthings?\b/i, /\bvarious\b/i,
-      /\bimprovements?\b/i, /\benhancements?\b/i
+      /\bchanges?\b/i,
+      /\bupdates?\b/i,
+      /\bfixes?\b/i,
+      /\bstuff\b/i,
+      /\bthings?\b/i,
+      /\bvarious\b/i,
+      /\bimprovements?\b/i,
+      /\benhancements?\b/i,
     ];
 
-    const hasGenericTerms = genericTerms.some(regex => regex.test(message));
+    const hasGenericTerms = genericTerms.some((regex) => regex.test(message));
 
     return hasSpecificEntities && hasGenericTerms;
   }
@@ -1029,9 +1227,12 @@ Do not explain the error, just provide the solution.`;
 
     // Determine providers to use - preferred first, then fallback
     const allProviders = ['ollama', 'groq'];
-    const providers = preferredProvider ?
-      [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
-      allProviders;
+    const providers = preferredProvider
+      ? [
+          preferredProvider,
+          ...allProviders.filter((p) => p !== preferredProvider),
+        ]
+      : allProviders;
 
     const mode = preferredProvider ? 'sequential fallback' : 'parallel';
     console.log(chalk.blue(`🤖 Using ${mode} provider mode...`));
@@ -1050,11 +1251,17 @@ Do not explain the error, just provide the solution.`;
 
     // Step 1: Intelligent diff management with semantic context
     const diffManagement = this.manageDiffForAI(diff, enrichedOptions);
-    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
+    console.log(
+      chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`)
+    );
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
 
     // Step 2: Use sequential fallback mode
-    return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
+    return await this.generateWithSequentialProviders(
+      diffManagement,
+      enrichedOptions,
+      providers
+    );
   }
 
   /**
@@ -1073,10 +1280,16 @@ Do not explain the error, just provide the solution.`;
         let actualPrompt;
 
         // Handle different diff strategies
-        if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
+        if (
+          diffManagement.strategy === 'full' ||
+          diffManagement.strategy === 'smart-truncated'
+        ) {
           // Simple case: diff in one prompt (full or smart-truncated)
           const prompt = provider.buildPrompt(diffManagement.data, options);
-          messages = await provider.generateCommitMessages(diffManagement.data, options);
+          messages = await provider.generateCommitMessages(
+            diffManagement.data,
+            options
+          );
           actualPrompt = prompt;
         } else {
           // Complex case: chunked processing
@@ -1097,7 +1310,11 @@ Do not explain the error, just provide the solution.`;
               chunkIndex: i,
               totalChunks: diffManagement.data.length,
               isLastChunk,
-              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
+              chunkContext: isLastChunk
+                ? 'final'
+                : i === 0
+                  ? 'initial'
+                  : 'middle',
               // Add chunk-specific context
               context: {
                 ...options.context,
@@ -1108,14 +1325,20 @@ Do not explain the error, just provide the solution.`;
                   files: chunk.context.files,
                   functions: chunk.context.functions,
                   classes: chunk.context.classes,
-                  hasSignificantChanges: chunk.context.hasSignificantChanges
-                }
-              }
+                  hasSignificantChanges: chunk.context.hasSignificantChanges,
+                },
+              },
             };
 
             // Generate with this chunk
-            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
-            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
+            const chunkPrompt = provider.buildPrompt(
+              chunk.content,
+              chunkOptions
+            );
+            const chunkResult = await provider.generateCommitMessages(
+              chunk.content,
+              chunkOptions
+            );
 
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
@@ -1142,7 +1365,9 @@ Do not explain the error, just provide the solution.`;
           await this.statsManager.recordCommit(providerName);
 
           console.log(
-            chalk.green(`✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`)
+            chalk.green(
+              `✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`
+            )
           );
 
           // Log the actual interaction with full prompt
@@ -1160,7 +1385,7 @@ Do not explain the error, just provide the solution.`;
             ...diffManagement.info,
             provider: providerName,
             responseTime,
-            success: true
+            success: true,
           });
 
           // Log context usage for debugging
@@ -1183,8 +1408,9 @@ Do not explain the error, just provide the solution.`;
         await this.activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated' 
-            ? diffManagement.data 
+          diffManagement.strategy === 'full' ||
+            diffManagement.strategy === 'smart-truncated'
+            ? diffManagement.data
             : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
           responseTime,
@@ -1197,7 +1423,7 @@ Do not explain the error, just provide the solution.`;
           provider: providerName,
           responseTime,
           success: false,
-          error: error.message
+          error: error.message,
         });
 
         // Continue to next provider in sequence
@@ -1212,16 +1438,10 @@ Do not explain the error, just provide the solution.`;
    * Intelligently merge results from multiple AI providers
    */
 
-
-
-
-
-
-
   /**
-    * Intelligent diff management for optimal AI generation
-    * Smart truncation that preserves file headers and prioritizes significant changes
-    */
+   * Intelligent diff management for optimal AI generation
+   * Smart truncation that preserves file headers and prioritizes significant changes
+   */
   manageDiffForAI(diff, options = {}) {
     const diffSize = diff.length;
     const MAX_SAFE_SIZE = 24000; // ~6K tokens, safe for Groq free-tier TPM (6K) with prompt overhead headroom
@@ -1237,12 +1457,16 @@ Do not explain the error, just provide the solution.`;
           size: diffSize,
           chunks: 1,
           reasoning: 'Full diff sent to AI for fast processing',
-          pluginUpdate: false
-        }
+          pluginUpdate: false,
+        },
       };
     }
 
-    console.log(chalk.yellow(`⚠️  Very large diff (${Math.round(diffSize/1024)}KB), applying smart truncation`));
+    console.log(
+      chalk.yellow(
+        `⚠️  Very large diff (${Math.round(diffSize / 1024)}KB), applying smart truncation`
+      )
+    );
 
     const smartTruncated = this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
     return {
@@ -1257,8 +1481,8 @@ Do not explain the error, just provide the solution.`;
         truncated: true,
         originalSize: diffSize,
         preservedFiles: smartTruncated.preservedFiles,
-        skippedFiles: smartTruncated.skippedFiles
-      }
+        skippedFiles: smartTruncated.skippedFiles,
+      },
     };
   }
 
@@ -1269,13 +1493,22 @@ Do not explain the error, just provide the solution.`;
     const fileChunks = this.parseDiffIntoFileChunks(diff);
 
     const IGNORED_PATTERNS = [
-      'node_modules/', 'dist/', 'build/', 'vendor/', '.git/',
-      '.lock', '.min.js', '.min.css', '.map'
+      'node_modules/',
+      'dist/',
+      'build/',
+      'vendor/',
+      '.git/',
+      '.lock',
+      '.min.js',
+      '.min.css',
+      '.map',
     ];
 
-    const filteredChunks = fileChunks.filter(fc => !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern)));
+    const filteredChunks = fileChunks.filter(
+      (fc) => !IGNORED_PATTERNS.some((pattern) => fc.fileName.includes(pattern))
+    );
 
-    const scoredChunks = filteredChunks.map(fc => {
+    const scoredChunks = filteredChunks.map((fc) => {
       const score = this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
@@ -1328,8 +1561,8 @@ Do not explain the error, just provide the solution.`;
 
     // Build summary of skipped files for context
     const trulySkipped = skippedFiles
-      .filter(f => !additionalPreservedFiles.includes(f.fileName))
-      .map(f => f.fileName);
+      .filter((f) => !additionalPreservedFiles.includes(f.fileName))
+      .map((f) => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
@@ -1339,10 +1572,12 @@ Do not explain the error, just provide the solution.`;
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join(
+        '\n'
+      ),
       reasoning,
       preservedFiles,
-      skippedFiles: trulySkipped
+      skippedFiles: trulySkipped,
     };
   }
 
@@ -1358,10 +1593,10 @@ Do not explain the error, just provide the solution.`;
       vendor: [],
       assets: [],
       config: [],
-      other: []
+      other: [],
     };
 
-    skippedFiles.forEach(file => {
+    skippedFiles.forEach((file) => {
       if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
         groups.plugin.push(file);
       } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
@@ -1381,38 +1616,56 @@ Do not explain the error, just provide the solution.`;
     summary.push('\n# SKIPPED FILES (too large, but changed):');
 
     if (groups.plugin.length) {
-      const plugins = new Set(groups.plugin.map(f => {
-        const match = f.match(/\/plugins\/([^\/]+)/);
-        return match ? match[1] : f;
-      }));
-      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
+      const plugins = new Set(
+        groups.plugin.map((f) => {
+          const match = f.match(/\/plugins\/([^\/]+)/);
+          return match ? match[1] : f;
+        })
+      );
+      summary.push(
+        `# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`
+      );
     }
 
     if (groups.theme.length) {
-      const themes = new Set(groups.theme.map(f => {
-        const match = f.match(/\/themes\/([^\/]+)/);
-        return match ? match[1] : f;
-      }));
-      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
+      const themes = new Set(
+        groups.theme.map((f) => {
+          const match = f.match(/\/themes\/([^\/]+)/);
+          return match ? match[1] : f;
+        })
+      );
+      summary.push(
+        `# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`
+      );
     }
 
     if (groups.assets.length > 5) {
-      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
+      summary.push(
+        `# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`
+      );
     } else if (groups.assets.length) {
-      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
+      summary.push(
+        `# Assets: ${groups.assets.map((f) => f.split('/').pop()).join(', ')}`
+      );
     }
 
     if (groups.config.length) {
-      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
+      summary.push(
+        `# Config files: ${groups.config.map((f) => f.split('/').pop()).join(', ')}`
+      );
     }
 
     if (groups.vendor.length) {
-      const vendorTypes = new Set(groups.vendor.map(f => {
-        if (f.includes('node_modules')) return 'npm';
-        if (f.includes('vendor/composer')) return 'composer';
-        return 'vendor';
-      }));
-      summary.push(`# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`);
+      const vendorTypes = new Set(
+        groups.vendor.map((f) => {
+          if (f.includes('node_modules')) return 'npm';
+          if (f.includes('vendor/composer')) return 'composer';
+          return 'vendor';
+        })
+      );
+      summary.push(
+        `# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`
+      );
     }
 
     if (groups.other.length <= 10) {
@@ -1443,14 +1696,20 @@ Do not explain the error, just provide the solution.`;
             content: currentContent.join('\n'),
             fileName: currentFile.fileName,
             isNewFile: currentFile.isNewFile,
-            changeCount: currentFile.changeCount
+            changeCount: currentFile.changeCount,
           });
         }
 
         const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
         const fileName = fileMatch ? fileMatch[2] : 'unknown';
-        let isNewFile = line.includes('/dev/null') || (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
-        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
+        let isNewFile =
+          line.includes('/dev/null') ||
+          (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
+        if (
+          !isNewFile &&
+          lines[i + 1] &&
+          lines[i + 1].includes('new file mode')
+        ) {
           isNewFile = true;
         }
 
@@ -1458,10 +1717,13 @@ Do not explain the error, just provide the solution.`;
           header: line,
           fileName,
           isNewFile,
-          changeCount: 0
+          changeCount: 0,
         };
         currentContent = [];
-      } else if (currentFile && (line.startsWith('@@ ') || line.startsWith('+') || line.startsWith('-'))) {
+      } else if (
+        currentFile &&
+        (line.startsWith('@@ ') || line.startsWith('+') || line.startsWith('-'))
+      ) {
         currentContent.push(line);
         if (line.startsWith('+') || line.startsWith('-')) {
           currentFile.changeCount++;
@@ -1477,7 +1739,7 @@ Do not explain the error, just provide the solution.`;
         content: currentContent.join('\n'),
         fileName: currentFile.fileName,
         isNewFile: currentFile.isNewFile,
-        changeCount: currentFile.changeCount
+        changeCount: currentFile.changeCount,
       });
     }
 
@@ -1492,9 +1754,11 @@ Do not explain the error, just provide the solution.`;
 
     if (chunk.isNewFile) {
       score += 50;
-      if (chunk.fileName.includes('package.json') ||
-          chunk.fileName.includes('composer.json') ||
-          chunk.fileName.includes('requirements.txt')) {
+      if (
+        chunk.fileName.includes('package.json') ||
+        chunk.fileName.includes('composer.json') ||
+        chunk.fileName.includes('requirements.txt')
+      ) {
         score += 100;
       }
     }
@@ -1507,14 +1771,24 @@ Do not explain the error, just provide the solution.`;
       score += 20;
     }
 
-    const ignoredPatterns = ['node_modules', '.git', 'dist', 'build', 'vendor', '.lock'];
-    if (ignoredPatterns.some(p => chunk.fileName.includes(p))) {
+    const ignoredPatterns = [
+      'node_modules',
+      '.git',
+      'dist',
+      'build',
+      'vendor',
+      '.lock',
+    ];
+    if (ignoredPatterns.some((p) => chunk.fileName.includes(p))) {
       score -= 50;
     }
 
     const semanticFiles = semanticContext?.files?.semantic || {};
     for (const [filePath, info] of Object.entries(semanticFiles)) {
-      if (chunk.fileName.includes(filePath) || filePath.includes(chunk.fileName)) {
+      if (
+        chunk.fileName.includes(filePath) ||
+        filePath.includes(chunk.fileName)
+      ) {
         if (info?.functions?.length > 0 || info?.classes?.length > 0) {
           score += 40;
         }
@@ -1524,16 +1798,18 @@ Do not explain the error, just provide the solution.`;
       }
     }
 
-    if (chunk.fileName.includes('index.') ||
-        chunk.fileName.includes('main.') ||
-        chunk.fileName.includes('app.') ||
-        chunk.fileName.includes('config.')) {
+    if (
+      chunk.fileName.includes('index.') ||
+      chunk.fileName.includes('main.') ||
+      chunk.fileName.includes('app.') ||
+      chunk.fileName.includes('config.')
+    ) {
       score += 25;
     }
 
     return score;
   }
-  
+
   /**
    * Parse conflict markers from content and extract both versions
    */
@@ -1549,7 +1825,7 @@ Do not explain the error, just provide the solution.`;
         currentConflict = {
           startLine: lines.indexOf(line),
           currentVersion: [],
-          incomingVersion: []
+          incomingVersion: [],
         };
         collectingCurrent = true;
         collectingIncoming = false;
@@ -1559,8 +1835,10 @@ Do not explain the error, just provide the solution.`;
       } else if (line.startsWith('>>>>>>>')) {
         if (currentConflict) {
           currentConflict.endLine = lines.indexOf(line);
-          currentConflict.currentVersion = currentConflict.currentVersion.join('\n');
-          currentConflict.incomingVersion = currentConflict.incomingVersion.join('\n');
+          currentConflict.currentVersion =
+            currentConflict.currentVersion.join('\n');
+          currentConflict.incomingVersion =
+            currentConflict.incomingVersion.join('\n');
           conflicts.push(currentConflict);
         }
         currentConflict = null;
@@ -1581,7 +1859,12 @@ Do not explain the error, just provide the solution.`;
   /**
    * Resolve a single conflict block using AI
    */
-  async resolveConflictWithAI(filePath, currentVersion, incomingVersion, language = 'javascript') {
+  async resolveConflictWithAI(
+    filePath,
+    currentVersion,
+    incomingVersion,
+    language = 'javascript'
+  ) {
     const prompt = `You are an expert software developer. Resolve a git merge conflict intelligently.
 
 CONTEXT:
@@ -1612,8 +1895,10 @@ RESOLVED CODE (output only):
 
     try {
       const config = await this.configManager.getAll();
-      const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
-      
+      const provider = AIProviderFactory.create(
+        config.defaultProvider || 'groq'
+      );
+
       const messages = await provider.generateCommitMessages(
         `RESOLVE CONFLICT IN ${filePath}:\n\n${prompt}`,
         { count: 1 }
@@ -1621,14 +1906,20 @@ RESOLVED CODE (output only):
 
       if (messages && messages.length > 0) {
         let resolved = messages[0].trim();
-        
+
         // Clean up any markdown code blocks if present
-        resolved = resolved.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
-        
+        resolved = resolved
+          .replace(/^```[a-zA-Z]*\n/, '')
+          .replace(/\n```$/, '');
+
         return resolved;
       }
     } catch (error) {
-      console.warn(chalk.yellow(`AI resolution failed, using current version: ${error.message}`));
+      console.warn(
+        chalk.yellow(
+          `AI resolution failed, using current version: ${error.message}`
+        )
+      );
     }
 
     // Fallback: keep current version
@@ -1639,15 +1930,20 @@ RESOLVED CODE (output only):
    * Handle conflict markers in a diff using AI-powered resolution
    */
   async handleConflictMarkers(diff, filePath) {
-    const conflictPattern = /<<<<<<< HEAD\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> .+/g;
+    const conflictPattern =
+      /<<<<<<< HEAD\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> .+/g;
     const matches = [...diff.matchAll(conflictPattern)];
 
     if (matches.length === 0) {
       return { cleanedDiff: diff, hasConflicts: false, resolved: [] };
     }
 
-    console.log(chalk.yellow(`⚠️  Found ${matches.length} conflict(s) in ${filePath}`));
-    console.log(chalk.blue(`🧠 Using AI to intelligently resolve conflicts...`));
+    console.log(
+      chalk.yellow(`⚠️  Found ${matches.length} conflict(s) in ${filePath}`)
+    );
+    console.log(
+      chalk.blue(`🧠 Using AI to intelligently resolve conflicts...`)
+    );
 
     let cleanedDiff = diff;
     const resolved = [];
@@ -1661,10 +1957,18 @@ RESOLVED CODE (output only):
       // Detect language from file extension
       const ext = filePath.split('.').pop();
       const langMap = {
-        'js': 'javascript', 'ts': 'typescript', 'py': 'python',
-        'php': 'php', 'html': 'html', 'css': 'css',
-        'json': 'json', 'md': 'markdown', 'sql': 'sql',
-        'java': 'java', 'go': 'go', 'rs': 'rust'
+        js: 'javascript',
+        ts: 'typescript',
+        py: 'python',
+        php: 'php',
+        html: 'html',
+        css: 'css',
+        json: 'json',
+        md: 'markdown',
+        sql: 'sql',
+        java: 'java',
+        go: 'go',
+        rs: 'rust',
       };
       const language = langMap[ext] || 'javascript';
 
@@ -1690,18 +1994,22 @@ RESOLVED CODE (output only):
       resolved.push({
         file: filePath,
         resolutionType: aiUsed ? 'ai-merged' : 'kept-current',
-        linesKept: resolvedVersion.split('\n').length
+        linesKept: resolvedVersion.split('\n').length,
       });
     }
 
     const successType = aiUsed ? 'AI-merged' : 'fallback';
-    console.log(chalk.green(`✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`));
+    console.log(
+      chalk.green(
+        `✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`
+      )
+    );
 
     return {
       cleanedDiff,
       hasConflicts: true,
       resolved,
-      aiUsed
+      aiUsed,
     };
   }
 
@@ -1715,7 +2023,9 @@ RESOLVED CODE (output only):
       return { cleaned: false, filesFixed: 0, diff };
     }
 
-    console.log(chalk.yellow('\n🔧 Detected conflict markers in staged changes'));
+    console.log(
+      chalk.yellow('\n🔧 Detected conflict markers in staged changes')
+    );
 
     // Parse diff to find which files have conflicts
     const filePattern = /diff --git a\/(.+?) b\/(.+)/g;
@@ -1759,9 +2069,15 @@ RESOLVED CODE (output only):
                 // Resolve each conflict block
                 const ext = file.fileB.split('.').pop();
                 const langMap = {
-                  'js': 'javascript', 'ts': 'typescript', 'py': 'python',
-                  'php': 'php', 'html': 'html', 'css': 'css',
-                  'json': 'json', 'md': 'markdown', 'sql': 'sql'
+                  js: 'javascript',
+                  ts: 'typescript',
+                  py: 'python',
+                  php: 'php',
+                  html: 'html',
+                  css: 'css',
+                  json: 'json',
+                  md: 'markdown',
+                  sql: 'sql',
                 };
                 const language = langMap[ext] || 'javascript';
 
@@ -1772,34 +2088,51 @@ RESOLVED CODE (output only):
                     conflict.incomingVersion,
                     language
                   );
-                  
+
                   // Replace the conflict block
-                  const conflictBlockStart = content.indexOf('<<<<<<<', conflict.startLine > 0 ? content.lastIndexOf('\n', conflict.startLine) : 0);
-                  const conflictBlockEnd = content.indexOf('>>>>>>>', conflictBlockStart) + content.substring(content.indexOf('>>>>>>>', conflictBlockStart)).indexOf('\n') + 1;
-                  
-                  if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
-                    cleanedContent = `${content.substring(0, conflictBlockStart) + resolved  }\n${  content.substring(conflictBlockEnd)}`;
+                  const conflictBlockStart = content.indexOf(
+                    '<<<<<<<',
+                    conflict.startLine > 0
+                      ? content.lastIndexOf('\n', conflict.startLine)
+                      : 0
+                  );
+                  const conflictBlockEnd =
+                    content.indexOf('>>>>>>>', conflictBlockStart) +
+                    content
+                      .substring(content.indexOf('>>>>>>>', conflictBlockStart))
+                      .indexOf('\n') +
+                    1;
+
+                  if (
+                    conflictBlockStart >= 0 &&
+                    conflictBlockEnd > conflictBlockStart
+                  ) {
+                    cleanedContent = `${content.substring(0, conflictBlockStart) + resolved}\n${content.substring(conflictBlockEnd)}`;
                   } else {
                     cleanedContent = cleanedContent.replace(
                       `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                      `${resolved  }\n`
+                      `${resolved}\n`
                     );
                   }
-                  
+
                   fileResolved++;
                   fileAiUsed = true;
                 } catch (e) {
                   // Fallback: use current version
                   cleanedContent = cleanedContent.replace(
                     `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                    `${conflict.currentVersion  }\n`
+                    `${conflict.currentVersion}\n`
                   );
                 }
               }
 
               if (fileResolved > 0) {
                 await fs.writeFile(fullPath, cleanedContent, 'utf8');
-                console.log(chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`));
+                console.log(
+                  chalk.green(
+                    `  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`
+                  )
+                );
                 totalResolved += fileResolved;
                 if (fileAiUsed) aiUsed = true;
               }
@@ -1815,7 +2148,7 @@ RESOLVED CODE (output only):
       cleaned: totalResolved > 0,
       filesFixed: totalResolved,
       diff: cleanedDiff,
-      aiUsed
+      aiUsed,
     };
   }
 
@@ -1870,15 +2203,20 @@ RESOLVED CODE (output only):
     }
 
     if (options.analyze) {
-      const analysis = await this.activityLogger.analyzeLogs(options.days || 30);
+      const analysis = await this.activityLogger.analyzeLogs(
+        options.days || 30
+      );
       this.displayLogAnalysis(analysis);
       return;
     }
 
     if (options.export) {
       const format = options.format || 'json';
-      const exportData = await this.activityLogger.exportLogs(options.days || 30, format);
-      
+      const exportData = await this.activityLogger.exportLogs(
+        options.days || 30,
+        format
+      );
+
       if (format === 'json') {
         console.log(JSON.stringify(JSON.parse(exportData), null, 2));
       } else {
@@ -1900,56 +2238,66 @@ RESOLVED CODE (output only):
    */
   displayLogAnalysis(analysis) {
     console.log(chalk.cyan('\n📈 Activity Analysis (Last 30 days):'));
-    
+
     console.log(chalk.yellow('\n🔥 Usage Metrics:'));
     console.log(`  Total Sessions: ${analysis.totalSessions}`);
     console.log(`  AI Interactions: ${analysis.aiInteractions}`);
     console.log(`  Successful Commits: ${analysis.successfulCommits}`);
     console.log(`  Conflict Resolutions: ${analysis.conflictResolutions}`);
-    
+
     console.log(chalk.yellow('\n🤖 Provider Usage:'));
     Object.entries(analysis.providerUsage).forEach(([provider, count]) => {
-      console.log(`  ${provider}: ${count} (${Math.round(count / analysis.aiInteractions * 100)}%)`);
+      console.log(
+        `  ${provider}: ${count} (${Math.round((count / analysis.aiInteractions) * 100)}%)`
+      );
     });
-    
+
     if (analysis.averageResponseTime > 0) {
       console.log(chalk.yellow('\n⚡ Performance:'));
       console.log(`  Average Response Time: ${analysis.averageResponseTime}ms`);
     }
-    
+
     if (Object.keys(analysis.messagePatterns).length > 0) {
       console.log(chalk.yellow('\n📝 Commit Patterns:'));
       Object.entries(analysis.messagePatterns)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .forEach(([type, count]) => {
-          const percentage = Math.round(count / analysis.successfulCommits * 100);
+          const percentage = Math.round(
+            (count / analysis.successfulCommits) * 100
+          );
           console.log(`  ${type}: ${count} (${percentage}%)`);
         });
     }
-    
+
     if (Object.keys(analysis.commonErrors).length > 0) {
       console.log(chalk.yellow('\n❌ Common Errors:'));
       Object.entries(analysis.commonErrors)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
         .forEach(([error, count]) => {
           console.log(`  ${error}: ${count}`);
         });
     }
-    
+
     if (Object.keys(analysis.peakUsageHours).length > 0) {
       console.log(chalk.yellow('\n🕐 Peak Usage Hours:'));
       Object.entries(analysis.peakUsageHours)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .slice(0, 3)
         .forEach(([hour, count]) => {
-          console.log(`  ${hour.toString().padStart(2, '0')}:00 - ${count} interactions`);
+          console.log(
+            `  ${hour.toString().padStart(2, '0')}:00 - ${count} interactions`
+          );
         });
     }
-    
-    console.log(chalk.dim('\n💡 Tip: Use --export to get detailed data for further analysis'));
+
+    console.log(
+      chalk.dim(
+        '\n💡 Tip: Use --export to get detailed data for further analysis'
+      )
+    );
   }
 }
 
-module.exports = AICommitGenerator;// Test change for prompt improvement
+module.exports = AICommitGenerator; // Test change for prompt improvement
 // Fix timeout handling to prevent null errors

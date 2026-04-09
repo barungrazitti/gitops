@@ -72,10 +72,7 @@ program
   .command('generate', { isDefault: true })
   .alias('gen')
   .description('Generate AI commit messages for staged changes')
-  .option(
-    '-p, --provider <provider>',
-    'AI provider to use (groq, ollama)'
-  )
+  .option('-p, --provider <provider>', 'AI provider to use (groq, ollama)')
   .option('-m, --model <model>', 'Specific model to use')
   .option('-c, --count <number>', 'Number of commit messages to generate', '3')
   .option('-t, --type <type>', 'Commit type (conventional commits)')
@@ -83,6 +80,7 @@ program
   .option('--no-cache', 'Disable caching')
   .option('--dry-run', 'Show what would be committed without making changes')
   .option('--conventional', 'Force conventional commit format')
+  .option('-q, --quiet', 'Suppress message quality scores')
   .action(handleGenerate);
 
 program
@@ -111,10 +109,6 @@ program
   .description('Show usage statistics')
   .option('--reset', 'Reset statistics')
   .action(handleStats);
-
-
-
-
 
 // --- Main Execution ---
 
