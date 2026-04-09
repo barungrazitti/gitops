@@ -4,6 +4,8 @@
 
 const TokenCounter = require('./token-counter');
 const DiffCategorizer = require('./diff-categorizer');
+const EntityExtractor = require('./entity-extractor');
+const PromptTemplates = require('./prompt-templates');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
@@ -11,6 +13,7 @@ class EfficientPromptBuilder {
     this.preserveContext = options.preserveContext || true;
     this.tokenCounter = new TokenCounter();
     this.diffCategorizer = new DiffCategorizer();
+    this.entityExtractor = new EntityExtractor();
   }
 
   /**
@@ -25,7 +28,7 @@ class EfficientPromptBuilder {
       totalChunks,
       enhancedPrompt,
       promptInstructions,
-      strictValidation
+      strictValidation,
     } = options;
 
     // Handle null/undefined diff
@@ -38,8 +41,28 @@ class EfficientPromptBuilder {
     const impactAnalysis = this.analyzeChangeImpact(diff, context);
 
     // Categorize diff by size
-    const diffCategory = this.diffCategorizer.categorizeDiff(diff, options.categorizationThresholds);
+    const diffCategory = this.diffCategorizer.categorizeDiff(
+      diff,
+      options.categorizationThresholds
+    );
     options.diffCategory = diffCategory;
+
+    // Extract entities for small diffs
+    if (diffCategory.category === 'small') {
+      const entities = this.entityExtractor.extractEntities(diff);
+      options.extractedEntities = entities;
+      options.entityList = PromptTemplates.entityListByType(entities);
+
+      // Add entity-centric section to prompt
+      const entitySection = PromptTemplates.buildSmallDiffPrompt({
+        category: diffCategory.category,
+        entityList: options.entityList,
+        entityCount: entities.all.length,
+        conventional,
+        context: relevantContext,
+      });
+      prompt += '\n\n' + entitySection;
+    }
 
     // Log category for debugging
     console.log(`Diff category: ${diffCategory.category}`);
@@ -53,7 +76,11 @@ class EfficientPromptBuilder {
 
     // Add enhanced instructions for problematic cases
     if (enhancedPrompt || isProblematicCase) {
-      prompt += this.buildEnhancedInstructions(isProblematicCase, isWordPressFile, promptInstructions);
+      prompt += this.buildEnhancedInstructions(
+        isProblematicCase,
+        isWordPressFile,
+        promptInstructions
+      );
     }
 
     // Add CRITICAL instruction to focus on actual changes
@@ -87,7 +114,7 @@ class EfficientPromptBuilder {
       prompt += `\n\nFormat: type(scope): description
 Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
 Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
-      
+
       // Add type hint if detected from file patterns
       if (context && context.files && context.files.type) {
         prompt += `\n\nDetected type hint: ${context.files.type} (based on changed files)`;
@@ -95,8 +122,11 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
     }
 
     // Add most relevant context (prioritized)
-    const relevantContext = this.extractRelevantContext(context, changeAnalysis);
-    
+    const relevantContext = this.extractRelevantContext(
+      context,
+      changeAnalysis
+    );
+
     // Check for asset summary in diff
     const hasAssetSummary = diff.includes('# ASSETS SUMMARY:');
     let assetContext = '';
@@ -106,7 +136,7 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
         assetContext = assetMatch[1];
       }
     }
-    
+
     if (relevantContext) {
       prompt += `\n\nContext: ${relevantContext}`;
       if (assetContext) {
@@ -154,12 +184,143 @@ REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE. NO WARNINGS. NO INSTRUCTIONS. NO DEPLO
 
 Single best commit message:`;
 
+    // Apply context line limiting for small diffs
+    if (options.diffCategory && options.diffCategory.category === 'small') {
+      const limitedDiff = this.limitContextLines(diff, 3);
+      options.truncatedDiff = limitedDiff;
+      // Replace diff in prompt with limited version
+      prompt = prompt.replace(
+        /```diff\n[\s\S]*?```/,
+        `\`\`\`diff\n${limitedDiff}\n\`\`\``
+      );
+
+      // Add single-line change highlighting
+      if (this.isSingleLineChange(diff)) {
+        const highlighted = this.highlightSingleLine(diff);
+        const singleLinePrompt =
+          PromptTemplates.buildSingleLineChangePrompt(highlighted);
+        prompt += '\n\n' + singleLinePrompt;
+      }
+    }
+
     // Compress if still too long
     if (this.tokenCounter.countTokens(prompt) > this.maxPromptLength) {
-      prompt = this.compressPrompt(prompt, diff, count, conventional, isWordPressFile);
+      prompt = this.compressPrompt(
+        prompt,
+        diff,
+        count,
+        conventional,
+        isWordPressFile
+      );
     }
 
     return prompt;
+  }
+
+  /**
+   * Limit surrounding context lines for small diffs
+   */
+  limitContextLines(diff, maxLines = 3) {
+    if (!diff || typeof diff !== 'string') {
+      return diff;
+    }
+
+    const lines = diff.split('\n');
+    const result = [];
+    let inContextBlock = false;
+    let contextCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Always keep headers
+      if (
+        line.startsWith('diff --git') ||
+        line.startsWith('index') ||
+        line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('@@')
+      ) {
+        result.push(line);
+        contextCount = 0;
+        inContextBlock = false;
+        continue;
+      }
+
+      // Keep added/removed lines
+      if (line.startsWith('+') || line.startsWith('-')) {
+        result.push(line);
+        contextCount = 0;
+        inContextBlock = true;
+        continue;
+      }
+
+      // Keep context lines within limit
+      if (inContextBlock && contextCount < maxLines) {
+        result.push(line);
+        contextCount++;
+      } else if (!inContextBlock) {
+        // Keep context before first change
+        result.push(line);
+      }
+      // Skip extra context lines beyond maxLines
+    }
+
+    return result.join('\n');
+  }
+
+  /**
+   * Check if diff has exactly one + or - line (excluding headers)
+   */
+  isSingleLineChange(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return false;
+    }
+
+    const lines = diff.split('\n');
+    let changeCount = 0;
+
+    for (const line of lines) {
+      // Skip diff headers
+      if (
+        line.startsWith('diff --git') ||
+        line.startsWith('index') ||
+        line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('@@')
+      ) {
+        continue;
+      }
+
+      // Count actual changes
+      if (line.startsWith('+') || line.startsWith('-')) {
+        changeCount++;
+      }
+    }
+
+    return changeCount === 1;
+  }
+
+  /**
+   * Wrap single line change with marker
+   */
+  highlightSingleLine(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return diff;
+    }
+
+    const lines = diff.split('\n');
+    const result = [];
+
+    for (const line of lines) {
+      if (line.startsWith('+') || line.startsWith('-')) {
+        result.push(`⬅️ ${line}`);
+      } else {
+        result.push(line);
+      }
+    }
+
+    return result.join('\n');
   }
 
   /**
@@ -170,18 +331,30 @@ Single best commit message:`;
 
     // Large diff detection
     const isLargeDiff = diff.length > 15000;
-    
-    // WordPress theme file detection
-    const isWordPressTheme = /functions\.php|style\.css|index\.php|header\.php|footer\.php|sidebar\.php|wp-content\/themes/.test(diff);
-    
-    // Mixed language detection (PHP + HTML + JS)
-    const hasMixedLanguages = /<\?php/.test(diff) && /<[^>]+>/.test(diff) && /function|var|let|const/.test(diff);
-    
-    // Repetitive pattern detection (like banner arrays)
-    const hasRepetitivePatterns = /(array|data)\s*=\s*\[.*?\]/s.test(diff) && 
-                                 (diff.match(/['"][^'"]*['"]/g) || []).length > 10;
 
-    return isLargeDiff || isWordPressTheme || hasMixedLanguages || hasRepetitivePatterns;
+    // WordPress theme file detection
+    const isWordPressTheme =
+      /functions\.php|style\.css|index\.php|header\.php|footer\.php|sidebar\.php|wp-content\/themes/.test(
+        diff
+      );
+
+    // Mixed language detection (PHP + HTML + JS)
+    const hasMixedLanguages =
+      /<\?php/.test(diff) &&
+      /<[^>]+>/.test(diff) &&
+      /function|var|let|const/.test(diff);
+
+    // Repetitive pattern detection (like banner arrays)
+    const hasRepetitivePatterns =
+      /(array|data)\s*=\s*\[.*?\]/s.test(diff) &&
+      (diff.match(/['"][^'"]*['"]/g) || []).length > 10;
+
+    return (
+      isLargeDiff ||
+      isWordPressTheme ||
+      hasMixedLanguages ||
+      hasRepetitivePatterns
+    );
   }
 
   /**
@@ -210,18 +383,24 @@ Single best commit message:`;
       /\$wpdb/,
       /do_action\s*\(/,
       /apply_filters\s*\(/,
-      /wordpress|wp_/
+      /wordpress|wp_/,
     ];
 
-    return wordpressPatterns.some(pattern => pattern.test(diff)) ||
-           context?.project?.primary === 'wordpress' ||
-           context?.files?.wordpress?.isWordPress;
+    return (
+      wordpressPatterns.some((pattern) => pattern.test(diff)) ||
+      context?.project?.primary === 'wordpress' ||
+      context?.files?.wordpress?.isWordPress
+    );
   }
 
   /**
    * Build enhanced instructions for problematic cases
    */
-  buildEnhancedInstructions(isProblematicCase, isWordPressFile, promptInstructions) {
+  buildEnhancedInstructions(
+    isProblematicCase,
+    isWordPressFile,
+    promptInstructions
+  ) {
     let instructions = '\n\nCRITICAL INSTRUCTIONS:';
 
     if (promptInstructions) {
@@ -342,27 +521,32 @@ REQUIREMENTS:
     const result = [];
     let inImportantSection = false;
     let skipCount = 0;
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
-      
+
       // Always keep headers
-      if (line.startsWith('diff --git') || 
-          line.startsWith('index') || 
-          line.startsWith('---') || 
-          line.startsWith('+++') || 
-          line.startsWith('@@')) {
+      if (
+        line.startsWith('diff --git') ||
+        line.startsWith('index') ||
+        line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('@@')
+      ) {
         result.push(line);
         continue;
       }
-      
+
       // PHP function changes are important
-      if (line.startsWith('+') && /function\s+\w+|add_action|add_filter|add_shortcode/.test(line)) {
+      if (
+        line.startsWith('+') &&
+        /function\s+\w+|add_action|add_filter|add_shortcode/.test(line)
+      ) {
         inImportantSection = true;
         result.push(line);
         continue;
       }
-      
+
       // Keep some context around important sections
       if (inImportantSection) {
         result.push(line);
@@ -373,26 +557,31 @@ REQUIREMENTS:
         }
         continue;
       }
-      
+
       // Skip repetitive HTML/template content
-      if (line.startsWith('+') && /<div|<span|<p|<h[1-6]|class=|id=/.test(line)) {
+      if (
+        line.startsWith('+') &&
+        /<div|<span|<p|<h[1-6]|class=|id=/.test(line)
+      ) {
         // Only keep every 3rd HTML line to reduce noise
         if (Math.random() < 0.3) {
           result.push(line);
         }
         continue;
       }
-      
+
       // Keep other changes but limit total
       if (result.length < 300) {
         result.push(line);
       }
     }
-    
+
     if (result.length < lines.length) {
-      result.push(`... (${lines.length - result.length} lines truncated for WordPress theme file) ...`);
+      result.push(
+        `... (${lines.length - result.length} lines truncated for WordPress theme file) ...`
+      );
     }
-    
+
     return result.join('\n');
   }
 
@@ -402,38 +591,40 @@ REQUIREMENTS:
   truncateDiff(diff) {
     const lines = diff.split('\n');
     const maxLines = 200; // Limit lines to stay within ~6K TPM budget for Groq free tier
-    
+
     if (lines.length <= maxLines) {
       return diff;
     }
-    
+
     // Keep headers and first/last parts of diff
     const headerLines = [];
     const contentLines = [];
-    
+
     for (let i = 0; i < lines.length; i++) {
-      if (lines[i].startsWith('diff --git') || 
-          lines[i].startsWith('index') || 
-          lines[i].startsWith('---') || 
-          lines[i].startsWith('+++') || 
-          lines[i].startsWith('@@')) {
+      if (
+        lines[i].startsWith('diff --git') ||
+        lines[i].startsWith('index') ||
+        lines[i].startsWith('---') ||
+        lines[i].startsWith('+++') ||
+        lines[i].startsWith('@@')
+      ) {
         headerLines.push(lines[i]);
       } else {
         contentLines.push(lines[i]);
       }
     }
-    
+
     // Take first and last parts of content to preserve change context
     const firstPart = contentLines.slice(0, Math.floor(maxLines * 0.4));
     const lastPart = contentLines.slice(-Math.floor(maxLines * 0.4));
-    
+
     const result = [
       ...headerLines,
       ...firstPart,
       `... (${contentLines.length - firstPart.length - lastPart.length} lines truncated) ...`,
-      ...lastPart
+      ...lastPart,
     ];
-    
+
     return result.join('\n');
   }
 
@@ -442,7 +633,7 @@ REQUIREMENTS:
    */
   buildChunkPrompt(chunk, options = {}) {
     const basePrompt = this.buildPrompt(chunk.content || chunk, options);
-    
+
     // Add chunk-specific instructions for better focus
     const chunkedPrompt = `CONTEXT FOR CHUNKED PROCESSING:
 - Process only the changes in this specific chunk
@@ -450,7 +641,7 @@ REQUIREMENTS:
 - Maintain consistency with overall changes if known
 
 ${basePrompt}`;
-    
+
     return chunkedPrompt;
   }
 
@@ -465,35 +656,35 @@ Focus on test additions, updates, or improvements.
 Examples: "test(auth): add unit tests for login flow", "test(utils): improve test coverage"
 
 ${this.buildPrompt(diff, options)}`;
-        
+
       case 'perf':
         return `Generate performance-related commit message for git diff.
 Focus on optimization, performance improvements, or efficiency changes.
 Examples: "perf(api): optimize query performance", "perf(ui): reduce render time"
 
 ${this.buildPrompt(diff, options)}`;
-        
+
       case 'fix':
         return `Generate bug fix commit message for git diff.
 Focus on issue resolution, bug fixes, or error corrections.
 Examples: "fix(auth): resolve login timeout issue", "fix(api): fix null pointer error"
 
 ${this.buildPrompt(diff, options)}`;
-        
+
       case 'feat':
         return `Generate feature addition commit message for git diff.
 Focus on new functionality, capabilities, or features.
 Examples: "feat(auth): add OAuth2 support", "feat(api): add user profile endpoint"
 
 ${this.buildPrompt(diff, options)}`;
-        
+
       case 'refactor':
         return `Generate refactoring commit message for git diff.
 Focus on code restructuring, improvements, or reorganization.
 Examples: "refactor(utils): extract validation logic", "refactor(auth): improve module structure"
 
 ${this.buildPrompt(diff, options)}`;
-        
+
       default:
         return this.buildPrompt(diff, options);
     }
@@ -509,7 +700,7 @@ ${this.buildPrompt(diff, options)}`;
       performance: false,
       security: false,
       dependency: false,
-      scope: 'internal'
+      scope: 'internal',
     };
 
     // Handle null/undefined diff input
@@ -520,21 +711,38 @@ ${this.buildPrompt(diff, options)}`;
     const lowerDiff = diff.toLowerCase();
 
     // Breaking changes detection
-    impact.breaking = /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(lowerDiff);
+    impact.breaking =
+      /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(
+        lowerDiff
+      );
 
     // User-facing changes
-    impact.userFacing = /ui|component|view|template|style|css|user.*interface|frontend/i.test(lowerDiff) ||
-                        (context?.files?.fileTypes?.jsx > 0 || context?.files?.fileTypes?.tsx > 0 ||
-                         context?.files?.fileTypes?.vue > 0 || context?.files?.fileTypes?.html > 0);
+    impact.userFacing =
+      /ui|component|view|template|style|css|user.*interface|frontend/i.test(
+        lowerDiff
+      ) ||
+      context?.files?.fileTypes?.jsx > 0 ||
+      context?.files?.fileTypes?.tsx > 0 ||
+      context?.files?.fileTypes?.vue > 0 ||
+      context?.files?.fileTypes?.html > 0;
 
     // Performance changes
-    impact.performance = /performance|optimize|cache|memo|lazy|async|await|promise/i.test(lowerDiff);
+    impact.performance =
+      /performance|optimize|cache|memo|lazy|async|await|promise/i.test(
+        lowerDiff
+      );
 
     // Security changes
-    impact.security = /security|auth|token|password|encrypt|decrypt|hash|validation|sanitize/i.test(lowerDiff);
+    impact.security =
+      /security|auth|token|password|encrypt|decrypt|hash|validation|sanitize/i.test(
+        lowerDiff
+      );
 
     // Dependency changes
-    impact.dependency = /package\.json|requirements\.txt|composer\.json|yarn\.lock|npm install|"react":|"express":|"lodash":/i.test(lowerDiff);
+    impact.dependency =
+      /package\.json|requirements\.txt|composer\.json|yarn\.lock|npm install|"react":|"express":|"lodash":/i.test(
+        lowerDiff
+      );
 
     // Determine scope
     if (impact.userFacing) impact.scope = 'user-facing';
@@ -601,7 +809,10 @@ ${this.buildPrompt(diff, options)}`;
 
     // Most relevant file types based on change type
     if (context.files?.fileTypes) {
-      const relevantTypes = this.getRelevantFileTypes(context.files.fileTypes, changeAnalysis);
+      const relevantTypes = this.getRelevantFileTypes(
+        context.files.fileTypes,
+        changeAnalysis
+      );
       if (relevantTypes.length > 0) {
         contextParts.push(relevantTypes.join(', '));
       }
@@ -609,17 +820,21 @@ ${this.buildPrompt(diff, options)}`;
 
     // Key semantic information (limited)
     if (context.files?.semantic) {
-      const {semantic} = context.files;
+      const { semantic } = context.files;
       const keyInfo = [];
 
       if (semantic.functions?.length > 0) {
         keyInfo.push(`new: ${semantic.functions.slice(0, 2).join(', ')}`);
       }
       if (semantic.components?.length > 0) {
-        keyInfo.push(`components: ${semantic.components.slice(0, 2).join(', ')}`);
+        keyInfo.push(
+          `components: ${semantic.components.slice(0, 2).join(', ')}`
+        );
       }
       if (semantic.wordpress_hooks?.length > 0) {
-        keyInfo.push(`hooks: ${semantic.wordpress_hooks.slice(0, 2).join(', ')}`);
+        keyInfo.push(
+          `hooks: ${semantic.wordpress_hooks.slice(0, 2).join(', ')}`
+        );
       }
 
       if (keyInfo.length > 0) {
@@ -635,7 +850,7 @@ ${this.buildPrompt(diff, options)}`;
    */
   getRelevantFileTypes(fileTypes, changeAnalysis) {
     const relevant = [];
-    
+
     // Prioritize file types based on change type
     const typePriorities = {
       feat: ['js', 'jsx', 'ts', 'tsx', 'py', 'php', 'css'],
@@ -644,11 +859,12 @@ ${this.buildPrompt(diff, options)}`;
       docs: ['md', 'txt', 'rst'],
       style: ['css', 'scss', 'less', 'vue'],
       perf: ['js', 'ts', 'py', 'java'],
-      refactor: ['js', 'ts', 'py', 'php', 'java']
+      refactor: ['js', 'ts', 'py', 'php', 'java'],
     };
 
-    const priorities = typePriorities[changeAnalysis.type] || Object.keys(fileTypes);
-    
+    const priorities =
+      typePriorities[changeAnalysis.type] || Object.keys(fileTypes);
+
     for (const type of priorities) {
       if (fileTypes[type] > 0) {
         relevant.push(type);
@@ -682,7 +898,9 @@ ${this.buildPrompt(diff, options)}`;
       case 'perf':
         examples.push('perf(database): optimize query with index');
         if (context?.project?.primary === 'wordpress') {
-          examples.push('perf(theme): change sort order for better performance');
+          examples.push(
+            'perf(theme): change sort order for better performance'
+          );
         }
         break;
       case 'refactor':
@@ -710,7 +928,7 @@ ${this.buildPrompt(diff, options)}`;
     const analysis = {
       type: 'chore', // default
       confidence: 0.1,
-      keywords: []
+      keywords: [],
     };
 
     // Handle null/undefined/empty diff input
@@ -721,33 +939,67 @@ ${this.buildPrompt(diff, options)}`;
     // Look for specific patterns that indicate change type
     const patterns = {
       test: {
-        keywords: ['test', 'spec', 'describe', 'it', 'expect', 'assert', 'jest', 'mocha'],
-        regex: /test|spec|describe|it\(|expect|assert|coverage/i
+        keywords: [
+          'test',
+          'spec',
+          'describe',
+          'it',
+          'expect',
+          'assert',
+          'jest',
+          'mocha',
+        ],
+        regex: /test|spec|describe|it\(|expect|assert|coverage/i,
       },
       perf: {
-        keywords: ['perf', 'performance', 'optimize', 'cache', 'memo', 'speed', 'fast'],
-        regex: /performance|optimize|cache|lazy|memo|speed|fast|efficien|bottleneck/i
+        keywords: [
+          'perf',
+          'performance',
+          'optimize',
+          'cache',
+          'memo',
+          'speed',
+          'fast',
+        ],
+        regex:
+          /performance|optimize|cache|lazy|memo|speed|fast|efficien|bottleneck/i,
       },
       fix: {
-        keywords: ['fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'correct'],
-        regex: /fix|bug|error|issue|problem|resolve|correct|patch|resolve/i
+        keywords: [
+          'fix',
+          'bug',
+          'error',
+          'issue',
+          'problem',
+          'resolve',
+          'correct',
+        ],
+        regex: /fix|bug|error|issue|problem|resolve|correct|patch|resolve/i,
       },
       feat: {
         keywords: ['add', 'new', 'implement', 'feature', 'create', 'introduce'],
-        regex: /add|new|implement|feature|create|introduce|enhance/i
+        regex: /add|new|implement|feature|create|introduce|enhance/i,
       },
       refactor: {
-        keywords: ['refactor', 'restructure', 'reorganize', 'clean', 'improve', 'move'],
-        regex: /refactor|restructure|reorganize|clean|improve|reorganize|restructure/i
+        keywords: [
+          'refactor',
+          'restructure',
+          'reorganize',
+          'clean',
+          'improve',
+          'move',
+        ],
+        regex:
+          /refactor|restructure|reorganize|clean|improve|reorganize|restructure/i,
       },
       docs: {
         keywords: ['doc', 'readme', 'comment', 'documentation', 'guide'],
-        regex: /doc|readme|comment|documentation|guide/i
+        regex: /doc|readme|comment|documentation|guide/i,
       },
       style: {
         keywords: ['style', 'format', 'lint', 'prettier', 'beautify'],
-        regex: /style|format|lint|prettier|beautify|indent|whitespace/i
-      }
+        regex: /style|format|lint|prettier|beautify|indent|whitespace/i,
+      },
     };
 
     // Count occurrences of pattern keywords in the diff
@@ -765,7 +1017,9 @@ ${this.buildPrompt(diff, options)}`;
 
       // Score based on keyword occurrences
       for (const keyword of pattern.keywords) {
-        const keywordMatches = lowerDiff.match(new RegExp(`\\b${keyword}\\b`, 'gi'));
+        const keywordMatches = lowerDiff.match(
+          new RegExp(`\\b${keyword}\\b`, 'gi')
+        );
         if (keywordMatches) {
           score += keywordMatches.length;
         }
