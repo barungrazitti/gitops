@@ -1,6 +1,6 @@
 {
   "name": "ai-commit-generator",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Automate your git workflow with AI-powered commit messages using Groq or Ollama",
   "main": "src/index.js",
   "bin": {
