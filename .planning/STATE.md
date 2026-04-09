@@ -13,11 +13,13 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 | --- | -------------------------------- | ------ | --------------- |
 | 1   | Stability & Error Recovery       | ✓      | 100%            |
 | 2   | Quality & Standards              | ✓      | 100%            |
-| 3   | Improve Commit Message Relevance | ○      | 50% (2/4 plans) |
+| 3   | Improve Commit Message Relevance | ○      | 75% (3/4 plans) |
 
 ## Current Context
 
 - **Active Phase**: 3 - Improve Commit Message Relevance
+- **Active Plan**: 03-04 (next: implement medium diff strategies)
+- **Recent Completion**: 03-03 - Hierarchical summarization for large diffs (parse-diff, chunk combine)
 - **Active Plan**: 03-03 (next: implement medium/large diff strategies)
 - **Recent Completion**: 03-02 - Entity-centric prompts for small diffs (entity extraction, handlebars templates, context limiting)
 
@@ -41,12 +43,14 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 - **DiffCategorizer**: Strict AND logic - all 3 metrics must agree for category assignment
 - **ConfigManager**: Added dot notation helpers (getNestedValue, setNestedValue, buildNestedObject)
 - **EntityExtractor**: Regex patterns for functions, classes, variables with false positive filtering
-- **PromptTemplates**: Handlebars templates with entity list formatting
+- **PromptTemplates**: Handlebars templates for small/large diffs
 - **ContextLimiting**: Max 3 lines surrounding changes for small diffs
+- **DiffSummarizer**: parse-diff integration for hierarchical summarization
+- **ChunkCombination**: Merge chunk summaries into one commit message
 
 ---
 
-_Last activity: 2026-04-09 - Completed 03-02: Entity-centric prompts for small diffs_
+_Last activity: 2026-04-09 - Completed 03-03: Hierarchical summarization for large diffs_
 
 ### Quick Tasks Completed
 
