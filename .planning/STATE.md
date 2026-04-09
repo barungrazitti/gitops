@@ -9,24 +9,26 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 
 ## Phase Progress
 
-| # | Phase | Status | Progress |
-|---|-------|--------|----------|
-| 1 | Stability & Error Recovery | ✓ | 100% |
-| 2 | Quality & Standards | ✓ | 100% |
-| 3 | Improve Commit Message Relevance | ○ | 33% (1/3 plans) |
+| #   | Phase                            | Status | Progress        |
+| --- | -------------------------------- | ------ | --------------- |
+| 1   | Stability & Error Recovery       | ✓      | 100%            |
+| 2   | Quality & Standards              | ✓      | 100%            |
+| 3   | Improve Commit Message Relevance | ○      | 50% (2/4 plans) |
 
 ## Current Context
 
 - **Active Phase**: 3 - Improve Commit Message Relevance
-- **Active Plan**: 03-02 (next: implement size-specific prompt strategies)
-- **Recent Completion**: 03-01 - Accurate token counting and diff categorization (tiktoken, hybrid metrics)
+- **Active Plan**: 03-03 (next: implement medium/large diff strategies)
+- **Recent Completion**: 03-02 - Entity-centric prompts for small diffs (entity extraction, handlebars templates, context limiting)
 
 ## Decisions Log
 
 ### Roadmap Evolution
+
 - Phase 3 added: Improve the relevance of git commit messages for small and large diffs
 
 ### Phase 3: Plan 01 - Token Counting & Categorization
+
 - **Tiktoken integration**: Use tiktoken library for accurate token counting (not character/4 approximation)
 - **Hybrid categorization**: 3 metrics (tokens, files, entities) with strict AND logic
 - **Conservative defaulting**: When metrics disagree, default to smallest category
@@ -34,16 +36,20 @@ See: .planning/PROJECT.md (updated 2026-03-20)
 - **Entity extraction**: Regex patterns for functions, classes, variables (lighter than AST)
 
 ### Technical Decisions
+
 - **TokenCounter**: Cache encoding objects for performance
 - **DiffCategorizer**: Strict AND logic - all 3 metrics must agree for category assignment
 - **ConfigManager**: Added dot notation helpers (getNestedValue, setNestedValue, buildNestedObject)
+- **EntityExtractor**: Regex patterns for functions, classes, variables with false positive filtering
+- **PromptTemplates**: Handlebars templates with entity list formatting
+- **ContextLimiting**: Max 3 lines surrounding changes for small diffs
 
 ---
-*Last activity: 2026-04-07 - Completed quick task 260407-hwa: Fix Groq 413 error when truncated diff still too large for model TPM limit*
 
+_Last activity: 2026-04-09 - Completed 03-02: Entity-centric prompts for small diffs_
 
 ### Quick Tasks Completed
 
-| # | Description | Date | Commit | Directory |
-|---|-------------|------|--------|-----------|
+| #          | Description                                                                | Date       | Commit  | Directory                                                                                                           |
+| ---------- | -------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
 | 260407-hwa | Fix Groq 413 error when truncated diff still too large for model TPM limit | 2026-04-07 | ed81f83 | [260407-hwa-fix-groq-413-error-when-truncated-diff-s](./quick/260407-hwa-fix-groq-413-error-when-truncated-diff-s/) |
