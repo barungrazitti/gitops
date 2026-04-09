@@ -35,7 +35,7 @@ class MessageFormatter {
     if (!message) return message;
     const composite = this.formatterFactory.createCompositeFormatter({
       conventional: options.conventional,
-      includeSections: options.includeSections || ['what', 'why', 'impact']
+      includeSections: options.includeSections || ['what', 'why', 'impact'],
     });
     return composite.format(message, context);
   }
@@ -74,7 +74,7 @@ class MessageFormatter {
       test: /test|spec|coverage|jest|mock/i,
       chore: /chore|update|upgrade|bump|dependency/i,
       ci: /ci|pipeline|workflow|action|deploy/i,
-      build: /build|webpack|rollup|babel|compile/i
+      build: /build|webpack|rollup|babel|compile/i,
     };
     for (const [type, pattern] of Object.entries(patterns)) {
       if (pattern.test(lower)) return type;
@@ -102,9 +102,13 @@ class MessageFormatter {
    */
   cleanDescription(message) {
     let desc = message.trim();
-    const prefixes = [/^(add|added|adds)\s+/i, /^(fix|fixed|fixes)\s+/i,
-      /^(update|updated|updates)\s+/i, /^(remove|removed|removes)\s+/i,
-      /^(implement|implemented|implements)\s+/i];
+    const prefixes = [
+      /^(add|added|adds)\s+/i,
+      /^(fix|fixed|fixes)\s+/i,
+      /^(update|updated|updates)\s+/i,
+      /^(remove|removed|removes)\s+/i,
+      /^(implement|implemented|implements)\s+/i,
+    ];
     for (const prefix of prefixes) desc = desc.replace(prefix, '');
     if (desc.length > 0) desc = desc.charAt(0).toLowerCase() + desc.slice(1);
     return desc.replace(/\.$/, '');
@@ -121,33 +125,28 @@ class MessageFormatter {
     if (title.length > 72) {
       const truncated = title.substring(0, 72);
       const lastSpace = truncated.lastIndexOf(' ');
-      formattedTitle = lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated;
+      formattedTitle =
+        lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated;
     }
-<<<<<<< HEAD
-
-    // If there's a body, add it back
-    if (body) {
-      return `${formattedTitle  }\n\n${  body}`;
-    }
-
-    return formattedTitle;
-=======
     return body ? formattedTitle + '\n\n' + body : formattedTitle;
->>>>>>> cea4c8218d91195730c9ef779506932cef526efa
   }
 
   /**
    * Clean up formatting issues
    */
   cleanupFormatting(message) {
-    return message.replace(/\s+/g, ' ').replace(/\n\s*\n\s*\n/g, '\n\n').trim();
+    return message
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      .trim();
   }
 
   /**
    * Validate commit message
    */
   validate(message, options = {}) {
-    const errors = [], warnings = [];
+    const errors = [],
+      warnings = [];
     if (!message || typeof message !== 'string') {
       errors.push('Message is required');
       return { valid: false, errors, warnings };
@@ -155,11 +154,15 @@ class MessageFormatter {
     const trimmed = message.trim();
     const title = trimmed.split('\n')[0];
     if (title.length === 0) errors.push('Title cannot be empty');
-    else if (title.length > 72) warnings.push('Title should be 72 characters or less');
+    else if (title.length > 72)
+      warnings.push('Title should be 72 characters or less');
     if (options.conventional && !this.isConventionalFormat(title)) {
-      errors.push('Conventional commit format required: type(scope): description');
+      errors.push(
+        'Conventional commit format required: type(scope): description'
+      );
     }
-    if (title.endsWith('.')) warnings.push('Title should not end with a period');
+    if (title.endsWith('.'))
+      warnings.push('Title should not end with a period');
     return { valid: errors.length === 0, errors, warnings };
   }
 
@@ -170,13 +173,19 @@ class MessageFormatter {
     if (!message || typeof message !== 'string') return false;
     const trimmed = message.trim();
     if (trimmed.length === 0) return false;
-    const invalid = [/^(here's|here is|this is|the following)/i,
+    const invalid = [
+      /^(here's|here is|this is|the following)/i,
       /^(breakdown|explanation|description|summary)/i,
-      /^(what|how|why|when|where)\s+(does|do|is|are)/i, /:$/, /^.{100,}$/];
+      /^(what|how|why|when|where)\s+(does|do|is|are)/i,
+      /:$/,
+      /^.{100,}$/,
+    ];
     for (const pattern of invalid) if (pattern.test(trimmed)) return false;
-    const valid = [/^(\w+)(\(.+\))?: .+/,
-      /^(add|fix|remove|update|create|delete|implement|refactor)/i];
-    return valid.some(p => p.test(trimmed));
+    const valid = [
+      /^(\w+)(\(.+\))?: .+/,
+      /^(add|fix|remove|update|create|delete|implement|refactor)/i,
+    ];
+    return valid.some((p) => p.test(trimmed));
   }
 
   /**
@@ -186,11 +195,20 @@ class MessageFormatter {
     let score = 50;
     const trimmed = message.toLowerCase().trim();
     if (/^\w+\(\w+\):/.test(message)) score += 15;
-    const actions = ['add', 'fix', 'remove', 'update', 'improve', 'optimize', 'refactor'];
-    if (actions.some(w => trimmed.includes(w))) score += 10;
-    if (/\((auth|api|ui|db|config|theme|plugin|utils|test)\)/.test(message)) score += 10;
+    const actions = [
+      'add',
+      'fix',
+      'remove',
+      'update',
+      'improve',
+      'optimize',
+      'refactor',
+    ];
+    if (actions.some((w) => trimmed.includes(w))) score += 10;
+    if (/\((auth|api|ui|db|config|theme|plugin|utils|test)\)/.test(message))
+      score += 10;
     const vague = ['update', 'change', 'modify', 'improve'];
-    score -= vague.filter(t => trimmed.includes(t)).length * 5;
+    score -= vague.filter((t) => trimmed.includes(t)).length * 5;
     return Math.max(0, Math.min(100, score));
   }
 }

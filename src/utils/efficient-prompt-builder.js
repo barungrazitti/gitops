@@ -33,10 +33,7 @@ class EfficientPromptBuilder {
       enhancedPrompt,
       promptInstructions,
       strictValidation,
-<<<<<<< HEAD
-=======
-      diffFacts
->>>>>>> cea4c8218d91195730c9ef779506932cef526efa
+      diffFacts,
     } = options;
 
     // Handle null/undefined diff

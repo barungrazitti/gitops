@@ -9,42 +9,31 @@ describe('AnalysisEngine', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
-    
-<<<<<<< HEAD
-    jest.mock('../src/core/git-manager', () => jest.fn().mockImplementation(() => ({
+
+    jest.mock('../src/core/git-manager', () => {
+      return jest.fn().mockImplementation(() => ({
         getRepositoryInfo: jest.fn().mockResolvedValue({ branch: 'main' }),
-        getCommitPatterns: jest.fn().mockResolvedValue({ mostUsedTypes: ['feat'] }),
+        getCommitPatterns: jest
+          .fn()
+          .mockResolvedValue({ mostUsedTypes: ['feat'] }),
         getStagedFiles: jest.fn().mockResolvedValue(['src/index.js']),
-        getFileStats: jest.fn().mockResolvedValue({ insertions: 10, deletions: 5 }),
+        getFileStats: jest
+          .fn()
+          .mockResolvedValue({ insertions: 10, deletions: 5 }),
         getCommitHistory: jest.fn().mockResolvedValue([]),
         getRepositoryRoot: jest.fn().mockResolvedValue('/test/repo'),
-      })));
-=======
-     jest.mock('../src/core/git-manager', () => {
-       return jest.fn().mockImplementation(() => ({
-         getRepositoryInfo: jest.fn().mockResolvedValue({ branch: 'main' }),
-         getCommitPatterns: jest.fn().mockResolvedValue({ mostUsedTypes: ['feat'] }),
-         getStagedFiles: jest.fn().mockResolvedValue(['src/index.js']),
-         getFileStats: jest.fn().mockResolvedValue({ insertions: 10, deletions: 5 }),
-       }));
-     });
->>>>>>> cea4c8218d91195730c9ef779506932cef526efa
-    
+      }));
+    });
+
     jest.mock('fs-extra', () => ({
       pathExists: jest.fn().mockResolvedValue(true),
       readFile: jest.fn().mockResolvedValue('content'),
     }));
-    
-<<<<<<< HEAD
+
     jest.mock('../src/utils/project-type-detector', () => ({
       detectProjectType: jest.fn().mockResolvedValue({ primary: 'nodejs' }),
     }));
-=======
-     jest.mock('../src/utils/project-type-detector', () => ({
-       detectProjectType: jest.fn().mockResolvedValue({ primary: 'nodejs' }),
-     }));
->>>>>>> cea4c8218d91195730c9ef779506932cef526efa
-    
+
     AnalysisEngine = require('../src/core/analysis-engine');
     engine = new AnalysisEngine();
   });
