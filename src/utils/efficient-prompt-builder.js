@@ -6,6 +6,8 @@ const TokenCounter = require('./token-counter');
 const DiffCategorizer = require('./diff-categorizer');
 const EntityExtractor = require('./entity-extractor');
 const PromptTemplates = require('./prompt-templates');
+const DiffSummarizer = require('./diff-summarizer');
+const OptimizedDiffProcessor = require('./optimized-diff-processor');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
@@ -14,6 +16,8 @@ class EfficientPromptBuilder {
     this.tokenCounter = new TokenCounter();
     this.diffCategorizer = new DiffCategorizer();
     this.entityExtractor = new EntityExtractor();
+    this.diffSummarizer = new DiffSummarizer();
+    this.diffProcessor = new OptimizedDiffProcessor();
   }
 
   /**
@@ -62,6 +66,40 @@ class EfficientPromptBuilder {
         context: relevantContext,
       });
       prompt += '\n\n' + entitySection;
+    }
+
+    // Handle large diffs with hierarchical summarization
+    if (diffCategory.category === 'large') {
+      // Reuse existing chunking logic
+      const chunks = this.diffProcessor.processDiffWithStrategy(diff);
+      const processingAnalysis = this.diffProcessor.analyzeDiff(diff);
+
+      console.log(
+        `Chunking strategy: ${processingAnalysis.processingStrategy}`
+      );
+
+      // Extract file chunks and summarize
+      const fileChunks = this.diffSummarizer.extractFileChunks(diff);
+      const summaries = fileChunks.map((chunk, index) =>
+        this.diffSummarizer.summarizeChunk(chunk, index, fileChunks.length)
+      );
+
+      const combined = this.diffSummarizer.combineSummaries(
+        summaries,
+        conventional
+      );
+
+      options.chunkSummaries = summaries;
+      options.combinedSummary = combined;
+
+      const largeDiffPrompt = PromptTemplates.buildLargeDiffPrompt({
+        chunkCount: fileChunks.length,
+        chunkSummaries: combined.combined,
+        conventional,
+      });
+
+      prompt += '\n\n' + largeDiffPrompt;
+      console.log(`Processing ${fileChunks.length} chunks in parallel...`);
     }
 
     // Log category for debugging
@@ -321,6 +359,35 @@ Single best commit message:`;
     }
 
     return result.join('\n');
+  }
+
+  /**
+   * Combine chunk summaries for large diffs
+   */
+  combineChunkSummaries(summaries, conventional = false) {
+    if (!summaries || summaries.length === 0) {
+      return '';
+    }
+
+    const summaryTexts = summaries.map((s) => {
+      if (s.keyChanges && s.keyChanges.length > 0) {
+        return `${s.fileName}: ${s.keyChanges.slice(0, 2).join('; ')}`;
+      }
+      if (
+        s.entities &&
+        s.entities.functions &&
+        s.entities.functions.length > 0
+      ) {
+        return `${s.fileName}: ${s.entities.functions.slice(0, 2).join(', ')}`;
+      }
+      return `${s.fileName}: No specific changes`;
+    });
+
+    const prompt = PromptTemplates.buildCombineSummariesPrompt(
+      summaryTexts,
+      conventional
+    );
+    return prompt;
   }
 
   /**
