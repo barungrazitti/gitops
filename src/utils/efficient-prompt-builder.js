@@ -40,15 +40,12 @@ class EfficientPromptBuilder {
       diff = '';
     }
 
+    // Initialize prompt first - before any code that uses it
+    let prompt = '';
+
     // Analyze diff for change type and impact
     const changeAnalysis = this.analyzeDiffForSpecialization(diff);
     const impactAnalysis = this.analyzeChangeImpact(diff, context);
-
-    // Add most relevant context (prioritized) - moved before usage
-    const relevantContext = this.extractRelevantContext(
-      context,
-      changeAnalysis
-    );
 
     // Categorize diff by size
     const diffCategory = this.diffCategorizer.categorizeDiff(
@@ -56,6 +53,12 @@ class EfficientPromptBuilder {
       options.categorizationThresholds
     );
     options.diffCategory = diffCategory;
+
+    // Add most relevant context (prioritized) - must be before small/large diff handling
+    const relevantContext = this.extractRelevantContext(
+      context,
+      changeAnalysis
+    );
 
     // Extract entities for small diffs
     if (diffCategory.category === 'small') {
@@ -116,7 +119,7 @@ class EfficientPromptBuilder {
     const isWordPressFile = this.isWordPressFile(diff, context);
 
     // Build concise, focused prompt
-    let prompt = `Generate ${count} precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
+    prompt = `Generate ${count} precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
 
     // Add enhanced instructions for problematic cases
     if (enhancedPrompt || isProblematicCase) {
