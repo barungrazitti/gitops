@@ -120,7 +120,25 @@ class EfficientPromptBuilder {
     const isWordPressFile = this.isWordPressFile(diff, context);
 
     // Build concise, focused prompt
-    prompt = `Generate ${count} precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
+    let basePrompt = `Generate ${count} precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
+
+    // Handle binary files specially - they have no code changes
+    if (changeAnalysis.type === 'binary') {
+      const hasFileHeaders = /^diff --git/m.test(diff);
+      const fileMatch = diff.match(/diff --git a\/(.+?) b\/(.+)/m);
+      const fileName = fileMatch ? fileMatch[2].split('/').pop() : 'unknown';
+      const isNew = changeAnalysis.keywords.includes('added');
+      const isDeleted = changeAnalysis.keywords.includes('removed');
+
+      basePrompt += `
+
+For BINARY FILES with no code changes:
+- Use format "chore: add/update/remove filename" based on file path
+- ${isNew ? `NEW file: Output "chore: add ${fileName}"` : isDeleted ? `DELETED file: Output "chore: remove ${fileName}"` : `CHANGED file: Output "chore: update ${fileName}"`}
+- DO NOT guess functionality - the diff contains no code changes to analyze`;
+    }
+
+    prompt = basePrompt;
 
     // Add enhanced instructions for problematic cases
     if (enhancedPrompt || isProblematicCase) {
@@ -1029,6 +1047,23 @@ ${this.buildPrompt(diff, options)}`;
 
     // Handle null/undefined/empty diff input
     if (!diff) {
+      return analysis;
+    }
+
+    // Detect binary files: file headers present but no +/- changes
+    const hasFileHeaders = /^diff --git/m.test(diff);
+    const hasChanges = /^[\+\-][^\+\-]/m.test(diff);
+    if (hasFileHeaders && !hasChanges) {
+      const isNew =
+        /new file mode|mode:/m.test(diff) &&
+        !/deleted file mode|mode: 000000/m.test(diff);
+      const isDeleted = /deleted file mode|mode: 000000/m.test(diff);
+      analysis.type = 'binary';
+      analysis.confidence = 0.9;
+      analysis.keywords = [
+        'binary',
+        isNew ? 'added' : isDeleted ? 'removed' : 'changed',
+      ];
       return analysis;
     }
 
