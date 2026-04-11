@@ -1,0 +1,943 @@
+
+> ai-commit-generator@1.3.0 lint
+> eslint "src/**/*.js" "tests/**/*.js" "bin/**/*.js"
+
+
+/Users/barun.tayenjam/Documents/Code/git-ops/bin/aic.js
+   17:25  error    Unexpected use of file extension "js" for "../src/auto-git.js"  import/extensions
+   18:35  error    Unexpected use of file extension "js" for "../src/index.js"     import/extensions
+   39:9   warning  Unexpected console statement                                    no-console
+   59:33  warning  Unexpected console statement                                    no-console
+   65:9   error    Assignment to property of function parameter 'options'          no-param-reassign
+   70:7   warning  Unexpected console statement                                    no-console
+   84:7   warning  Unexpected console statement                                    no-console
+  102:7   warning  Unexpected console statement                                    no-console
+  121:7   warning  Unexpected console statement                                    no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/bin/aicommit.js
+  10:35  error    Unexpected use of file extension "js" for "../src/index.js"  import/extensions
+  19:5   warning  Unexpected console statement                                 no-console
+  29:5   warning  Unexpected console statement                                 no-console
+  39:5   warning  Unexpected console statement                                 no-console
+  49:5   warning  Unexpected console statement                                 no-console
+  59:5   warning  Unexpected console statement                                 no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/auto-git.js
+    7:7   error    'ora' is assigned a value but never used                                                                                                                                   no-unused-vars
+   10:7   error    'fs' is assigned a value but never used                                                                                                                                    no-unused-vars
+   11:7   error    'path' is assigned a value but never used                                                                                                                                  no-unused-vars
+   12:35  error    Unexpected use of file extension "js" for "./index.js"                                                                                                                     import/extensions
+   31:7   warning  Unexpected console statement                                                                                                                                               no-console
+   40:7   warning  Unexpected console statement                                                                                                                                               no-console
+   50:7   warning  Unexpected console statement                                                                                                                                               no-console
+   60:9   warning  Unexpected console statement                                                                                                                                               no-console
+   63:11  warning  Unexpected console statement                                                                                                                                               no-console
+   78:11  warning  Unexpected console statement                                                                                                                                               no-console
+  103:7   warning  Unexpected console statement                                                                                                                                               no-console
+  110:7   warning  Unexpected console statement                                                                                                                                               no-console
+  130:7   warning  Unexpected console statement                                                                                                                                               no-console
+  150:9   warning  Unexpected console statement                                                                                                                                               no-console
+  155:7   warning  Unexpected console statement                                                                                                                                               no-console
+  168:7   warning  Unexpected console statement                                                                                                                                               no-console
+  176:31  error    'options' is defined but never used. Allowed unused args must match /^_/u                                                                                                  no-unused-vars
+  190:9   warning  Unexpected console statement                                                                                                                                               no-console
+  226:7   warning  Unexpected console statement                                                                                                                                               no-console
+  234:32  error    'options' is defined but never used. Allowed unused args must match /^_/u                                                                                                  no-unused-vars
+  237:7   warning  Unexpected console statement                                                                                                                                               no-console
+  239:7   warning  Unexpected console statement                                                                                                                                               no-console
+  257:11  warning  Unexpected console statement                                                                                                                                               no-console
+  259:13  warning  Unexpected console statement                                                                                                                                               no-console
+  298:13  warning  Unexpected console statement                                                                                                                                               no-console
+  299:13  warning  Unexpected console statement                                                                                                                                               no-console
+  300:13  warning  Unexpected console statement                                                                                                                                               no-console
+  301:13  warning  Unexpected console statement                                                                                                                                               no-console
+  312:15  error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  313:17  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  319:15  warning  Unexpected console statement                                                                                                                                               no-console
+  322:13  warning  Unexpected console statement                                                                                                                                               no-console
+  331:13  warning  Unexpected console statement                                                                                                                                               no-console
+  333:13  warning  Unexpected console statement                                                                                                                                               no-console
+  343:9   warning  Unexpected console statement                                                                                                                                               no-console
+  356:13  warning  Unexpected console statement                                                                                                                                               no-console
+  369:5   warning  Unexpected console statement                                                                                                                                               no-console
+  372:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  373:7   warning  Unexpected console statement                                                                                                                                               no-console
+  376:9   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  377:9   warning  Unexpected console statement                                                                                                                                               no-console
+  379:9   warning  Unexpected console statement                                                                                                                                               no-console
+  381:30  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  395:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  409:9   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  410:9   warning  Unexpected console statement                                                                                                                                               no-console
+  419:5   warning  Unexpected console statement                                                                                                                                               no-console
+  445:24  error    Unexpected require()                                                                                                                                                       global-require
+  446:13  error    'fs' is already declared in the upper scope on line 10 column 7                                                                                                            no-shadow
+  446:18  error    Unexpected require()                                                                                                                                                       global-require
+  476:7   warning  Unexpected console statement                                                                                                                                               no-console
+  478:7   warning  Unexpected console statement                                                                                                                                               no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/activity-logger.js
+   38:7   warning  Unexpected console statement                                                                                                                                               no-console
+   45:3   error    Expected 'this' to be used by class method 'generateSessionId'                                                                                                             class-methods-use-this
+   52:3   error    Expected 'this' to be used by class method 'getDateString'                                                                                                                 class-methods-use-this
+   86:13  error    'filesToKeep' is assigned a value but never used                                                                                                                           no-unused-vars
+   95:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   97:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   98:11  warning  Unexpected console statement                                                                                                                                               no-console
+  100:11  warning  Unexpected console statement                                                                                                                                               no-console
+  104:7   warning  Unexpected console statement                                                                                                                                               no-console
+  129:21  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  144:7   warning  Unexpected console statement                                                                                                                                               no-console
+  163:3   error    Expected 'this' to be used by class method 'logToConsole'                                                                                                                  class-methods-use-this
+  167:5   error    Expected a default case                                                                                                                                                    default-case
+  169:9   warning  Unexpected console statement                                                                                                                                               no-console
+  172:9   warning  Unexpected console statement                                                                                                                                               no-console
+  175:9   warning  Unexpected console statement                                                                                                                                               no-console
+  178:9   warning  Unexpected console statement                                                                                                                                               no-console
+  191:7   warning  Unexpected console statement                                                                                                                                               no-console
+  193:7   warning  Unexpected console statement                                                                                                                                               no-console
+  229:49  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  231:54  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  314:22  error    Unexpected dangling '_' in '_getActiveHandles'                                                                                                                             no-underscore-dangle
+  314:50  error    Unexpected dangling '_' in '_getActiveHandles'                                                                                                                             no-underscore-dangle
+  315:23  error    Unexpected dangling '_' in '_getActiveRequests'                                                                                                                            no-underscore-dangle
+  315:52  error    Unexpected dangling '_' in '_getActiveRequests'                                                                                                                            no-underscore-dangle
+  347:38  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  384:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  386:23  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  389:27  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  392:11  error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  407:7   warning  Unexpected console statement                                                                                                                                               no-console
+  433:13  error    Use object destructuring                                                                                                                                                   prefer-destructuring
+  474:3   error    Expected 'this' to be used by class method 'extractCommitType'                                                                                                             class-methods-use-this
+  487:12  error    Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+  497:3   error    Expected 'this' to be used by class method 'convertToCSV'                                                                                                                  class-methods-use-this
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/analysis-engine.js
+    5:20  error    `./git-manager` import should occur after import of `path`                                                                                                                 import/order
+   34:9   error    Expected property shorthand                                                                                                                                                object-shorthand
+   38:7   warning  Unexpected console statement                                                                                                                                               no-console
+   87:7   warning  Unexpected console statement                                                                                                                                               no-console
+  103:3   error    Expected 'this' to be used by class method 'categorizeFiles'                                                                                                               class-methods-use-this
+  126:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  128:11  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  135:9   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  145:3   error    Expected 'this' to be used by class method 'inferScope'                                                                                                                    class-methods-use-this
+  180:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  259:3   error    Expected 'this' to be used by class method 'detectCommitType'                                                                                                              class-methods-use-this
+  307:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  308:9   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  342:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  345:15  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  345:47  error    Unexpected use of continue statement                                                                                                                                       no-continue
+  347:25  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  352:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  354:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  356:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  362:7   warning  Unexpected console statement                                                                                                                                               no-console
+  370:3   error    Expected 'this' to be used by class async method 'analyzeJavaScriptFile'                                                                                                   class-methods-use-this
+  450:3   error    Expected 'this' to be used by class async method 'analyzePHPFile'                                                                                                          class-methods-use-this
+  511:3   error    Expected 'this' to be used by class async method 'analyzePythonFile'                                                                                                       class-methods-use-this
+  538:3   error    Expected blank line between class members                                                                                                                                  lines-between-class-members
+  538:3   error    Expected 'this' to be used by class method 'detectWordPressContext'                                                                                                        class-methods-use-this
+  602:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  661:7   warning  Unexpected console statement                                                                                                                                               no-console
+  676:3   error    Expected 'this' to be used by class async method 'detectMonorepo'                                                                                                          class-methods-use-this
+  685:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  686:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  710:3   error    Expected 'this' to be used by class async method 'hasTestFiles'                                                                                                            class-methods-use-this
+  719:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  720:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  731:3   error    Expected 'this' to be used by class async method 'hasCIConfig'                                                                                                             class-methods-use-this
+  743:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  744:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  755:3   error    Expected 'this' to be used by class async method 'analyzeComplexity'                                                                                                       class-methods-use-this
+  802:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  831:3   error    Expected 'this' to be used by class method 'extractCodeChanges'                                                                                                            class-methods-use-this
+  840:9   error    Use array destructuring                                                                                                                                                    prefer-destructuring
+  847:19  error    Unnecessary escape character: \+                                                                                                                                           no-useless-escape
+  857:33  error    Unnecessary escape character: \*                                                                                                                                           no-useless-escape
+  857:35  error    Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+  861:13  error    Expected property shorthand                                                                                                                                                object-shorthand
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/cache-manager.js
+   31:7   warning  Unexpected console statement                                                                                                                                               no-console
+   49:3   error    Expected 'this' to be used by class method 'extractSemanticFingerprint'                                                                                                    class-methods-use-this
+   70:3   error    Expected 'this' to be used by class method 'extractStructuralFingerprint'                                                                                                  class-methods-use-this
+   82:13  error    'semanticFingerprint' is assigned a value but never used                                                                                                                   no-unused-vars
+   85:11  error    'cached' is never reassigned. Use 'const' instead                                                                                                                          prefer-const
+   90:16  error    Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+  109:18  error    Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+  121:7   warning  Unexpected console statement                                                                                                                                               no-console
+  147:7   warning  Unexpected console statement                                                                                                                                               no-console
+  154:3   error    Expected 'this' to be used by class method 'truncateDiff'                                                                                                                  class-methods-use-this
+  155:33  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  171:7   warning  Unexpected console statement                                                                                                                                               no-console
+  191:7   warning  Unexpected console statement                                                                                                                                               no-console
+  208:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  212:29  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  216:13  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  217:13  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  221:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  222:11  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  226:7   error    Async method 'cleanup' expected no return value                                                                                                                            consistent-return
+  228:7   warning  Unexpected console statement                                                                                                                                               no-console
+  229:7   error    Async method 'cleanup' expected no return value                                                                                                                            consistent-return
+  240:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  254:9   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  257:31  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  263:13  error    Unexpected use of continue statement                                                                                                                                       no-continue
+  325:7   warning  Unexpected console statement                                                                                                                                               no-console
+  333:3   error    Expected 'this' to be used by class method 'extractCodeChanges'                                                                                                            class-methods-use-this
+  352:3   error    Expected 'this' to be used by class method 'quickHash'                                                                                                                     class-methods-use-this
+  355:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/circuit-breaker.js
+   31:5  error    Unary operator '++' used      no-plusplus
+   37:9  warning  Unexpected console statement  no-console
+   64:5  error    Unary operator '++' used      no-plusplus
+   68:7  error    Unary operator '++' used      no-plusplus
+   82:5  error    Unary operator '++' used      no-plusplus
+   83:5  error    Unary operator '++' used      no-plusplus
+   87:5  warning  Unexpected console statement  no-console
+  107:5  warning  Unexpected console statement  no-console
+  169:5  warning  Unexpected console statement  no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/config-manager.js
+   23:3   error  Expected 'this' to be used by class method 'getDefaults'                                                                                                                   class-methods-use-this
+   99:3   error  Expected 'this' to be used by class method 'getValidationSchema'                                                                                                           class-methods-use-this
+  213:15  error  'encryptedApiKey' is assigned a value but never used                                                                                                                       no-unused-vars
+  386:5   error  Expected a default case                                                                                                                                                    default-case
+  409:3   error  Expected 'this' to be used by class method 'isValidUrl'                                                                                                                    class-methods-use-this
+  411:7   error  Do not use 'new' for side effects                                                                                                                                          no-new
+  428:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/git-manager.js
+  188:15  error  Use object destructuring                                 prefer-destructuring
+  315:11  error  'targetBranch' is never reassigned. Use 'const' instead  prefer-const
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/hook-manager.js
+   38:9   warning  Unexpected console statement                                                                                                                                               no-console
+   94:9   warning  Unexpected console statement                                                                                                                                               no-console
+   95:9   warning  Unexpected console statement                                                                                                                                               no-console
+   96:9   warning  Unexpected console statement                                                                                                                                               no-console
+  136:3   error    Expected 'this' to be used by class method 'generateHookScript'                                                                                                            class-methods-use-this
+  188:3   error    Expected 'this' to be used by class method 'generateAdvancedHookScript'                                                                                                    class-methods-use-this
+  345:3   error    Expected 'this' to be used by class method 'parseHookConfig'                                                                                                               class-methods-use-this
+  356:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  360:11  error    Do not nest ternary expressions                                                                                                                                            no-nested-ternary
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/memory-efficient-cache-manager.js
+   29:3   error    Expected 'this' to be used by class method 'calculateSize'                                                                                                                 class-methods-use-this
+   71:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   97:9   warning  Unexpected console statement                                                                                                                                               no-console
+  160:3   error    Expected 'this' to be used by class method 'generateHash'                                                                                                                  class-methods-use-this
+  193:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  216:3   error    Expected 'this' to be used by class method 'calculateTextSimilarity'                                                                                                       class-methods-use-this
+  218:33  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                                                                      arrow-body-style
+  293:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  308:25  error    Unexpected string concatenation                                                                                                                                            prefer-template
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/message-formatter.js
+   80:3   error  Expected 'this' to be used by class method 'isConventionalFormat'                                                                                                          class-methods-use-this
+   88:3   error  Expected 'this' to be used by class method 'inferType'                                                                                                                     class-methods-use-this
+  187:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  189:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  251:3   error  Expected 'this' to be used by class method 'inferScopeFromMessage'                                                                                                         class-methods-use-this
+  310:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  312:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  333:3   error  Expected 'this' to be used by class method 'inferWordPressScope'                                                                                                           class-methods-use-this
+  340:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  353:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  364:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  389:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  418:3   error  Expected 'this' to be used by class method 'cleanDescription'                                                                                                              class-methods-use-this
+  430:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  448:3   error  Expected 'this' to be used by class method 'applyLanguageFormatting'                                                                                                       class-methods-use-this
+  457:3   error  Expected 'this' to be used by class method 'applyLengthConstraints'                                                                                                        class-methods-use-this
+  478:14  error  Unexpected string concatenation                                                                                                                                            prefer-template
+  487:3   error  Expected 'this' to be used by class method 'cleanupFormatting'                                                                                                             class-methods-use-this
+  497:3   error  Expected 'this' to be used by class method 'formatWithTemplate'                                                                                                            class-methods-use-this
+  513:3   error  Expected 'this' to be used by class method 'parseConventionalCommit'                                                                                                       class-methods-use-this
+  616:3   error  Expected 'this' to be used by class method 'isValidCommitMessage'                                                                                                          class-methods-use-this
+  652:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  670:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  725:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  741:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  764:3   error  Expected 'this' to be used by class method 'calculateRelevanceScore'                                                                                                       class-methods-use-this
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/provider-performance-manager.js
+   57:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   60:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   78:56  error    'result' is defined but never used. Allowed unused args must match /^_/u                                                                                                   no-unused-vars
+   82:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  101:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  118:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  119:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  126:5   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  147:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  252:11  warning  Unexpected console statement                                                                                                                                               no-console
+  254:16  error    Redundant use of `await` on a return value                                                                                                                                 no-return-await
+  274:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/secure-config-manager.js
+    9:1   error  Expected 1 empty line after require statement not followed by another require                                                                                              import/newline-after-import
+   36:12  error  Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+   39:24  error  Unexpected require()                                                                                                                                                       global-require
+   48:3   error  Expected 'this' to be used by class method 'getKeyFilePath'                                                                                                                class-methods-use-this
+   49:16  error  Unexpected require()                                                                                                                                                       global-require
+   50:18  error  Unexpected require()                                                                                                                                                       global-require
+   94:3   error  Expected 'this' to be used by class method 'getDefaults'                                                                                                                   class-methods-use-this
+  166:3   error  Expected 'this' to be used by class method 'getValidationSchema'                                                                                                           class-methods-use-this
+  289:44  error  'encryptedValue' is not defined                                                                                                                                            no-undef
+  309:16  error  Assignment to property of function parameter 'values'                                                                                                                      no-param-reassign
+  406:9   error  Expected property shorthand                                                                                                                                                object-shorthand
+  510:11  error  'config' is assigned a value but never used                                                                                                                                no-unused-vars
+  529:3   error  Expected 'this' to be used by class async method 'validateProviderConfig'                                                                                                  class-methods-use-this
+  557:3   error  Expected 'this' to be used by class method 'isValidUrl'                                                                                                                    class-methods-use-this
+  559:7   error  Do not use 'new' for side effects                                                                                                                                          no-new
+  576:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/core/stats-manager.js
+   58:7   warning  Unexpected console statement                                  no-console
+   70:7   warning  Unexpected console statement                                  no-console
+   82:7   warning  Unexpected console statement                                  no-console
+  108:7   warning  Unexpected console statement                                  no-console
+  172:7   warning  Unexpected console statement                                  no-console
+  202:7   warning  Unexpected console statement                                  no-console
+  203:14  error    Redundant use of `await` on a return value                    no-return-await
+  210:3   error    Expected 'this' to be used by class method 'calculateTrends'  class-methods-use-this
+  237:7   error    Do not nest ternary expressions                               no-nested-ternary
+  251:7   error    Do not nest ternary expressions                               no-nested-ternary
+  253:11  error    Do not nest ternary expressions                               no-nested-ternary
+  287:7   warning  Unexpected console statement                                  no-console
+  303:7   warning  Unexpected console statement                                  no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/index.js
+     8:7   error    'inquirer' is assigned a value but never used                                                                                                                              no-unused-vars
+    19:12  error    `fs-extra` import should occur before import of `./core/git-manager`                                                                                                       import/order
+    21:7   error    'PerformanceUtils' is assigned a value but never used                                                                                                                      no-unused-vars
+    51:14  error    Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+   122:9   error    'diff' is never reassigned. Use 'const' instead                                                                                                                            prefer-const
+   138:11  error    'diff' is already declared in the upper scope on line 122 column 9                                                                                                         no-shadow
+   160:11  warning  Unexpected console statement                                                                                                                                               no-console
+   167:15  warning  Unexpected console statement                                                                                                                                               no-console
+   212:20  error    Missing radix parameter                                                                                                                                                    radix
+   235:9   warning  Unexpected console statement                                                                                                                                               no-console
+   237:11  warning  Unexpected console statement                                                                                                                                               no-console
+   247:9   warning  Unexpected console statement                                                                                                                                               no-console
+   288:3   error    Expected 'this' to be used by class method 'identifyErrorType'                                                                                                             class-methods-use-this
+   321:3   error    Expected 'this' to be used by class method 'getLocalSuggestion'                                                                                                            class-methods-use-this
+   348:13  warning  Unexpected console statement                                                                                                                                               no-console
+   362:9   warning  Unexpected console statement                                                                                                                                               no-console
+   373:22  error    Unexpected require()                                                                                                                                                       global-require
+   384:7   warning  Unexpected console statement                                                                                                                                               no-console
+   386:9   warning  Unexpected console statement                                                                                                                                               no-console
+   389:7   warning  Unexpected console statement                                                                                                                                               no-console
+   390:7   warning  Unexpected console statement                                                                                                                                               no-console
+   391:7   warning  Unexpected console statement                                                                                                                                               no-console
+   394:25  error    Missing radix parameter                                                                                                                                                    radix
+   397:9   warning  Unexpected console statement                                                                                                                                               no-console
+   402:9   warning  Unexpected console statement                                                                                                                                               no-console
+   411:11  warning  Unexpected console statement                                                                                                                                               no-console
+   423:7   warning  Unexpected console statement                                                                                                                                               no-console
+   440:7   warning  Unexpected console statement                                                                                                                                               no-console
+   443:7   warning  Unexpected console statement                                                                                                                                               no-console
+   446:7   warning  Unexpected console statement                                                                                                                                               no-console
+   448:9   warning  Unexpected console statement                                                                                                                                               no-console
+   452:7   warning  Unexpected console statement                                                                                                                                               no-console
+   460:5   warning  Unexpected console statement                                                                                                                                               no-console
+   463:22  error    Unexpected require()                                                                                                                                                       global-require
+   474:7   warning  Unexpected console statement                                                                                                                                               no-console
+   475:7   warning  Unexpected console statement                                                                                                                                               no-console
+   476:7   warning  Unexpected console statement                                                                                                                                               no-console
+   485:11  warning  Unexpected console statement                                                                                                                                               no-console
+   494:7   warning  Unexpected console statement                                                                                                                                               no-console
+   495:7   warning  Unexpected console statement                                                                                                                                               no-console
+   496:7   warning  Unexpected console statement                                                                                                                                               no-console
+   497:7   warning  Unexpected console statement                                                                                                                                               no-console
+   498:7   warning  Unexpected console statement                                                                                                                                               no-console
+   499:7   warning  Unexpected console statement                                                                                                                                               no-console
+   500:7   warning  Unexpected console statement                                                                                                                                               no-console
+   509:9   error    Expected property shorthand                                                                                                                                                object-shorthand
+   510:9   error    Expected property shorthand                                                                                                                                                object-shorthand
+   511:9   error    Expected property shorthand                                                                                                                                                object-shorthand
+   514:7   warning  Unexpected console statement                                                                                                                                               no-console
+   515:7   warning  Unexpected console statement                                                                                                                                               no-console
+   517:7   warning  Unexpected console statement                                                                                                                                               no-console
+   529:7   warning  Unexpected console statement                                                                                                                                               no-console
+   532:7   warning  Unexpected console statement                                                                                                                                               no-console
+   534:7   warning  Unexpected console statement                                                                                                                                               no-console
+   544:3   error    Expected 'this' to be used by class method 'chunkDiff'                                                                                                                     class-methods-use-this
+   554:42  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                                                                      arrow-body-style
+   564:39  error    'maxTokens' is already declared in the upper scope on line 544 column 19                                                                                                   no-shadow
+   568:48  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   602:43  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   607:9   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   608:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+   618:53  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   627:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+   633:7   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   681:11  error    Use object destructuring                                                                                                                                                   prefer-destructuring
+   795:3   error    Expected 'this' to be used by class method 'extractEntitiesFromDiff'                                                                                                       class-methods-use-this
+   807:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   821:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   827:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   828:45  error    Unnecessary escape character: \s                                                                                                                                           no-useless-escape
+   834:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   841:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   850:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   877:3   error    Expected 'this' to be used by class method 'isCommonStopWord'                                                                                                              class-methods-use-this
+   895:3   error    Expected 'this' to be used by class method 'calculateEntityOverlap'                                                                                                        class-methods-use-this
+   899:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   904:9   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   909:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   914:9   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   919:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   924:9   error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   929:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   931:46  error    Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+   933:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   937:11  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   949:3   error    Expected 'this' to be used by class method 'checkTypeMatch'                                                                                                                class-methods-use-this
+   959:14  error    Unnecessary escape character: \-                                                                                                                                           no-useless-escape
+   959:22  error    Unnecessary escape character: \-                                                                                                                                           no-useless-escape
+   959:32  error    Unnecessary escape character: \-                                                                                                                                           no-useless-escape
+   961:48  error    Unnecessary escape character: \-                                                                                                                                           no-useless-escape
+   981:11  error    Use object destructuring                                                                                                                                                   prefer-destructuring
+  1041:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1057:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1058:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1061:12  error    Redundant use of `await` on a return value                                                                                                                                 no-return-await
+  1071:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1083:22  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1087:11  warning  Unexpected console statement                                                                                                                                               no-console
+  1095:59  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  1104:29  error    Do not nest ternary expressions                                                                                                                                            no-nested-ternary
+  1122:33  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1128:15  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1146:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1148:11  warning  Unexpected console statement                                                                                                                                               no-console
+  1153:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1163:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1172:13  warning  Unexpected console statement                                                                                                                                               no-console
+  1182:9   warning  Unexpected console statement                                                                                                                                               no-console
+  1187:9   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1199:9   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1208:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+  1249:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1280:52  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                                                                      arrow-body-style
+  1291:9   error    'selectedContent' is never reassigned. Use 'const' instead                                                                                                                 prefer-const
+  1292:9   error    'preservedFiles' is never reassigned. Use 'const' instead                                                                                                                  prefer-const
+  1293:9   error    'skippedFiles' is never reassigned. Use 'const' instead                                                                                                                    prefer-const
+  1295:11  error    'HEADER_BUDGET' is assigned a value but never used                                                                                                                         no-unused-vars
+  1297:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1323:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1359:3   error    Expected 'this' to be used by class method 'buildSkippedFileSummary'                                                                                                       class-methods-use-this
+  1392:46  error    Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+  1400:45  error    Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+  1437:3   error    Expected 'this' to be used by class method 'parseDiffIntoFileChunks'                                                                                                       class-methods-use-this
+  1443:39  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  1474:11  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  1497:3   error    Expected 'this' to be used by class method 'scoreFileChunk'                                                                                                                class-methods-use-this
+  1523:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1547:3   error    Expected 'this' to be used by class method 'parseConflictBlocks'                                                                                                           class-methods-use-this
+  1554:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1638:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1656:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1657:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1663:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1681:27  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1689:9   warning  Unexpected console statement                                                                                                                                               no-console
+  1705:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1725:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1731:13  error    Unexpected assignment within a 'while' statement                                                                                                                           no-cond-assign
+  1735:9   error    'cleanedDiff' is never reassigned. Use 'const' instead                                                                                                                     prefer-const
+  1739:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1748:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1757:29  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1765:15  error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1776:36  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1788:38  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  1792:23  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  1796:19  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  1802:21  error    Unexpected string concatenation                                                                                                                                            prefer-template
+  1808:17  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1809:17  warning  Unexpected console statement                                                                                                                                               no-console
+  1832:3   error    Expected 'this' to be used by class method 'cleanConflictMarkers'                                                                                                          class-methods-use-this
+  1839:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1843:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+  1848:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+  1855:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+  1875:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1890:9   warning  Unexpected console statement                                                                                                                                               no-console
+  1892:9   warning  Unexpected console statement                                                                                                                                               no-console
+  1898:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1899:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1900:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1901:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1902:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1908:3   error    Expected 'this' to be used by class method 'displayLogAnalysis'                                                                                                            class-methods-use-this
+  1909:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1911:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1912:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1913:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1914:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1915:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1917:5   warning  Unexpected console statement                                                                                                                                               no-console
+  1919:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1923:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1924:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1928:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1933:11  warning  Unexpected console statement                                                                                                                                               no-console
+  1938:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1943:11  warning  Unexpected console statement                                                                                                                                               no-console
+  1948:7   warning  Unexpected console statement                                                                                                                                               no-console
+  1953:11  warning  Unexpected console statement                                                                                                                                               no-console
+  1957:5   warning  Unexpected console statement                                                                                                                                               no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/providers/ai-provider-factory.js
+   78:29  error    Unexpected require()                                                                                                                                                       global-require
+   79:27  error    A constructor name should not start with a lowercase letter                                                                                                                new-cap
+   98:29  error    Unexpected require()                                                                                                                                                       global-require
+   99:27  error    A constructor name should not start with a lowercase letter                                                                                                                new-cap
+  144:7   warning  Unexpected console statement                                                                                                                                               no-console
+  170:27  error    Unexpected require()                                                                                                                                                       global-require
+  171:25  error    A constructor name should not start with a lowercase letter                                                                                                                new-cap
+  174:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  175:7   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  186:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  189:24  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  193:11  error    Expected property shorthand                                                                                                                                                object-shorthand
+  220:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/providers/base-provider.js
+     5:23  error    `../core/config-manager` import should occur after import of `path`                                                                                                        import/order
+    18:3   error    Expected 'this' to be used by class async method 'generateCommitMessages'                                                                                                  class-methods-use-this
+    25:3   error    Expected 'this' to be used by class async method 'generateResponse'                                                                                                        class-methods-use-this
+    32:3   error    Expected 'this' to be used by class async method 'validate'                                                                                                                class-methods-use-this
+    54:39  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+    69:13  error    'filteredLines' is not defined                                                                                                                                             no-undef
+    73:15  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+    75:13  error    Unexpected use of continue statement                                                                                                                                       no-continue
+    89:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+   101:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+   110:55  error    Unexpected string concatenation                                                                                                                                            prefer-template
+   148:19  error    Unexpected string concatenation                                                                                                                                            prefer-template
+   165:3   error    Expected 'this' to be used by class method 'isImportantContext'                                                                                                            class-methods-use-this
+   173:3   error    Expected 'this' to be used by class method 'prioritizeContextLines'                                                                                                        class-methods-use-this
+   180:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   182:26  error    Unexpected use of continue statement                                                                                                                                       no-continue
+   184:45  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   202:3   error    Expected 'this' to be used by class method 'isTrivialChange'                                                                                                               class-methods-use-this
+   239:3   error    Expected 'this' to be used by class method 'getAssetType'                                                                                                                  class-methods-use-this
+   254:36  error    Unexpected require()                                                                                                                                                       global-require
+   266:3   error    Expected 'this' to be used by class method 'analyzeDiffContent'                                                                                                            class-methods-use-this
+   307:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   309:15  error    Unexpected assignment within a 'while' statement                                                                                                                           no-cond-assign
+   355:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   393:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   393:18  error    'patterns' is already declared in the upper scope on line 336 column 11                                                                                                    no-shadow
+   450:3   error    Expected 'this' to be used by class method 'getLanguageName'                                                                                                               class-methods-use-this
+   465:3   error    Expected 'this' to be used by class method 'handleError'                                                                                                                   class-methods-use-this
+   467:5   warning  Unexpected console statement                                                                                                                                               no-console
+   471:13  error    Use object destructuring                                                                                                                                                   prefer-destructuring
+   516:3   error    Expected 'this' to be used by class method 'parseResponse'                                                                                                                 class-methods-use-this
+   565:30  error    Unexpected require()                                                                                                                                                       global-require
+   573:50  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   576:26  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   578:11  error    Expected property shorthand                                                                                                                                                object-shorthand
+   586:9   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   628:13  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   630:15  error    Expected property shorthand                                                                                                                                                object-shorthand
+   643:11  error    Expected property shorthand                                                                                                                                                object-shorthand
+   644:11  error    Expected property shorthand                                                                                                                                                object-shorthand
+   651:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   669:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   671:13  error    Expected property shorthand                                                                                                                                                object-shorthand
+   672:13  error    Expected property shorthand                                                                                                                                                object-shorthand
+   684:39  error    Use the '**' operator instead of 'Math.pow'                                                                                                                                prefer-exponentiation-operator
+   684:39  error    'Math.pow' is restricted from being used. Use the exponentiation operator (**) instead                                                                                     no-restricted-properties
+   685:9   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   685:38  error    Return values from promise executor functions cannot be read                                                                                                               no-promise-executor-return
+   701:30  error    Unexpected require()                                                                                                                                                       global-require
+   742:11  error    'originalOptions' is assigned a value but never used                                                                                                                       no-unused-vars
+   746:7   error    Assignment to property of function parameter 'options'                                                                                                                     no-param-reassign
+   747:7   error    Assignment to property of function parameter 'options'                                                                                                                     no-param-reassign
+   751:9   error    Assignment to property of function parameter 'options'                                                                                                                     no-param-reassign
+   768:9   error    Assignment to property of function parameter 'options'                                                                                                                     no-param-reassign
+   782:12  error    Redundant use of `await` on a return value                                                                                                                                 no-return-await
+   790:50  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   792:16  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   807:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   808:13  error    Return values from promise executor functions cannot be read                                                                                                               no-promise-executor-return
+   808:41  error    Use the '**' operator instead of 'Math.pow'                                                                                                                                prefer-exponentiation-operator
+   808:41  error    'Math.pow' is restricted from being used. Use the exponentiation operator (**) instead                                                                                     no-restricted-properties
+   819:3   error    Expected 'this' to be used by class method 'validateMessage'                                                                                                               class-methods-use-this
+   840:7   warning  Unexpected console statement                                                                                                                                               no-console
+   848:3   error    Expected 'this' to be used by class method 'logError'                                                                                                                      class-methods-use-this
+   868:3   error    Duplicate name 'preprocessDiff'                                                                                                                                            no-dupe-class-members
+   876:39  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   893:15  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   895:13  error    Unexpected use of continue statement                                                                                                                                       no-continue
+   923:3   error    Expected 'this' to be used by class method 'chunkDiff'                                                                                                                     class-methods-use-this
+   929:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   939:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+   965:3   error    Expected 'this' to be used by class method 'estimateTokens'                                                                                                                class-methods-use-this
+   966:30  error    Unexpected require()                                                                                                                                                       global-require
+   994:11  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   997:11  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  1022:3   error    Expected 'this' to be used by class method 'extractKeyChanges'                                                                                                             class-methods-use-this
+  1041:3   error    Expected 'this' to be used by class method 'extractSemanticChanges'                                                                                                        class-methods-use-this
+  1057:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  1121:3   error    Expected 'this' to be used by class method 'inferLikelyPurpose'                                                                                                            class-methods-use-this
+  1124:12  error    Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+  1130:39  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                                                                      arrow-body-style
+  1136:39  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                                                                      arrow-body-style
+  1154:40  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  1161:9   error    Expected property shorthand                                                                                                                                                object-shorthand
+  1162:23  error    Do not nest ternary expressions                                                                                                                                            no-nested-ternary
+  1165:7   error    Unnecessary try/catch wrapper                                                                                                                                              no-useless-catch
+  1166:26  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  1181:9   error    Expected to return a value at the end of async method 'sendHTTPRequest'                                                                                                    consistent-return
+  1184:21  error    Unexpected require()                                                                                                                                                       global-require
+  1204:13  error    'config' is assigned a value but never used                                                                                                                                no-unused-vars
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/providers/groq-provider.js
+   53:12  error  Redundant use of `await` on a return value                                                             no-return-await
+   53:45  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+   54:14  error  Redundant use of `await` on a return value                                                             no-return-await
+   80:3   error  Expected 'this' to be used by class method 'validateMessage'                                           class-methods-use-this
+  107:14  error  Unnecessary 'else' after 'return'                                                                      no-else-return
+  119:12  error  Redundant use of `await` on a return value                                                             no-return-await
+  119:45  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+  120:14  error  Redundant use of `await` on a return value                                                             no-return-await
+  152:3   error  Expected 'this' to be used by class async method 'validate'                                            class-methods-use-this
+  163:3   error  Expected 'this' to be used by class async method 'test'                                                class-methods-use-this
+  204:3   error  Expected 'this' to be used by class async method 'getAvailableModels'                                  class-methods-use-this
+  254:3   error  Expected 'this' to be used by class method 'parseResponse'                                             class-methods-use-this
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/providers/ollama-provider.js
+   33:12  error  Redundant use of `await` on a return value                                                             no-return-await
+   33:45  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+   34:14  error  Redundant use of `await` on a return value                                                             no-return-await
+   38:13  error  Expected property shorthand                                                                            object-shorthand
+   71:12  error  Redundant use of `await` on a return value                                                             no-return-await
+   71:45  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+   72:14  error  Redundant use of `await` on a return value                                                             no-return-await
+   76:13  error  Expected property shorthand                                                                            object-shorthand
+  137:11  error  Expected property shorthand                                                                            object-shorthand
+  157:9   error  Expected property shorthand                                                                            object-shorthand
+  244:3   error  Expected 'this' to be used by class method 'getModelDescription'                                       class-methods-use-this
+  262:3   error  Expected 'this' to be used by class method 'formatSize'                                                class-methods-use-this
+  267:24  error  Use the '**' operator instead of 'Math.pow'                                                            prefer-exponentiation-operator
+  267:24  error  'Math.pow' is restricted from being used. Use the exponentiation operator (**) instead                 no-restricted-properties
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/circuit-breaker.js
+  56:5  error  Unary operator '++' used  no-plusplus
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/config-validator.js
+  106:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  112:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  120:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  127:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  133:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  140:11  error  Unexpected use of continue statement                                                                                                                                       no-continue
+  144:11  error  Unexpected use of continue statement                                                                                                                                       no-continue
+  152:11  error  Unexpected use of continue statement                                                                                                                                       no-continue
+  156:11  error  Unexpected use of continue statement                                                                                                                                       no-continue
+  162:15  error  Use object destructuring                                                                                                                                                   prefer-destructuring
+  218:17  error  Do not nest ternary expressions                                                                                                                                            no-nested-ternary
+  254:3   error  Expected 'this' to be used by class method 'isOllamaRunning'                                                                                                               class-methods-use-this
+  259:21  error  Unreachable code                                                                                                                                                           no-unreachable
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/date-utils.js
+  3:35  error  Unexpected use of 'isNaN'. Use Number.isNaN instead https://github.com/airbnb/javascript#standard-library--isnan  no-restricted-globals
+  6:27  error  'format' is assigned a value but never used                                                                       no-unused-vars
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/efficient-prompt-builder.js
+   19:7   error  'type' is assigned a value but never used                                                                                                                                  no-unused-vars
+   20:7   error  'language' is assigned a value but never used                                                                                                                              no-unused-vars
+   23:7   error  'chunkContext' is assigned a value but never used                                                                                                                          no-unused-vars
+   31:7   error  Assignment to function parameter 'diff'                                                                                                                                    no-param-reassign
+   97:9   error  Use array destructuring                                                                                                                                                    prefer-destructuring
+  159:3   error  Expected 'this' to be used by class method 'detectProblematicCase'                                                                                                         class-methods-use-this
+  159:31  error  'context' is defined but never used. Allowed unused args must match /^_/u                                                                                                  no-unused-vars
+  181:3   error  Expected 'this' to be used by class method 'isWordPressFile'                                                                                                               class-methods-use-this
+  215:3   error  Expected 'this' to be used by class method 'buildEnhancedInstructions'                                                                                                     class-methods-use-this
+  244:3   error  Expected 'this' to be used by class method 'buildWordPressGuidance'                                                                                                        class-methods-use-this
+  244:32  error  'context' is defined but never used. Allowed unused args must match /^_/u                                                                                                  no-unused-vars
+  331:3   error  Expected 'this' to be used by class method 'truncateWordPressDiff'                                                                                                         class-methods-use-this
+  337:39  error  Unary operator '++' used                                                                                                                                                   no-plusplus
+  347:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  354:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  361:37  error  Unary operator '++' used                                                                                                                                                   no-plusplus
+  365:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  374:9   error  Unexpected use of continue statement                                                                                                                                       no-continue
+  393:3   error  Expected 'this' to be used by class method 'truncateDiff'                                                                                                                  class-methods-use-this
+  405:39  error  Unary operator '++' used                                                                                                                                                   no-plusplus
+  496:3   error  Expected 'this' to be used by class method 'analyzeChangeImpact'                                                                                                           class-methods-use-this
+  542:3   error  Expected 'this' to be used by class method 'buildChangeSpecificGuidance'                                                                                                   class-methods-use-this
+  603:13  error  Use object destructuring                                                                                                                                                   prefer-destructuring
+  627:3   error  Expected 'this' to be used by class method 'getRelevantFileTypes'                                                                                                          class-methods-use-this
+  643:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  656:3   error  Expected 'this' to be used by class method 'generateContextualExamples'                                                                                                    class-methods-use-this
+  700:3   error  Expected 'this' to be used by class method 'analyzeDiffForSpecialization'                                                                                                  class-methods-use-this
+  748:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  758:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/fallback-commit-generator.js
+   46:12  error  Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+   69:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   71:9   error  Unary operator '++' used                                                                                                                                                   no-plusplus
+   73:9   error  Unary operator '++' used                                                                                                                                                   no-plusplus
+   81:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   91:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   93:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  106:7   error  Use array destructuring                                                                                                                                                    prefer-destructuring
+  115:3   error  Expected 'this' to be used by class method 'generateMessageWithType'                                                                                                       class-methods-use-this
+  149:12  error  Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+  173:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/input-sanitizer.js
+    6:1   error  Expected 1 empty line after require statement not followed by another require                                                                                              import/newline-after-import
+   31:7   error  Unexpected control character(s) in regular expression: \x00, \x1f                                                                                                          no-control-regex
+   38:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   52:7   error  Assignment to function parameter 'args'                                                                                                                                    no-param-reassign
+   88:35  error  Unexpected control character(s) in regular expression: \x00, \x1f                                                                                                          no-control-regex
+  111:37  error  Unexpected control character(s) in regular expression: \x00, \x1f                                                                                                          no-control-regex
+  154:7   error  Unexpected control character(s) in regular expression: \x00                                                                                                                no-control-regex
+  155:16  error  Unnecessary escape character: \[                                                                                                                                           no-useless-escape
+  159:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/optimized-diff-processor.js
+   50:9   error  'currentChunk' is never reassigned. Use 'const' instead                                                                                                                    prefer-const
+   51:9   error  'currentSize' is assigned a value but never used                                                                                                                           no-unused-vars
+   51:9   error  'currentSize' is never reassigned. Use 'const' instead                                                                                                                     prefer-const
+   54:42  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                                                                      arrow-body-style
+   68:50  error  Unary operator '++' used                                                                                                                                                   no-plusplus
+   73:43  error  Unary operator '--' used                                                                                                                                                   no-plusplus
+  103:20  error  Unexpected string concatenation                                                                                                                                            prefer-template
+  130:3   error  Expected 'this' to be used by class method 'isFunctionDeclaration'                                                                                                         class-methods-use-this
+  140:3   error  Expected 'this' to be used by class method 'isClassDeclaration'                                                                                                            class-methods-use-this
+  149:3   error  Expected 'this' to be used by class method 'isImportStatement'                                                                                                             class-methods-use-this
+  169:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  193:43  error  Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+  193:50  error  Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+  201:3   error  Expected 'this' to be used by class method 'escapeRegExp'                                                                                                                  class-methods-use-this
+  208:3   error  Expected 'this' to be used by class method 'determineProcessingStrategy'                                                                                                   class-methods-use-this
+  211:12  error  Unnecessary 'else' after 'return'                                                                                                                                          no-else-return
+  255:37  error  'analysis' is defined but never used. Allowed unused args must match /^_/u                                                                                                 no-unused-vars
+  263:39  error  Unary operator '++' used                                                                                                                                                   no-plusplus
+  312:39  error  'analysis' is defined but never used. Allowed unused args must match /^_/u                                                                                                 no-unused-vars
+  320:37  error  'analysis' is defined but never used. Allowed unused args must match /^_/u                                                                                                 no-unused-vars
+  328:3   error  Expected 'this' to be used by class method 'getFileBoundaries'                                                                                                             class-methods-use-this
+  333:13  error  Unexpected assignment within a 'while' statement                                                                                                                           no-cond-assign
+  347:3   error  Expected 'this' to be used by class method 'mergeChunks'                                                                                                                   class-methods-use-this
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/performance-utils.js
+   58:30  error    Unexpected `await` inside a loop                              no-await-in-loop
+   73:9   warning  Unexpected console statement                                  no-console
+  111:12  warning  Unexpected unnamed function                                   func-names
+  112:20  error    Use the rest parameters instead of 'arguments'                prefer-rest-params
+  117:20  error    Arrow function should not return assignment                   no-return-assign
+  127:12  warning  Unexpected unnamed function                                   func-names
+  151:7   error    Expected an error object to be thrown                         no-throw-literal
+  161:7   error    'concurrency' is assigned a value but never used              no-unused-vars
+  172:40  error    Return values from promise executor functions cannot be read  no-promise-executor-return
+  177:28  error    Unexpected `await` inside a loop                              no-await-in-loop
+  214:7   error    'preserveContextLines' is assigned a value but never used     no-unused-vars
+  222:41  error    Unary operator '++' used                                      no-plusplus
+  232:11  error    Unexpected use of continue statement                          no-continue
+  237:31  error    Unexpected string concatenation                               prefer-template
+  238:11  error    Unexpected use of continue statement                          no-continue
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/progress-tracker.js
+  139:5   warning  Unexpected console statement                                   no-console
+  140:5   warning  Unexpected console statement                                   no-console
+  144:7   warning  Unexpected console statement                                   no-console
+  153:3   error    Expected 'this' to be used by class method 'getFormattedTime'  class-methods-use-this
+  160:12  error    Unnecessary 'else' after 'return'                              no-else-return
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/project-type-detector.js
+   42:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   43:35  error    Unexpected use of continue statement                                                                                                                                       no-continue
+   45:9   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+   47:15  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   67:15  warning  Unexpected console statement                                                                                                                                               no-console
+   68:15  warning  Unexpected console statement                                                                                                                                               no-console
+   87:44  error    ["wpapi"] is better written in dot notation                                                                                                                                dot-notation
+   87:61  error    ["wordpress"] is better written in dot notation                                                                                                                            dot-notation
+  102:13  error    'hasWordPress' is constant                                                                                                                                                 no-const-assign
+  136:7   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  145:9   error    Use array destructuring                                                                                                                                                    prefer-destructuring
+  157:7   warning  Unexpected console statement                                                                                                                                               no-console
+  221:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  223:25  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  248:9   error    Unexpected use of continue statement                                                                                                                                       no-continue
+  390:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  392:20  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  396:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  418:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  419:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  446:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  447:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  470:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  471:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/retry-utility.js
+   29:55  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+   31:16  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   48:9   warning  Unexpected console statement                                                                                                                                               no-console
+   51:9   error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+   61:3   error    Expected 'this' to be used by class method 'calculateDelay'                                                                                                                class-methods-use-this
+   62:37  error    Use the '**' operator instead of 'Math.pow'                                                                                                                                prefer-exponentiation-operator
+   62:37  error    'Math.pow' is restricted from being used. Use the exponentiation operator (**) instead                                                                                     no-restricted-properties
+   69:7   error    Assignment (=) can be replaced with operator assignment (*=)                                                                                                               operator-assignment
+   83:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  111:3   error    Expected 'this' to be used by class method 'sleep'                                                                                                                         class-methods-use-this
+  112:35  error    Return values from promise executor functions cannot be read                                                                                                               no-promise-executor-return
+  122:5   error    iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  124:24  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  143:55  error    Unary operator '++' used                                                                                                                                                   no-plusplus
+  145:24  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  155:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+  167:11  error    Unexpected `await` inside a loop                                                                                                                                           no-await-in-loop
+
+/Users/barun.tayenjam/Documents/Code/git-ops/src/utils/secret-scanner.js
+   47:67  error  Unnecessary escape character: \/                                                                                                                                           no-useless-escape
+  166:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  204:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  206:7   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  250:5   error  iterators/generators require regenerator-runtime, which is too heavyweight for this guide to allow them. Separately, loops should be avoided in favor of array iterations  no-restricted-syntax
+  251:24  error  Unexpected use of continue statement                                                                                                                                       no-continue
+  276:3   error  Duplicate name 'isSafe'                                                                                                                                                    no-dupe-class-members
+  344:3   error  Expected 'this' to be used by class method 'getDescriptionForPattern'                                                                                                      class-methods-use-this
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/activity-logger.test.js
+   14:29  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+   38:22  error    Unexpected require()                                                                                   global-require
+  101:7   warning  Unexpected console statement                                                                           no-console
+  103:14  warning  Unexpected console statement                                                                           no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/aicommit-cli.test.js
+  12:36  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                      arrow-body-style
+  13:45  error  Unexpected block statement surrounding arrow body; parenthesize the returned value and move it immediately after the `=>`  arrow-body-style
+  31:13  error  Unexpected use of file extension "js" for "../bin/aicommit.js"                                                             import/extensions
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/analysis-engine.test.js
+  13:48  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+  33:22  error  Unexpected require()                                                                                   global-require
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/asset-filter.test.js
+  196:7  warning  Unexpected console statement  no-console
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/auto-git.test.js
+   15:17  error  `../src/auto-git` import should occur after import of `chalk`      import/order
+   16:27  error  `../src/index` import should occur after import of `chalk`         import/order
+   20:7   error  'path' is assigned a value but never used                          no-unused-vars
+   21:7   error  'chalk' is assigned a value but never used                         no-unused-vars
+  549:16  error  Unexpected require()                                               global-require
+  550:11  error  'path' is assigned a value but never used                          no-unused-vars
+  550:11  error  'path' is already declared in the upper scope on line 20 column 7  no-shadow
+  550:18  error  Unexpected require()                                               global-require
+  554:44  error  Expected to return a value at the end of arrow function            consistent-return
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/cache-manager.test.js
+  15:7   error  'crypto' is assigned a value but never used  no-unused-vars
+  32:20  error  Unexpected require()                         global-require
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/circuit-breaker.test.js
+   12:22  error  Unexpected require()              global-require
+  115:30  error  Unary operator '++' used          no-plusplus
+  117:11  error  Unexpected `await` inside a loop  no-await-in-loop
+  118:21  error  Empty block statement             no-empty
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/config-manager.test.js
+  6:7   error  'fs' is assigned a value but never used                                                                no-unused-vars
+  6:12  error  `fs-extra` import should occur before import of `../src/core/config-manager`                           import/order
+  9:25  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/error-handling.test.js
+  80:19  error  'originalGenerateResponse' is assigned a value but never used  no-unused-vars
+  83:46  error  Return values from promise executor functions cannot be read   no-promise-executor-return
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/git-manager.test.js
+   48:23  error  Unexpected require()                         global-require
+  234:13  error  'result' is assigned a value but never used  no-unused-vars
+  244:13  error  'result' is assigned a value but never used  no-unused-vars
+  311:13  error  'result' is assigned a value but never used  no-unused-vars
+  317:13  error  'result' is assigned a value but never used  no-unused-vars
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/groq-provider.test.js
+  12:14  error  `groq-sdk` import should occur before import of `../src/providers/groq-provider`  import/order
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/hook-manager.test.js
+  23:48  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+  29:19  error  Unexpected require()                                                                                   global-require
+  46:18  error  Unexpected require()                                                                                   global-require
+  60:18  error  Unexpected require()                                                                                   global-require
+  68:18  error  Unexpected require()                                                                                   global-require
+  87:18  error  Unexpected require()                                                                                   global-require
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/index.test.js
+    5:7   error  'path' is assigned a value but never used      no-unused-vars
+   23:7   error  'inquirer' is assigned a value but never used  no-unused-vars
+  195:25  error  Unexpected string concatenation                prefer-template
+  276:25  error  Unexpected string concatenation                prefer-template
+  332:32  error  Unary operator '++' used                       no-plusplus
+  341:25  error  Unexpected string concatenation                prefer-template
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/input-sanitizer.test.js
+  6:48  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+  8:5   error  Expected 'this' to be used by class method 'scanAndRedact'                                             class-methods-use-this
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/mocks/groq-mock.js
+  10:3   error  Expected 'this' to be used by class getter 'chat'                          class-methods-use-this
+  13:24  error  'options' is defined but never used. Allowed unused args must match /^_/u  no-unused-vars
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/ollama-provider.test.js
+   14:51  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+   24:52  error  Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`  arrow-body-style
+   31:11  error  'axios' is assigned a value but never used                                                             no-unused-vars
+   31:19  error  Unexpected require()                                                                                   global-require
+   33:22  error  Unexpected require()                                                                                   global-require
+   53:21  error  Unexpected require()                                                                                   global-require
+   61:21  error  Unexpected require()                                                                                   global-require
+   71:21  error  Unexpected require()                                                                                   global-require
+   84:21  error  Unexpected require()                                                                                   global-require
+   94:21  error  Unexpected require()                                                                                   global-require
+  130:21  error  Unexpected require()                                                                                   global-require
+  141:21  error  Unexpected require()                                                                                   global-require
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/performance-utils.test.js
+  10:24  error  Unexpected require()                                          global-require
+  86:46  error  Return values from promise executor functions cannot be read  no-promise-executor-return
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/retry-utility.test.js
+  10:20  error  Unexpected require()  global-require
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/secret-scanner.test.js
+  11:21  error  Unexpected require()  global-require
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/setup.js
+  11:28  warning  Unexpected console statement                                                                                               no-console
+  12:30  warning  Unexpected console statement                                                                                               no-console
+  13:29  warning  Unexpected console statement                                                                                               no-console
+  26:5   warning  Unexpected console statement                                                                                               no-console
+  27:5   warning  Unexpected console statement                                                                                               no-console
+  28:5   warning  Unexpected console statement                                                                                               no-console
+  35:5   warning  Unexpected console statement                                                                                               no-console
+  36:5   warning  Unexpected console statement                                                                                               no-console
+  37:5   warning  Unexpected console statement                                                                                               no-console
+  44:44  error    Unexpected block statement surrounding arrow body; move the returned value immediately after the `=>`                      arrow-body-style
+  59:41  error    Unexpected block statement surrounding arrow body; parenthesize the returned value and move it immediately after the `=>`  arrow-body-style
+  73:46  error    Return values from promise executor functions cannot be read                                                               no-promise-executor-return
+
+/Users/barun.tayenjam/Documents/Code/git-ops/tests/stats-manager.test.js
+  20:20  error  Unexpected require()  global-require
+  88:18  error  Unexpected require()  global-require
+
+✖ 829 problems (637 errors, 192 warnings)
+  100 errors and 0 warnings potentially fixable with the `--fix` option.
+
