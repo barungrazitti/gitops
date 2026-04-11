@@ -62,10 +62,11 @@ See: .planning/PROJECT.md (updated 2026-04-11)
 
 ---
 
-_Last activity: 2026-04-11 — Completed v1.0 milestone (3 phases, 10 plans, 39 tasks)_
+_Last activity: 2026-04-11 — Completed quick task 260411-q4r: Update README and docs, mark v1.0 release_
 
 ### Quick Tasks Completed
 
 | #          | Description                                                                | Date       | Commit  | Directory                                                                                                           |
 | ---------- | -------------------------------------------------------------------------- | ---------- | ------- | ------------------------------------------------------------------------------------------------------------------- |
 | 260407-hwa | Fix Groq 413 error when truncated diff still too large for model TPM limit | 2026-04-07 | ed81f83 | [260407-hwa-fix-groq-413-error-when-truncated-diff-s](./quick/260407-hwa-fix-groq-413-error-when-truncated-diff-s/) |
+| 260411-q4r | Update README and docs, mark v1.0 release, merge with main | 2026-04-11 | 659307e | [260411-q4r-update-readme-and-docs-mark-v1-0-release](./quick/260411-q4r-update-readme-and-docs-mark-v1-0-release/) |
