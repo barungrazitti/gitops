@@ -8,8 +8,10 @@ const OptimizedDiffProcessor = require('./optimized-diff-processor');
 
 class DiffPreprocessor {
   constructor(options = {}) {
-    this.maxPromptLength = options.maxPromptLength || 8000;
-    this.preserveContext = options.preserveContext !== undefined ? options.preserveContext : true;
+    // Groq has 6000 TPM limit, reserve margin for prompt overhead
+    this.maxPromptLength = options.maxPromptLength || 4500;
+    this.preserveContext =
+      options.preserveContext !== undefined ? options.preserveContext : true;
     this.optimizedDiffProcessor = new OptimizedDiffProcessor();
   }
 
@@ -21,16 +23,17 @@ class DiffPreprocessor {
 
     // First, sanitize the diff to remove any potential secrets
     const sanitizedDiff = InputSanitizer.sanitizeDiffContent(diff) || '';
-    
+
     // Then, use the optimized diff processor to reduce size while keeping important changes
     const processed = this.optimizedDiffProcessor.process(sanitizedDiff);
-    
+
     // If the processed diff is still too long, we can truncate it smartly
     const estimatedTokens = PerformanceUtils.estimateTokens(processed);
-    if (estimatedTokens > this.maxPromptLength * 0.75) { // Leave room for prompt overhead
+    if (estimatedTokens > this.maxPromptLength * 0.75) {
+      // Leave room for prompt overhead
       return this._smartTruncate(processed, this.maxPromptLength * 0.75);
     }
-    
+
     return processed;
   }
 
@@ -39,14 +42,14 @@ class DiffPreprocessor {
    */
   _smartTruncate(content, maxLength) {
     if (content.length <= maxLength) return content;
-    
+
     // Try to preserve beginning and end which often contain important context
     const headLength = Math.floor(maxLength * 0.6);
     const tailLength = Math.floor(maxLength * 0.4);
-    
+
     const head = content.substring(0, headLength);
     const tail = content.substring(content.length - tailLength);
-    
+
     return head + '\n\n... [content truncated for length] ...\n\n' + tail;
   }
 
@@ -59,7 +62,7 @@ class DiffPreprocessor {
     const PromptBuilder = require('./prompt-builder');
     const promptBuilder = new PromptBuilder({
       maxPromptLength: this.maxPromptLength,
-      preserveContext: this.preserveContext
+      preserveContext: this.preserveContext,
     });
     return promptBuilder.buildPrompt(diff, options);
   }
@@ -84,14 +87,38 @@ class DiffPreprocessor {
         if (fileMatch) {
           const filePath = fileMatch[2];
           const ext = filePath.split('.').pop().toLowerCase();
-          const assetExtensions = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4', 'mp3', 'pdf', 'zip', 'tar', 'gz'];
+          const assetExtensions = [
+            'svg',
+            'png',
+            'jpg',
+            'jpeg',
+            'gif',
+            'webp',
+            'ico',
+            'woff',
+            'woff2',
+            'ttf',
+            'eot',
+            'mp4',
+            'mp3',
+            'pdf',
+            'zip',
+            'tar',
+            'gz',
+          ];
 
-          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
+          if (
+            assetExtensions.includes(ext) ||
+            /^Binary files/.test(lines[i + 1] || '')
+          ) {
             assetFiles.push(filePath);
             filteredLines.push(`# Asset file added: ${filePath}`);
 
             // Skip ahead to next diff --git (don't include asset content)
-            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
+            while (
+              i + 1 < lines.length &&
+              !lines[i + 1].startsWith('diff --git')
+            ) {
               i++;
             }
             continue;
@@ -125,7 +152,7 @@ class DiffPreprocessor {
     if (!assetFiles || assetFiles.length === 0) return '';
 
     const extensions = {};
-    assetFiles.forEach(file => {
+    assetFiles.forEach((file) => {
       const ext = file.split('.').pop().toLowerCase();
       extensions[ext] = (extensions[ext] || 0) + 1;
     });

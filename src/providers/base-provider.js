@@ -846,9 +846,15 @@ Use: "config: update database connection settings for production"
       } catch (error) {
         lastError = error;
 
-        // Do not retry on client-side errors (e.g., 401, 403)
+        // Do not retry on client-side errors (e.g., 401, 403), but retry on rate limits (429, 413)
         const status = error.response?.status;
-        if (status && status >= 400 && status < 500) {
+        if (
+          status &&
+          status >= 400 &&
+          status < 500 &&
+          status !== 413 &&
+          status !== 429
+        ) {
           throw error;
         }
 

@@ -11,7 +11,8 @@ const OptimizedDiffProcessor = require('./optimized-diff-processor');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
-    this.maxPromptLength = options.maxPromptLength || 5000;
+    // Groq has 6000 TPM limit, reserve margin for prompt overhead
+    this.maxPromptLength = options.maxPromptLength || 4500;
     this.preserveContext = options.preserveContext || true;
     this.tokenCounter = new TokenCounter();
     this.diffCategorizer = new DiffCategorizer();

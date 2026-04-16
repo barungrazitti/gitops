@@ -11,12 +11,12 @@ class GroqProvider extends BaseProvider {
     super();
     this.name = 'groq';
     this.client = null;
-    
+
     // Initialize circuit breaker for Groq
     this.circuitBreaker = new CircuitBreaker({
       failureThreshold: 5,
       timeout: 60000, // 1 minute for cloud API
-      monitoringPeriod: 15000 // 15 seconds
+      monitoringPeriod: 15000, // 15 seconds
     });
   }
 
@@ -50,26 +50,33 @@ class GroqProvider extends BaseProvider {
     // Send full diff without chunking for fast processing
     const prompt = this.buildPrompt(diff, options);
 
-    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
-        const response = await this.client.chat.completions.create({
-          model: options.model || config.model || 'llama-3.1-8b-instant',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          max_tokens: config.maxTokens || 150,
-          temperature: config.temperature || 0.3,
-        });
+    return await this.withRetry(
+      async () =>
+        await this.circuitBreaker.execute(
+          async () => {
+            const response = await this.client.chat.completions.create({
+              model: options.model || config.model || 'llama-3.1-8b-instant',
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.',
+                },
+                {
+                  role: 'user',
+                  content: prompt,
+                },
+              ],
+              max_tokens: config.maxTokens || 150,
+              temperature: config.temperature || 0.3,
+            });
 
-        const messages = this.parseResponse(response);
-        return messages.filter((msg) => this.validateMessage(msg));
-      }, { provider: 'groq' }));
+            const messages = this.parseResponse(response);
+            return messages.filter((msg) => this.validateMessage(msg));
+          },
+          { provider: 'groq' }
+        )
+    );
   }
 
   /**
@@ -89,22 +96,23 @@ class GroqProvider extends BaseProvider {
       await this.initializeClient();
       const config = await this.getConfig();
 
+      // Groq has 6000 TPM limit - leave margin for system prompt and response
       const maxTokens = options.maxTokens || 2000;
+      const maxInputTokens = 4500; // Reserve for prompt overhead
       const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
 
       // Check if we need to chunk the prompt
       const estimatedTokens = this.estimateTokens(fullPrompt);
-      if (estimatedTokens > maxTokens) {
-        // For code fixing, we'll try to fit in one request by truncating if needed
-        const truncatedPrompt = fullPrompt.substring(0, maxTokens * 3); // Rough estimate
+      if (estimatedTokens > maxInputTokens) {
+        // Truncate to stay under Groq's 6000 TPM limit
+        const truncatedPrompt = fullPrompt.substring(0, maxInputTokens * 4); // ~4 chars per token
         return await this.generateSingleResponse(
           truncatedPrompt,
           options,
           config
         );
-      } 
-        return await this.generateSingleResponse(fullPrompt, options, config);
-      
+      }
+      return await this.generateSingleResponse(fullPrompt, options, config);
     } catch (error) {
       throw this.handleError(error, 'Groq');
     }
@@ -114,32 +122,38 @@ class GroqProvider extends BaseProvider {
    * Generate single response
    */
   async generateSingleResponse(prompt, options, config) {
-    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
-        const response = await this.client.chat.completions.create({
-          model: config.model || 'llama-3.1-8b-instant',
-          messages: [
-            {
-              role: 'system',
-              content:
-                'You are an expert software developer who helps fix code issues and improve code quality.',
-            },
-            {
-              role: 'user',
-              content: prompt,
-            },
-          ],
-          max_tokens: options.maxTokens || 2000,
-          temperature: options.temperature || 0.3,
-          n: 1,
-        });
+    return await this.withRetry(
+      async () =>
+        await this.circuitBreaker.execute(
+          async () => {
+            const response = await this.client.chat.completions.create({
+              model: config.model || 'llama-3.1-8b-instant',
+              messages: [
+                {
+                  role: 'system',
+                  content:
+                    'You are an expert software developer who helps fix code issues and improve code quality.',
+                },
+                {
+                  role: 'user',
+                  content: prompt,
+                },
+              ],
+              max_tokens: options.maxTokens || 2000,
+              temperature: options.temperature || 0.3,
+              n: 1,
+            });
 
-        const content = response.choices[0]?.message?.content;
-        if (!content) {
-          throw new Error('No response content from Groq');
-        }
+            const content = response.choices[0]?.message?.content;
+            if (!content) {
+              throw new Error('No response content from Groq');
+            }
 
-        return [content.trim()];
-      }, { provider: 'groq' }));
+            return [content.trim()];
+          },
+          { provider: 'groq' }
+        )
+    );
   }
 
   /**
@@ -212,7 +226,7 @@ class GroqProvider extends BaseProvider {
       {
         id: 'openai/gpt-oss-120b',
         name: 'GPT-OSS 120B',
-        description: 'OpenAI\'s flagship open-weight model with reasoning',
+        description: "OpenAI's flagship open-weight model with reasoning",
       },
       {
         id: 'qwen/qwen3-32b',
@@ -231,14 +245,17 @@ class GroqProvider extends BaseProvider {
       messages: [
         {
           role: 'system',
-          content: options.systemPrompt || 'You are an expert software developer who helps generate concise, meaningful commit messages.'
+          content:
+            options.systemPrompt ||
+            'You are an expert software developer who helps generate concise, meaningful commit messages.',
         },
         {
           role: 'user',
-          content: prompt
-        }
+          content: prompt,
+        },
       ],
-      temperature: options.temperature ?? config.temperature ?? this.temperature,
+      temperature:
+        options.temperature ?? config.temperature ?? this.temperature,
       max_tokens: options.maxTokens ?? config.maxTokens ?? this.maxTokens,
       timeout: options.timeout ?? config.timeout ?? this.timeout,
     };
@@ -264,8 +281,8 @@ class GroqProvider extends BaseProvider {
     // Split content by newlines and clean up
     const messages = content
       .split('\n')
-      .map(msg => msg.trim())
-      .filter(msg => msg.length > 0);
+      .map((msg) => msg.trim())
+      .filter((msg) => msg.length > 0);
 
     return messages;
   }
@@ -281,10 +298,10 @@ class GroqProvider extends BaseProvider {
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${config.apiKey}`,
-            'Content-Type': 'application/json'
+            Authorization: `Bearer ${config.apiKey}`,
+            'Content-Type': 'application/json',
           },
-          ...params
+          ...params,
         }
       );
       return response;
