@@ -286,7 +286,7 @@ class BaseProvider {
   buildPrompt(diff, options = {}) {
     const EfficientPromptBuilder = require('../utils/efficient-prompt-builder');
     const promptBuilder = new EfficientPromptBuilder({
-      maxPromptLength: this.config?.maxPromptLength || 5000,
+      maxPromptLength: this.config?.maxPromptLength || 4500,
       preserveContext: true,
     });
 

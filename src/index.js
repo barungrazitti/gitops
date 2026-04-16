@@ -19,6 +19,7 @@ const SecretScanner = require('./utils/secret-scanner');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
 const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
 const MetricsScorer = require('./utils/metrics-scorer');
+const DiffManager = require('./core/diff-manager');
 
 class AICommitGenerator {
   constructor() {
@@ -33,6 +34,7 @@ class AICommitGenerator {
     this.efficientPromptBuilder = new EfficientPromptBuilder();
     this.diffProcessor = new OptimizedDiffProcessor();
     this.metricsScorer = new MetricsScorer();
+    this.diffManager = new DiffManager();
   }
 
   /**
@@ -1443,14 +1445,16 @@ Do not explain the error, just provide the solution.`;
    * Smart truncation that preserves file headers and prioritizes significant changes
    */
   manageDiffForAI(diff, options = {}) {
-    const diffSize = diff.length;
+    // Filter out binary/media files first
+    const filteredDiff = this.diffManager.filterBinaryFiles(diff);
+    const diffSize = filteredDiff.length;
     const MAX_SAFE_SIZE = 18000; // ~4.5K tokens, safe for Groq free-tier TPM (6K) with system prompt overhead
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {
       return {
         strategy: 'full',
-        data: diff,
+        data: filteredDiff,
         chunks: null,
         info: {
           strategy: 'full',
@@ -1468,7 +1472,11 @@ Do not explain the error, just provide the solution.`;
       )
     );
 
-    const smartTruncated = this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
+    const smartTruncated = this.smartTruncateDiff(
+      filteredDiff,
+      MAX_SAFE_SIZE,
+      context
+    );
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,

@@ -4,21 +4,32 @@
 
 const chalk = require('chalk');
 const AIProviderFactory = require('../providers/ai-provider-factory');
+const DiffManager = require('./diff-manager');
 
 class ProviderOrchestrator {
-  constructor() {}
+  constructor() {
+    this.diffManager = new DiffManager();
+  }
 
   /**
    * Generate commit messages with sequential fallback
    */
-  async generateWithSequentialFallback(diff, options, activityLogger, statsManager) {
+  async generateWithSequentialFallback(
+    diff,
+    options,
+    activityLogger,
+    statsManager
+  ) {
     const { preferredProvider, context, ...generationOptions } = options;
 
     // Determine providers to use - preferred first, then fallback
     const allProviders = ['groq', 'ollama'];
-    const providers = preferredProvider ?
-      [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)] :
-      allProviders;
+    const providers = preferredProvider
+      ? [
+          preferredProvider,
+          ...allProviders.filter((p) => p !== preferredProvider),
+        ]
+      : allProviders;
 
     // Enrich options with context first
     const enrichedOptions = {
@@ -36,33 +47,45 @@ class ProviderOrchestrator {
     const diffManagement = await this.manageDiffForAI(diff, enrichedOptions);
 
     // Step 2: Use sequential fallback mode
-    return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers, activityLogger, statsManager);
+    return await this.generateWithSequentialProviders(
+      diffManagement,
+      enrichedOptions,
+      providers,
+      activityLogger,
+      statsManager
+    );
   }
 
   /**
    * Intelligently manage diff for optimal AI processing
    */
   async manageDiffForAI(diff, options = {}) {
-    const diffSize = diff.length;
+    // Filter out binary/media files first
+    const filteredDiff = this.diffManager.filterBinaryFiles(diff);
+    const diffSize = filteredDiff.length;
     const MAX_SAFE_SIZE = 60000; // ~20K tokens, safe for modern Groq (131K context) and Ollama
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {
       return {
         strategy: 'full',
-        data: diff,
+        data: filteredDiff,
         chunks: null,
         info: {
           strategy: 'full',
           size: diffSize,
           chunks: 1,
           reasoning: 'Full diff sent to AI for fast processing',
-          pluginUpdate: false
-        }
+          pluginUpdate: false,
+        },
       };
     }
 
-    const smartTruncated = await this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
+    const smartTruncated = await this.smartTruncateDiff(
+      diff,
+      MAX_SAFE_SIZE,
+      context
+    );
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,
@@ -75,8 +98,8 @@ class ProviderOrchestrator {
         truncated: true,
         originalSize: diffSize,
         preservedFiles: smartTruncated.preservedFiles,
-        skippedFiles: smartTruncated.skippedFiles
-      }
+        skippedFiles: smartTruncated.skippedFiles,
+      },
     };
   }
 
@@ -87,15 +110,22 @@ class ProviderOrchestrator {
     const fileChunks = this.parseDiffIntoFileChunks(diff);
 
     const IGNORED_PATTERNS = [
-      'node_modules/', 'dist/', 'build/', 'vendor/', '.git/',
-      '.lock', '.min.js', '.min.css', '.map'
+      'node_modules/',
+      'dist/',
+      'build/',
+      'vendor/',
+      '.git/',
+      '.lock',
+      '.min.js',
+      '.min.css',
+      '.map',
     ];
 
-    const filteredChunks = fileChunks.filter(fc => {
-      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
+    const filteredChunks = fileChunks.filter((fc) => {
+      return !IGNORED_PATTERNS.some((pattern) => fc.fileName.includes(pattern));
     });
 
-    const scoredChunks = filteredChunks.map(fc => {
+    const scoredChunks = filteredChunks.map((fc) => {
       const score = this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
@@ -149,8 +179,8 @@ class ProviderOrchestrator {
 
     // Build summary of skipped files for context
     const trulySkipped = skippedFiles
-      .filter(f => !additionalPreservedFiles.includes(f.fileName))
-      .map(f => f.fileName);
+      .filter((f) => !additionalPreservedFiles.includes(f.fileName))
+      .map((f) => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
@@ -160,10 +190,12 @@ class ProviderOrchestrator {
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join(
+        '\n'
+      ),
       reasoning,
       preservedFiles,
-      skippedFiles: trulySkipped
+      skippedFiles: trulySkipped,
     };
   }
 
@@ -179,10 +211,10 @@ class ProviderOrchestrator {
       vendor: [],
       assets: [],
       config: [],
-      other: []
+      other: [],
     };
 
-    skippedFiles.forEach(file => {
+    skippedFiles.forEach((file) => {
       if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
         groups.plugin.push(file);
       } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
@@ -202,38 +234,56 @@ class ProviderOrchestrator {
     summary.push('\n# SKIPPED FILES (too large, but changed):');
 
     if (groups.plugin.length) {
-      const plugins = new Set(groups.plugin.map(f => {
-        const match = f.match(/\/plugins\/([^\/]+)/);
-        return match ? match[1] : f;
-      }));
-      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
+      const plugins = new Set(
+        groups.plugin.map((f) => {
+          const match = f.match(/\/plugins\/([^\/]+)/);
+          return match ? match[1] : f;
+        })
+      );
+      summary.push(
+        `# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`
+      );
     }
 
     if (groups.theme.length) {
-      const themes = new Set(groups.theme.map(f => {
-        const match = f.match(/\/themes\/([^\/]+)/);
-        return match ? match[1] : f;
-      }));
-      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
+      const themes = new Set(
+        groups.theme.map((f) => {
+          const match = f.match(/\/themes\/([^\/]+)/);
+          return match ? match[1] : f;
+        })
+      );
+      summary.push(
+        `# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`
+      );
     }
 
     if (groups.assets.length > 5) {
-      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
+      summary.push(
+        `# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`
+      );
     } else if (groups.assets.length) {
-      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
+      summary.push(
+        `# Assets: ${groups.assets.map((f) => f.split('/').pop()).join(', ')}`
+      );
     }
 
     if (groups.config.length) {
-      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
+      summary.push(
+        `# Config files: ${groups.config.map((f) => f.split('/').pop()).join(', ')}`
+      );
     }
 
     if (groups.vendor.length) {
-      const vendorTypes = new Set(groups.vendor.map(f => {
-        if (f.includes('node_modules')) return 'npm';
-        if (f.includes('vendor/composer')) return 'composer';
-        return 'vendor';
-      }));
-      summary.push(`# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`);
+      const vendorTypes = new Set(
+        groups.vendor.map((f) => {
+          if (f.includes('node_modules')) return 'npm';
+          if (f.includes('vendor/composer')) return 'composer';
+          return 'vendor';
+        })
+      );
+      summary.push(
+        `# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`
+      );
     }
 
     if (groups.other.length <= 10) {
@@ -264,14 +314,20 @@ class ProviderOrchestrator {
             content: currentContent.join('\n'),
             fileName: currentFile.fileName,
             isNewFile: currentFile.isNewFile,
-            changeCount: currentFile.changeCount
+            changeCount: currentFile.changeCount,
           });
         }
 
         const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
         const fileName = fileMatch ? fileMatch[2] : 'unknown';
-        let isNewFile = line.includes('/dev/null') || (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
-        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
+        let isNewFile =
+          line.includes('/dev/null') ||
+          (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
+        if (
+          !isNewFile &&
+          lines[i + 1] &&
+          lines[i + 1].includes('new file mode')
+        ) {
           isNewFile = true;
         }
 
@@ -279,7 +335,7 @@ class ProviderOrchestrator {
           header: line,
           fileName,
           isNewFile,
-          changeCount: 0
+          changeCount: 0,
         };
         currentContent = [];
       } else if (line.startsWith('@@')) {
@@ -299,7 +355,7 @@ class ProviderOrchestrator {
         content: currentContent.join('\n'),
         fileName: currentFile.fileName,
         isNewFile: currentFile.isNewFile,
-        changeCount: currentFile.changeCount
+        changeCount: currentFile.changeCount,
       });
     }
 
@@ -314,19 +370,35 @@ class ProviderOrchestrator {
     const fileName = chunk.fileName.toLowerCase();
 
     // Prioritize certain file types
-    if (fileName.endsWith('.js') || fileName.endsWith('.ts') || 
-        fileName.endsWith('.py') || fileName.endsWith('.java')) {
+    if (
+      fileName.endsWith('.js') ||
+      fileName.endsWith('.ts') ||
+      fileName.endsWith('.py') ||
+      fileName.endsWith('.java')
+    ) {
       score += 3;
-    } else if (fileName.endsWith('.json') || fileName.endsWith('.yaml') || 
-               fileName.endsWith('.yml') || fileName.endsWith('.toml')) {
+    } else if (
+      fileName.endsWith('.json') ||
+      fileName.endsWith('.yaml') ||
+      fileName.endsWith('.yml') ||
+      fileName.endsWith('.toml')
+    ) {
       score += 2;
-    } else if (fileName.includes('package') || fileName.includes('requirements') ||
-               fileName.includes('pom.xml') || fileName.includes('build.gradle')) {
+    } else if (
+      fileName.includes('package') ||
+      fileName.includes('requirements') ||
+      fileName.includes('pom.xml') ||
+      fileName.includes('build.gradle')
+    ) {
       score += 4;
     }
 
     // Boost score for files mentioned in semantic context
-    if (semanticContext && semanticContext.files && semanticContext.files.semantic) {
+    if (
+      semanticContext &&
+      semanticContext.files &&
+      semanticContext.files.semantic
+    ) {
       const semanticFiles = Object.keys(semanticContext.files.semantic);
       if (semanticFiles.includes(chunk.fileName)) {
         score += 5;
@@ -342,7 +414,13 @@ class ProviderOrchestrator {
   /**
    * Generate commit messages with sequential provider processing (with fallback)
    */
-  async generateWithSequentialProviders(diffManagement, options, providers, activityLogger, statsManager) {
+  async generateWithSequentialProviders(
+    diffManagement,
+    options,
+    providers,
+    activityLogger,
+    statsManager
+  ) {
     const startTime = Date.now();
 
     // Try providers sequentially
@@ -355,10 +433,16 @@ class ProviderOrchestrator {
         let actualPrompt;
 
         // Handle different diff strategies
-        if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
+        if (
+          diffManagement.strategy === 'full' ||
+          diffManagement.strategy === 'smart-truncated'
+        ) {
           // Simple case: diff in one prompt (full or smart-truncated)
           const prompt = provider.buildPrompt(diffManagement.data, options);
-          messages = await provider.generateCommitMessages(diffManagement.data, options);
+          messages = await provider.generateCommitMessages(
+            diffManagement.data,
+            options
+          );
           actualPrompt = prompt;
         } else {
           // Complex case: chunked processing
@@ -373,7 +457,11 @@ class ProviderOrchestrator {
               chunkIndex: i,
               totalChunks: diffManagement.data.length,
               isLastChunk,
-              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
+              chunkContext: isLastChunk
+                ? 'final'
+                : i === 0
+                  ? 'initial'
+                  : 'middle',
               // Add chunk-specific context
               context: {
                 ...options.context,
@@ -384,14 +472,20 @@ class ProviderOrchestrator {
                   files: chunk.context.files,
                   functions: chunk.context.functions,
                   classes: chunk.context.classes,
-                  hasSignificantChanges: chunk.context.hasSignificantChanges
-                }
-              }
+                  hasSignificantChanges: chunk.context.hasSignificantChanges,
+                },
+              },
             };
 
             // Generate with this chunk
-            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
-            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
+            const chunkPrompt = provider.buildPrompt(
+              chunk.content,
+              chunkOptions
+            );
+            const chunkResult = await provider.generateCommitMessages(
+              chunk.content,
+              chunkOptions
+            );
 
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
@@ -432,7 +526,7 @@ class ProviderOrchestrator {
             ...diffManagement.info,
             provider: providerName,
             responseTime,
-            success: true
+            success: true,
           });
 
           return messages;
@@ -444,8 +538,9 @@ class ProviderOrchestrator {
         await activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated' 
-            ? diffManagement.data 
+          diffManagement.strategy === 'full' ||
+            diffManagement.strategy === 'smart-truncated'
+            ? diffManagement.data
             : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
           responseTime,
@@ -458,7 +553,7 @@ class ProviderOrchestrator {
           provider: providerName,
           responseTime,
           success: false,
-          error: error.message
+          error: error.message,
         });
 
         // Continue to next provider in sequence
@@ -497,7 +592,11 @@ class ProviderOrchestrator {
     let score = 0;
 
     // Prefer conventional commit format
-    if (/^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(message)) {
+    if (
+      /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(
+        message
+      )
+    ) {
       score += 10;
     }
 
@@ -510,7 +609,10 @@ class ProviderOrchestrator {
     }
 
     // Prefer messages with proper capitalization
-    if (message[0] === message[0].toUpperCase() && message[0] !== message[0].toLowerCase()) {
+    if (
+      message[0] === message[0].toUpperCase() &&
+      message[0] !== message[0].toLowerCase()
+    ) {
       score += 2;
     }
 
@@ -587,7 +689,10 @@ class ProviderOrchestrator {
     const messageKeywords = this.extractKeywordsFromMessage(message);
 
     // Calculate overlap between diff entities and message
-    const entityOverlap = this.calculateEntityOverlap(entitiesFromDiff, messageKeywords);
+    const entityOverlap = this.calculateEntityOverlap(
+      entitiesFromDiff,
+      messageKeywords
+    );
     relevanceScore += entityOverlap * 8; // Weight entity overlap heavily
 
     // Check if the commit type matches the diff type
@@ -620,7 +725,7 @@ class ProviderOrchestrator {
       variables: [],
       filenames: [],
       fileTypes: [],
-      methods: []
+      methods: [],
     };
 
     // Extract file names from diff
@@ -638,27 +743,36 @@ class ProviderOrchestrator {
     }
 
     // Extract function/class definitions from diff
-    const functionMatches = diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const functionMatches =
+      diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of functionMatches) {
       const funcName = match.replace(/function\s+|def\s+/, '').trim();
       if (funcName) entities.functions.push(funcName);
     }
 
-    const classMatches = diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const classMatches =
+      diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of classMatches) {
-      const className = match.replace('class\s+', '').replace('class ', '').trim();
+      const className = match
+        .replace('class\s+', '')
+        .replace('class ', '')
+        .trim();
       if (className) entities.classes.push(className);
     }
 
     // Extract variable declarations
-    const varMatches = diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const varMatches =
+      diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of varMatches) {
       const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
       if (varName) entities.variables.push(varName);
     }
 
     // Extract method definitions in diff
-    const methodMatches = diff.match(/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g) || [];
+    const methodMatches =
+      diff.match(
+        /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
+      ) || [];
     for (const match of methodMatches) {
       const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
       if (methodName && !entities.functions.includes(methodName)) {
@@ -667,9 +781,13 @@ class ProviderOrchestrator {
     }
 
     // Extract import/module statements
-    const importMatches = diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
+    const importMatches =
+      diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
     for (const match of importMatches) {
-      const importName = match.replace(/(?:import|from|require)\s*/, '').replace(/['"`].*?['"`]/, '').trim();
+      const importName = match
+        .replace(/(?:import|from|require)\s*/, '')
+        .replace(/['"`].*?['"`]/, '')
+        .trim();
       if (importName) entities.variables.push(importName);
     }
 
@@ -684,10 +802,11 @@ class ProviderOrchestrator {
     const content = message.replace(/^[a-z]+(\([^)]+\))?:\s*/, '');
 
     // Extract words that could be relevant
-    const words = content.toLowerCase()
+    const words = content
+      .toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter(word => word.length > 2 && !this.isCommonStopWord(word));
+      .filter((word) => word.length > 2 && !this.isCommonStopWord(word));
 
     return [...new Set(words)]; // Remove duplicates
   }
@@ -697,14 +816,84 @@ class ProviderOrchestrator {
    */
   isCommonStopWord(word) {
     const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should',
-      'this', 'that', 'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we',
-      'they', 'me', 'him', 'her', 'us', 'them', 'my', 'your', 'his', 'its',
-      'our', 'their', 'what', 'which', 'who', 'when', 'where', 'why', 'how',
-      'if', 'then', 'else', 'so', 'than', 'too', 'very', 'just', 'now', 'up',
-      'down', 'out', 'off', 'over', 'under', 'again', 'further', 'then', 'once'
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'should',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+      'me',
+      'him',
+      'her',
+      'us',
+      'them',
+      'my',
+      'your',
+      'his',
+      'its',
+      'our',
+      'their',
+      'what',
+      'which',
+      'who',
+      'when',
+      'where',
+      'why',
+      'how',
+      'if',
+      'then',
+      'else',
+      'so',
+      'than',
+      'too',
+      'very',
+      'just',
+      'now',
+      'up',
+      'down',
+      'out',
+      'off',
+      'over',
+      'under',
+      'again',
+      'further',
+      'then',
+      'once',
     ]);
 
     return stopWords.has(word.toLowerCase());
@@ -719,9 +908,11 @@ class ProviderOrchestrator {
     // Check for function name matches
     for (const func of entities.functions) {
       const funcName = func.toLowerCase();
-      if (messageKeywords.some(keyword =>
-        funcName.includes(keyword) || keyword.includes(funcName)
-      )) {
+      if (
+        messageKeywords.some(
+          (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
+        )
+      ) {
         overlapCount++;
       }
     }
@@ -729,9 +920,12 @@ class ProviderOrchestrator {
     // Check for class name matches
     for (const cls of entities.classes) {
       const className = cls.toLowerCase();
-      if (messageKeywords.some(keyword =>
-        className.includes(keyword) || keyword.includes(className)
-      )) {
+      if (
+        messageKeywords.some(
+          (keyword) =>
+            className.includes(keyword) || keyword.includes(className)
+        )
+      ) {
         overlapCount++;
       }
     }
@@ -739,9 +933,12 @@ class ProviderOrchestrator {
     // Check for variable name matches
     for (const varName of entities.variables) {
       const varNameLower = varName.toLowerCase();
-      if (messageKeywords.some(keyword =>
-        varNameLower.includes(keyword) || keyword.includes(varNameLower)
-      )) {
+      if (
+        messageKeywords.some(
+          (keyword) =>
+            varNameLower.includes(keyword) || keyword.includes(varNameLower)
+        )
+      ) {
         overlapCount++;
       }
     }
@@ -752,9 +949,11 @@ class ProviderOrchestrator {
       const fileNameParts = fileName.split(/[\/\\]/); // Split by path separators
 
       for (const part of fileNameParts) {
-        if (messageKeywords.some(keyword =>
-          part.includes(keyword) || keyword.includes(part)
-        )) {
+        if (
+          messageKeywords.some(
+            (keyword) => part.includes(keyword) || keyword.includes(part)
+          )
+        ) {
           overlapCount++;
           break;
         }
@@ -776,11 +975,18 @@ class ProviderOrchestrator {
     // Determine what type of changes are in the diff
     const diffIndicators = {
       feat: /(\+.*function|\+.*class|\+.*def|\+.*export|\+.*import)/.test(diff),
-      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(diff),
+      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(
+        diff
+      ),
       docs: /(\+.*\.(md|txt|rst)|\+.*README|\+.*documentation)/i.test(diff),
-      refactor: /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
-      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(diff),
-      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(diff),
+      refactor:
+        /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
+      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(
+        diff
+      ),
+      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(
+        diff
+      ),
     };
 
     return diffIndicators[changeType] || false;
@@ -800,23 +1006,23 @@ class ProviderOrchestrator {
 
     // Common scope-type mappings
     const scopeTypeMap = {
-      'api': ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
-      'ui': ['jsx', 'tsx', 'vue', 'html', 'css', 'scss', 'sass', 'less'],
-      'auth': ['js', 'ts', 'py', 'php', 'java', 'go'],
-      'db': ['sql', 'js', 'ts', 'py', 'php'],
-      'config': ['json', 'yaml', 'yml', 'env', 'xml', 'toml', 'conf'],
-      'test': ['test.js', 'spec.js', 'test.ts', 'spec.ts', 'test.py', 'spec.rb'],
-      'docs': ['md', 'txt', 'rst', 'adoc', 'tex'],
-      'build': ['js', 'ts', 'json', 'lock', 'yml', 'yaml', 'sh', 'gradle', 'xml'],
-      'ci': ['yml', 'yaml', 'sh', 'json'],
-      'utils': ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
-      'types': ['ts', 'js', 'py', 'java', 'go'],
-      'perf': ['js', 'ts', 'py', 'java', 'go', 'php'],
-      'deps': ['json', 'lock', 'yml', 'yaml', 'xml', 'txt']
+      api: ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
+      ui: ['jsx', 'tsx', 'vue', 'html', 'css', 'scss', 'sass', 'less'],
+      auth: ['js', 'ts', 'py', 'php', 'java', 'go'],
+      db: ['sql', 'js', 'ts', 'py', 'php'],
+      config: ['json', 'yaml', 'yml', 'env', 'xml', 'toml', 'conf'],
+      test: ['test.js', 'spec.js', 'test.ts', 'spec.ts', 'test.py', 'spec.rb'],
+      docs: ['md', 'txt', 'rst', 'adoc', 'tex'],
+      build: ['js', 'ts', 'json', 'lock', 'yml', 'yaml', 'sh', 'gradle', 'xml'],
+      ci: ['yml', 'yaml', 'sh', 'json'],
+      utils: ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
+      types: ['ts', 'js', 'py', 'java', 'go'],
+      perf: ['js', 'ts', 'py', 'java', 'go', 'php'],
+      deps: ['json', 'lock', 'yml', 'yaml', 'xml', 'txt'],
     };
 
     if (scopeTypeMap[scope]) {
-      return fileTypes.some(type => scopeTypeMap[scope].includes(type));
+      return fileTypes.some((type) => scopeTypeMap[scope].includes(type));
     }
 
     return false;
@@ -827,17 +1033,23 @@ class ProviderOrchestrator {
    */
   isMessageTooGenericForDiff(message, diff) {
     const entities = this.extractEntitiesFromDiff(diff);
-    const hasSpecificEntities = entities.functions.length > 0 ||
-                                entities.classes.length > 0 ||
-                                entities.variables.length > 0;
+    const hasSpecificEntities =
+      entities.functions.length > 0 ||
+      entities.classes.length > 0 ||
+      entities.variables.length > 0;
 
     const genericTerms = [
-      /\bchanges?\b/i, /\bupdates?\b/i, /\bfixes?\b/i,
-      /\bstuff\b/i, /\bthings?\b/i, /\bvarious\b/i,
-      /\bimprovements?\b/i, /\benhancements?\b/i
+      /\bchanges?\b/i,
+      /\bupdates?\b/i,
+      /\bfixes?\b/i,
+      /\bstuff\b/i,
+      /\bthings?\b/i,
+      /\bvarious\b/i,
+      /\bimprovements?\b/i,
+      /\benhancements?\b/i,
     ];
 
-    const hasGenericTerms = genericTerms.some(regex => regex.test(message));
+    const hasGenericTerms = genericTerms.some((regex) => regex.test(message));
 
     return hasSpecificEntities && hasGenericTerms;
   }

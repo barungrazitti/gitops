@@ -2,33 +2,122 @@
  * Manages diff processing for AI commit generation
  */
 
+const BINARY_EXTENSIONS = [
+  '.svg',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.ico',
+  '.webp',
+  '.avif',
+  '.pdf',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.rar',
+  '.7z',
+  '.mp3',
+  '.mp4',
+  '.wav',
+  '.ogg',
+  '.webm',
+  '.avi',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.otf',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.db',
+  '.sqlite',
+  '.mdb',
+  '.bin',
+  '.dat',
+];
+
 class DiffManager {
   constructor() {}
+
+  /**
+   * Check if a file is a binary/media file based on extension
+   */
+  isBinaryFile(filePath) {
+    const ext = filePath.toLowerCase().match(/\.[^.]+$/);
+    return ext && BINARY_EXTENSIONS.includes(ext[0]);
+  }
+
+  /**
+   * Filter out binary/media file changes from diff
+   */
+  filterBinaryFiles(diff) {
+    if (!diff || !diff.includes('diff --git')) return diff;
+
+    const lines = diff.split('\n');
+    const filteredLines = [];
+    let inBinaryFile = false;
+    let currentFile = '';
+
+    for (const line of lines) {
+      const fileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)/);
+      if (fileMatch) {
+        currentFile = fileMatch[2];
+        inBinaryFile = this.isBinaryFile(currentFile);
+      }
+
+      if (!inBinaryFile) {
+        filteredLines.push(line);
+      } else if (
+        line.startsWith('diff --git') ||
+        line.startsWith('index') ||
+        line.startsWith('---') ||
+        line.startsWith('+++')
+      ) {
+        // Include header lines for context but skip content
+        filteredLines.push(line);
+      } else if (!line.startsWith('+') && !line.startsWith('-')) {
+        // Include non-changed lines (@@, etc)
+        filteredLines.push(line);
+      }
+      // Skip actual content lines (+/-) for binary files
+    }
+
+    return filteredLines.join('\n');
+  }
 
   /**
    * Intelligently manage diff for optimal AI processing
    */
   manageDiffForAI(diff, options = {}) {
-    const diffSize = diff.length;
+    // Filter out binary/media files first
+    const filteredDiff = this.filterBinaryFiles(diff);
+    const diffSize = filteredDiff.length;
     const MAX_SAFE_SIZE = 60000; // ~20K tokens, safe for modern Groq (131K context) and Ollama
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {
       return {
         strategy: 'full',
-        data: diff,
+        data: filteredDiff,
         chunks: null,
         info: {
           strategy: 'full',
           size: diffSize,
           chunks: 1,
           reasoning: 'Full diff sent to AI for fast processing',
-          pluginUpdate: false
-        }
+          pluginUpdate: false,
+        },
       };
     }
 
-    const smartTruncated = this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
+    const smartTruncated = this.smartTruncateDiff(
+      filteredDiff,
+      MAX_SAFE_SIZE,
+      context
+    );
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,
@@ -41,8 +130,8 @@ class DiffManager {
         truncated: true,
         originalSize: diffSize,
         preservedFiles: smartTruncated.preservedFiles,
-        skippedFiles: smartTruncated.skippedFiles
-      }
+        skippedFiles: smartTruncated.skippedFiles,
+      },
     };
   }
 
@@ -53,15 +142,22 @@ class DiffManager {
     const fileChunks = this.parseDiffIntoFileChunks(diff);
 
     const IGNORED_PATTERNS = [
-      'node_modules/', 'dist/', 'build/', 'vendor/', '.git/',
-      '.lock', '.min.js', '.min.css', '.map'
+      'node_modules/',
+      'dist/',
+      'build/',
+      'vendor/',
+      '.git/',
+      '.lock',
+      '.min.js',
+      '.min.css',
+      '.map',
     ];
 
-    const filteredChunks = fileChunks.filter(fc => {
-      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
+    const filteredChunks = fileChunks.filter((fc) => {
+      return !IGNORED_PATTERNS.some((pattern) => fc.fileName.includes(pattern));
     });
 
-    const scoredChunks = filteredChunks.map(fc => {
+    const scoredChunks = filteredChunks.map((fc) => {
       const score = this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
@@ -115,8 +211,8 @@ class DiffManager {
 
     // Build summary of skipped files for context
     const trulySkipped = skippedFiles
-      .filter(f => !additionalPreservedFiles.includes(f.fileName))
-      .map(f => f.fileName);
+      .filter((f) => !additionalPreservedFiles.includes(f.fileName))
+      .map((f) => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
@@ -126,10 +222,12 @@ class DiffManager {
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join(
+        '\n'
+      ),
       reasoning,
       preservedFiles,
-      skippedFiles: trulySkipped
+      skippedFiles: trulySkipped,
     };
   }
 
@@ -145,10 +243,10 @@ class DiffManager {
       vendor: [],
       assets: [],
       config: [],
-      other: []
+      other: [],
     };
 
-    skippedFiles.forEach(file => {
+    skippedFiles.forEach((file) => {
       if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
         groups.plugin.push(file);
       } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
@@ -168,38 +266,56 @@ class DiffManager {
     summary.push('\n# SKIPPED FILES (too large, but changed):');
 
     if (groups.plugin.length) {
-      const plugins = new Set(groups.plugin.map(f => {
-        const match = f.match(/\/plugins\/([^\/]+)/);
-        return match ? match[1] : f;
-      }));
-      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
+      const plugins = new Set(
+        groups.plugin.map((f) => {
+          const match = f.match(/\/plugins\/([^\/]+)/);
+          return match ? match[1] : f;
+        })
+      );
+      summary.push(
+        `# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`
+      );
     }
 
     if (groups.theme.length) {
-      const themes = new Set(groups.theme.map(f => {
-        const match = f.match(/\/themes\/([^\/]+)/);
-        return match ? match[1] : f;
-      }));
-      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
+      const themes = new Set(
+        groups.theme.map((f) => {
+          const match = f.match(/\/themes\/([^\/]+)/);
+          return match ? match[1] : f;
+        })
+      );
+      summary.push(
+        `# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`
+      );
     }
 
     if (groups.assets.length > 5) {
-      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
+      summary.push(
+        `# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`
+      );
     } else if (groups.assets.length) {
-      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
+      summary.push(
+        `# Assets: ${groups.assets.map((f) => f.split('/').pop()).join(', ')}`
+      );
     }
 
     if (groups.config.length) {
-      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
+      summary.push(
+        `# Config files: ${groups.config.map((f) => f.split('/').pop()).join(', ')}`
+      );
     }
 
     if (groups.vendor.length) {
-      const vendorTypes = new Set(groups.vendor.map(f => {
-        if (f.includes('node_modules')) return 'npm';
-        if (f.includes('vendor/composer')) return 'composer';
-        return 'vendor';
-      }));
-      summary.push(`# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`);
+      const vendorTypes = new Set(
+        groups.vendor.map((f) => {
+          if (f.includes('node_modules')) return 'npm';
+          if (f.includes('vendor/composer')) return 'composer';
+          return 'vendor';
+        })
+      );
+      summary.push(
+        `# Dependencies: ${Array.from(vendorTypes).join(', ')} (${groups.vendor.length} files)`
+      );
     }
 
     if (groups.other.length <= 10) {
@@ -230,14 +346,20 @@ class DiffManager {
             content: currentContent.join('\n'),
             fileName: currentFile.fileName,
             isNewFile: currentFile.isNewFile,
-            changeCount: currentFile.changeCount
+            changeCount: currentFile.changeCount,
           });
         }
 
         const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
         const fileName = fileMatch ? fileMatch[2] : 'unknown';
-        let isNewFile = line.includes('/dev/null') || (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
-        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
+        let isNewFile =
+          line.includes('/dev/null') ||
+          (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
+        if (
+          !isNewFile &&
+          lines[i + 1] &&
+          lines[i + 1].includes('new file mode')
+        ) {
           isNewFile = true;
         }
 
@@ -245,10 +367,13 @@ class DiffManager {
           header: line,
           fileName,
           isNewFile,
-          changeCount: 0
+          changeCount: 0,
         };
         currentContent = [];
-      } else if (currentFile && (line.startsWith('@@ ') || line.startsWith('+') || line.startsWith('-'))) {
+      } else if (
+        currentFile &&
+        (line.startsWith('@@ ') || line.startsWith('+') || line.startsWith('-'))
+      ) {
         currentContent.push(line);
         if (line.startsWith('+') || line.startsWith('-')) {
           currentFile.changeCount++;
@@ -264,7 +389,7 @@ class DiffManager {
         content: currentContent.join('\n'),
         fileName: currentFile.fileName,
         isNewFile: currentFile.isNewFile,
-        changeCount: currentFile.changeCount
+        changeCount: currentFile.changeCount,
       });
     }
 
@@ -279,9 +404,11 @@ class DiffManager {
 
     if (chunk.isNewFile) {
       score += 50;
-      if (chunk.fileName.includes('package.json') ||
-          chunk.fileName.includes('composer.json') ||
-          chunk.fileName.includes('requirements.txt')) {
+      if (
+        chunk.fileName.includes('package.json') ||
+        chunk.fileName.includes('composer.json') ||
+        chunk.fileName.includes('requirements.txt')
+      ) {
         score += 100;
       }
     }
@@ -294,14 +421,24 @@ class DiffManager {
       score += 20;
     }
 
-    const ignoredPatterns = ['node_modules', '.git', 'dist', 'build', 'vendor', '.lock'];
-    if (ignoredPatterns.some(p => chunk.fileName.includes(p))) {
+    const ignoredPatterns = [
+      'node_modules',
+      '.git',
+      'dist',
+      'build',
+      'vendor',
+      '.lock',
+    ];
+    if (ignoredPatterns.some((p) => chunk.fileName.includes(p))) {
       score -= 50;
     }
 
     const semanticFiles = semanticContext?.files?.semantic || {};
     for (const [filePath, info] of Object.entries(semanticFiles)) {
-      if (chunk.fileName.includes(filePath) || filePath.includes(chunk.fileName)) {
+      if (
+        chunk.fileName.includes(filePath) ||
+        filePath.includes(chunk.fileName)
+      ) {
         if (info?.functions?.length > 0 || info?.classes?.length > 0) {
           score += 40;
         }
@@ -311,10 +448,12 @@ class DiffManager {
       }
     }
 
-    if (chunk.fileName.includes('index.') ||
-        chunk.fileName.includes('main.') ||
-        chunk.fileName.includes('app.') ||
-        chunk.fileName.includes('config.')) {
+    if (
+      chunk.fileName.includes('index.') ||
+      chunk.fileName.includes('main.') ||
+      chunk.fileName.includes('app.') ||
+      chunk.fileName.includes('config.')
+    ) {
       score += 25;
     }
 
@@ -335,12 +474,15 @@ class DiffManager {
 
     // Helper to detect semantic boundaries
     const isSemanticBoundary = (line) => {
-      return line.startsWith('diff --git') ||
+      return (
+        line.startsWith('diff --git') ||
         line.startsWith('index ') ||
         line.startsWith('---') ||
         line.startsWith('+++') ||
         (line.startsWith('@@') && currentChunk.length > 10) ||
-        (/^(function|class|def|const|let|var)\s+\w+/.test(line) && currentChunk.length > 5);
+        (/^(function|class|def|const|let|var)\s+\w+/.test(line) &&
+          currentChunk.length > 5)
+      );
     };
 
     // Helper to find good break point near token limit
