@@ -72,3 +72,4 @@ fix(docs): update README and documentation for v1.0 release
 | 260410-h09 | Fix binary file diff detection generates incorrect commit message       | 2026-04-10 | 7f293df | [260410-h09-fix-binary-file-diff-detection-generates](./quick/260410-h09-fix-binary-file-diff-detection-generates/) |
 | 260411-q4r | Update README and docs, mark v1.0 release, merge with main | 2026-04-11 | 659307e | [260411-q4r-update-readme-and-docs-mark-v1-0-release](./quick/260411-q4r-update-readme-and-docs-mark-v1-0-release/) |
 | 260416-uxz | fix Groq TPM rate limit error | 2026-04-16 | 9689f21 | [260416-uxz-fix-groq-tpm-rate-limit-error](./quick/260416-uxz-fix-groq-tpm-rate-limit-error/) |
+| 260416-v2y | skip binary media files when generating commit messages | 2026-04-16 | 11df22c | [260416-v2y-skip-binary-media-files-when-generating-](./quick/260416-v2y-skip-binary-media-files-when-generating-/) |
