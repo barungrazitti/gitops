@@ -17,14 +17,14 @@ class AIProviderFactory {
     }
 
     switch (providerName.toLowerCase()) {
-    case 'groq':
-      return new GroqProvider();
-    case 'ollama':
-      return new OllamaProvider();
-    default:
-      throw new Error(
-        `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
-      );
+      case 'groq':
+        return new GroqProvider();
+      case 'ollama':
+        return new OllamaProvider();
+      default:
+        throw new Error(
+          `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
+        );
     }
   }
 
@@ -67,7 +67,7 @@ class AIProviderFactory {
    */
   static isProviderAvailable(providerName) {
     const providers = this.getAvailableProviders();
-    return providers.some(p => p.name === providerName.toLowerCase());
+    return providers.some((p) => p.name === providerName.toLowerCase());
   }
 
   /**
@@ -77,7 +77,7 @@ class AIProviderFactory {
     try {
       const configManager = require('../core/config-manager');
       const manager = new configManager();
-      const defaultProvider = manager.get('provider');
+      const defaultProvider = manager.get('defaultProvider');
 
       if (defaultProvider && this.isProviderAvailable(defaultProvider)) {
         return this.create(defaultProvider);
@@ -161,15 +161,19 @@ class AIProviderFactory {
     }
 
     const availableProviders = this.getAvailableProviders();
-    const providerInfo = availableProviders.find(p => p.name === providerName.toLowerCase());
+    const providerInfo = availableProviders.find(
+      (p) => p.name === providerName.toLowerCase()
+    );
 
     if (!providerInfo) {
-      throw new Error(`Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`);
+      throw new Error(
+        `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
+      );
     }
 
     const configManager = require('../core/config-manager');
     const manager = new configManager();
-    
+
     // Set provider-specific configs
     for (const [key, value] of Object.entries(config)) {
       await manager.set(`${providerName}.${key}`, value);

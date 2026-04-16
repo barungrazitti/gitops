@@ -34,14 +34,14 @@ aic
 
 ## ✨ Features
 
-| Feature | Description |
-|---------|-------------|
-| **🚀 Fast** | Groq-first with Ollama fallback (~500ms) |
-| **🧠 Smart** | Understands your codebase context |
-| **🔒 Secure** | Auto-redacts 20+ secret/PII patterns |
-| **✅ Quality** | Enforces specific, reasoned messages |
-| **🤖 Auto Git** | Stage, commit, pull, resolve conflicts, push |
-| **🏢 Enterprise** | Strict security mode available |
+| Feature           | Description                                  |
+| ----------------- | -------------------------------------------- |
+| **🚀 Fast**       | Groq-first with Ollama fallback (~500ms)     |
+| **🧠 Smart**      | Understands your codebase context            |
+| **🔒 Secure**     | Auto-redacts 20+ secret/PII patterns         |
+| **✅ Quality**    | Enforces specific, reasoned messages         |
+| **🤖 Auto Git**   | Stage, commit, pull, resolve conflicts, push |
+| **🏢 Enterprise** | Strict security mode available               |
 
 ---
 
@@ -103,13 +103,13 @@ aic stats --export --format csv
 
 Complete documentation is available in the [`docs/`](docs/INDEX.md) directory:
 
-| Audience | Documentation |
-|----------|--------------|
-| **Users** | [Getting Started](docs/user-guide/GETTING_STARTED.md) |
-| **Developers** | [Developer Guide](docs/developer-guide/MODULES.md) |
-| **Security** | [PII Protection](docs/security/PII_PROTECTION.md) |
-| **Enterprise** | [Enterprise Features](docs/enterprise/FEATURES.md) |
-| **Architecture** | [Overview](docs/architecture/OVERVIEW.md) |
+| Audience         | Documentation                                         |
+| ---------------- | ----------------------------------------------------- |
+| **Users**        | [Getting Started](docs/user-guide/GETTING_STARTED.md) |
+| **Developers**   | [Developer Guide](docs/developer-guide/MODULES.md)    |
+| **Security**     | [PII Protection](docs/security/PII_PROTECTION.md)     |
+| **Enterprise**   | [Enterprise Features](docs/enterprise/FEATURES.md)    |
+| **Architecture** | [Overview](docs/architecture/OVERVIEW.md)             |
 
 ---
 
@@ -119,10 +119,10 @@ All code is scanned and sanitized **BEFORE** sending to AI:
 
 ### Protected Data Types
 
-| Category | Patterns | Examples |
-|----------|----------|----------|
-| **🔑 Secrets** | 15+ | API keys, tokens, passwords, SSH keys |
-| **👤 PII** | 8 | Emails, phones, SSN, addresses, credit cards |
+| Category       | Patterns | Examples                                     |
+| -------------- | -------- | -------------------------------------------- |
+| **🔑 Secrets** | 15+      | API keys, tokens, passwords, SSH keys        |
+| **👤 PII**     | 8        | Emails, phones, SSN, addresses, credit cards |
 
 ### Enterprise Mode
 
@@ -193,12 +193,13 @@ Impact:
 
 ## 📊 Project Status
 
-| Metric | Status |
-|--------|--------|
-| Test Coverage | 423 tests, 19 suites ✅ |
-| Security Patterns | 23 detection patterns ✅ |
-| Quality Gates | QUAL-01, QUAL-02 enforced ✅ |
-| Documentation | Complete with 20+ guides ✅ |
+| Metric            | Status                              |
+| ----------------- | ----------------------------------- |
+| Latest Release    | [v1.4.0](CHANGELOG.md) (2026-04-11) |
+| Test Coverage     | 423 tests, 19 suites                |
+| Security Patterns | 23 detection patterns               |
+| Quality Gates     | QUAL-01, QUAL-02 enforced           |
+| Documentation     | Complete with 20+ guides            |
 
 ---
 
@@ -296,12 +297,14 @@ export PATH="$HOME/.local/bin:$PATH"
 ### AI Provider Issues
 
 **Groq:**
+
 ```bash
 aic setup
 # Re-enter API key from console.groq.com/keys
 ```
 
 **Ollama:**
+
 ```bash
 # Ensure Ollama is running
 ollama serve
@@ -313,6 +316,7 @@ curl http://localhost:11434/api/tags
 ### Security Redaction
 
 If commits are blocked in enterprise mode:
+
 1. Review redaction summary
 2. Remove sensitive data from code
 3. Use environment variables for secrets
@@ -323,6 +327,7 @@ If commits are blocked in enterprise mode:
 ## 🔗 Links
 
 - 📖 [Full Documentation](docs/INDEX.md)
+- 📋 [Changelog](CHANGELOG.md)
 - 🐛 [Issue Tracker](https://github.com/barungrazitti/gitops/issues)
 - 💬 [Discussions](https://github.com/barungrazitti/gitops/discussions)
 - 🔑 [Get Groq API Key](https://console.groq.com/keys)
@@ -342,4 +347,4 @@ Made with ❤️ by [Barun Tayenjam](https://github.com/barungrazitti)
 
 ---
 
-*Last updated: 2026-03-27*
+_Last updated: 2026-04-11_
