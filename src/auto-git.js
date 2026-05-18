@@ -6,6 +6,7 @@
 const chalk = require('chalk');
 const inquirer = require('inquirer');
 const simpleGit = require('simple-git');
+const ora = require('ora');
 const AICommitGenerator = require('./index');
 
 class AutoGit {
@@ -13,6 +14,7 @@ class AutoGit {
     this.git = simpleGit();
     this.aiCommit = new AICommitGenerator();
     this.activityLogger = this.aiCommit.activityLogger;
+    this.spinner = ora();
     // Configure git to prefer merge over rebase for safety
     this.git.raw(['config', 'pull.rebase', 'false']);
   }
@@ -22,6 +24,13 @@ class AutoGit {
    */
   async run(options = {}) {
     const startTime = Date.now();
+
+    // Handle dry run mode
+    if (options.dryRun) {
+      await this.activityLogger.info('auto_git_started', { options });
+      await this.activityLogger.info('auto_git_completed', { reason: 'dry_run', duration: Date.now() - startTime });
+      return;
+    }
 
     try {
       await this.activityLogger.info('auto_git_started', { options });
@@ -102,13 +111,16 @@ class AutoGit {
    * Validate that we're in a git repository
    */
   async validateRepository() {
+    this.spinner.start('Validating git repository...');
     try {
       const isRepo = await this.git.checkIsRepo();
       if (!isRepo) {
+        this.spinner.fail('Repository validation failed');
         throw new Error('Not a git repository');
       }
+      this.spinner.succeed('Git repository validated');
     } catch (error) {
-      console.log(chalk.red('✗ Repository validation failed'));
+      this.spinner.fail('Repository validation failed');
       throw error;
     }
   }
@@ -117,6 +129,7 @@ class AutoGit {
    * Check if there are any changes (staged or unstaged)
    */
   async checkForChanges() {
+    this.spinner.start('Checking for changes...');
     try {
       const status = await this.git.status();
       const hasChanges =
@@ -128,12 +141,14 @@ class AutoGit {
         status.renamed.length > 0;
 
       if (!hasChanges) {
-        console.log(chalk.yellow('✗ No changes detected'));
+        this.spinner.succeed('No changes detected');
+      } else {
+        this.spinner.succeed('Changes detected');
       }
 
       return hasChanges;
     } catch (error) {
-      console.log(chalk.red('✗ Failed to check for changes'));
+      this.spinner.fail('Failed to check for changes');
       throw error;
     }
   }
@@ -142,11 +157,13 @@ class AutoGit {
    * Stage all changes
    */
   async stageChanges() {
+    this.spinner.start('Staging changes...');
     try {
       // Stage all changes including new files
       await this.git.add('.');
+      this.spinner.succeed('Changes staged');
     } catch (error) {
-      console.log(chalk.red('✗ Failed to stage changes'));
+      this.spinner.fail('Failed to stage changes');
       throw error;
     }
   }
@@ -155,6 +172,7 @@ class AutoGit {
    * Generate AI commit message
    */
   async generateCommitMessage(_options) {
+    this.spinner.start('Generating AI commit message...');
     try {
       // Get repository context for better AI generation
       const context = await this.aiCommit.analysisEngine.analyzeRepository();
@@ -163,13 +181,13 @@ class AutoGit {
       const diff = await this.git.diff(['--staged']);
 
       if (!diff || diff.trim().length === 0) {
+        this.spinner.fail('No staged changes available');
         throw new Error('No staged changes available');
       }
 
       // Check for and clean up conflict markers before generating commit
       if (/<<<<<<<|=======|>>>>>>>/.test(diff)) {
-        console.log(chalk.yellow('✗ Conflict markers detected'));
-
+        this.spinner.text = chalk.yellow('Conflict markers detected, cleaning up...');
         const cleanupResult = await this.aiCommit.detectAndCleanupConflictMarkers();
 
         if (cleanupResult.cleaned) {
@@ -188,6 +206,7 @@ class AutoGit {
               conventional: true,
               preferredProvider: config.defaultProvider || 'groq',
             });
+            this.spinner.succeed('AI commit message generated from cleaned diff');
             return messages[0];
           }
         }
@@ -202,8 +221,10 @@ class AutoGit {
         preferredProvider: config.defaultProvider || 'groq',
       });
 
+      this.spinner.succeed('AI commit message generated');
       return messages[0]; // Return the best message
     } catch (error) {
+      this.spinner.fail('Failed to generate commit message');
       console.log(chalk.red('✗ Failed to generate commit message'));
       throw error;
     }
@@ -213,10 +234,12 @@ class AutoGit {
    * Commit changes
    */
   async commitChanges(message, _options) {
+    this.spinner.start('Committing changes...');
     try {
       await this.git.commit(message);
-      console.log(chalk.green(`✓ Committed: ${message}`));
+      this.spinner.succeed(`Committed: ${message}`);
     } catch (error) {
+      this.spinner.fail('Failed to commit changes');
       console.log(chalk.red('✗ Failed to commit changes'));
       throw error;
     }
@@ -442,10 +465,12 @@ class AutoGit {
    * Push changes to remote
    */
   async pushChanges() {
+    this.spinner.start('Pushing changes to remote...');
     try {
       await this.git.push();
-      console.log(chalk.green('✓ Pushed to remote'));
+      this.spinner.succeed('Pushed to remote');
     } catch (error) {
+      this.spinner.fail('Failed to push changes');
       console.log(chalk.red('✗ Failed to push changes'));
       throw error;
     }

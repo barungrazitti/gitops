@@ -24,7 +24,7 @@ const {
   handleSetup,
   handleHook,
   handleStats,
-} = require('../bin/aicommit');
+} = require('../bin/aicommit.js');
 
 describe('aicommit CLI Action Handlers', () => {
 
