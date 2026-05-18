@@ -1,6 +1,6 @@
 {
   "name": "ai-commit-generator",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "Automate your git workflow with AI-powered commit messages using Groq or Ollama",
   "main": "src/index.js",
   "bin": {
@@ -73,6 +73,7 @@
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-import": "^2.32.0",
+    "express-rate-limit": "^8.5.2",
     "jest": "^29.7.0",
     "prettier": "^3.8.1"
   }

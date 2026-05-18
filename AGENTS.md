@@ -4,7 +4,7 @@
 
 ### Testing
 
-- `npm test` - Run full Jest test suite (423 tests, 19 suites)
+- `npm test` - Run full Jest test suite (723 tests, 37 suites)
 - `npx jest tests/aicommit-cli.test.js` - Run single test file
 - `npm run test:coverage` - Jest with coverage report
 - `npm run test:watch` - Jest in watch mode
@@ -27,7 +27,10 @@
 
 ### Code Quality
 
-No linting/formatting tools - removed per user request.
+- `npm run lint` - Run ESLint (0 errors, 0 warnings)
+- `npm run lint:fix` - Auto-fix linting issues
+- `npm run format` - Format code with Prettier
+- `npm run format:check` - Check formatting without changes
 
 ## Code Style Guidelines
 
