@@ -80,6 +80,7 @@ program
   .option('--dry-run', 'Show what would be committed without making changes')
   .option('--conventional', 'Force conventional commit format')
   .option('-q, --quiet', 'Suppress message quality scores')
+  .option('--enterprise-mode', 'Block commits with any sensitive data (strict security)')
   .action(handleGenerate);
 
 program

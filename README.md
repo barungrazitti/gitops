@@ -64,11 +64,22 @@ aic --no-push
 aic --enterprise-mode
 ```
 
-### Message Generation Only
+### Message Generation Only (aicommit)
 
 ```bash
 git add .
 aicommit
+
+# With enterprise mode (strict security)
+aicommit --enterprise-mode
+```
+
+### Full Automation (aic)
+
+```bash
+aic                         # Auto commit, pull, push
+aic --enterprise-mode       # With strict security
+aic "commit message"        # Use provided message
 ```
 
 ### Configuration
@@ -232,8 +243,10 @@ src/
 ├── utils/          # Utilities (security, validation, etc.)
 └── commands/       # CLI commands
 bin/
-├── aic.js             # Main CLI (auto git workflow)
-└── aicommit.js        # Commit generator CLI
+├── aic                  # Auto git workflow (symlink → aic.js)
+├── aic.js               # Main CLI entry point
+├── aicommit             # Commit generator (symlink → aicommit.js)
+└── aicommit.js          # Commit generator CLI
 tests/              # Test suites
 docs/               # Documentation
 ```
