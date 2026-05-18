@@ -24,6 +24,8 @@ program
 
 // Main command (default) - Auto git workflow
 program
+  .command('auto', { isDefault: true })
+  .description('Auto commit, pull, resolve conflicts, push')
   .argument('[message]', 'Optional commit message (skips AI generation)')
   .option('-f, --force', 'Force run even if no changes detected')
   .option('-p, --provider <provider>', 'AI provider to use')
