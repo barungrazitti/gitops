@@ -10,8 +10,7 @@ class PromptBuilder {
     // Groq has 6000 TPM limit, reserve 1500 for prompt overhead (system + user instructions)
     // Leave margin for token estimation variance
     this.maxPromptLength = options.maxPromptLength || 4500;
-    this.preserveContext =
-      options.preserveContext !== undefined ? options.preserveContext : true;
+    this.preserveContext = options.preserveContext !== undefined ? options.preserveContext : true;
   }
 
   /**
@@ -30,10 +29,7 @@ class PromptBuilder {
     let processedDiff = sanitizedDiff;
     if (estimatedTokens > this.maxPromptLength * 0.75) {
       // Leave room for prompt overhead
-      processedDiff = this._smartTruncate(
-        sanitizedDiff,
-        this.maxPromptLength * 0.75
-      );
+      processedDiff = this._smartTruncate(sanitizedDiff, this.maxPromptLength * 0.75);
     }
 
     // Build the prompt
@@ -43,10 +39,7 @@ class PromptBuilder {
     // Add context if available
     if (context.files && Object.keys(context.files).length > 0) {
       prompt += `## Context:\n`;
-      if (
-        context.files.semantic &&
-        Object.keys(context.files.semantic).length > 0
-      ) {
+      if (context.files.semantic && Object.keys(context.files.semantic).length > 0) {
         prompt += `- Semantic changes detected in: ${Object.keys(context.files.semantic).join(', ')}\n`;
       }
       if (context.files.modified && context.files.modified.length > 0) {
@@ -88,13 +81,7 @@ class PromptBuilder {
   /**
    * Build prompt for conflict resolution
    */
-  buildConflictPrompt(
-    filePath,
-    currentVersion,
-    incomingVersion,
-    baseVersion,
-    language
-  ) {
+  buildConflictPrompt(filePath, currentVersion, incomingVersion, baseVersion, language) {
     let prompt = `You are an expert software engineer tasked with resolving a merge conflict in the file '${filePath}'.\n\n`;
     prompt += `## Current Version (HEAD):\n\`\`\`${language}\n${currentVersion}\n\`\`\`\n\n`;
     prompt += `## Incoming Version (MERGE_HEAD):\n\`\`\`${language}\n${incomingVersion}\n\`\`\`\n\n`;

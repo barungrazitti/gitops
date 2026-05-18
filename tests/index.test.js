@@ -9,12 +9,12 @@ jest.mock('simple-git');
 jest.mock('fs-extra');
 jest.mock('ora');
 jest.mock('chalk', () => ({
-  blue: jest.fn((text) => text),
-  green: jest.fn((text) => text),
-  red: jest.fn((text) => text),
-  yellow: jest.fn((text) => text),
-  cyan: jest.fn((text) => text),
-  dim: jest.fn((text) => text),
+  blue: jest.fn(text => text),
+  green: jest.fn(text => text),
+  red: jest.fn(text => text),
+  yellow: jest.fn(text => text),
+  cyan: jest.fn(text => text),
+  dim: jest.fn(text => text),
 }));
 
 const simpleGit = require('simple-git');
@@ -86,7 +86,7 @@ describe('AICommitGenerator', () => {
       generator.cacheManager.getValidated = jest.fn().mockResolvedValue(null);
       generator.cacheManager.setValidated = jest.fn().mockResolvedValue();
       generator.analysisEngine.analyzeRepository = jest.fn().mockResolvedValue({ files: {} });
-      generator.messageFormatter.format = jest.fn((msg) => msg);
+      generator.messageFormatter.format = jest.fn(msg => msg);
       generator.configManager.load = jest.fn().mockResolvedValue({
         defaultProvider: 'groq',
         conventionalCommits: true,
@@ -189,7 +189,7 @@ describe('AICommitGenerator', () => {
     });
 
     it('should handle very large diffs', () => {
-      const largeDiff = `diff --git a/file1.js b/file1.js\n${  'line 1\n'.repeat(2000)}`;
+      const largeDiff = `diff --git a/file1.js b/file1.js\n${'line 1\n'.repeat(2000)}`;
       const result = generator.chunkDiff(largeDiff, 6000);
 
       expect(Array.isArray(result)).toBe(true);
@@ -270,7 +270,7 @@ describe('AICommitGenerator', () => {
     });
 
     it('should truncate very large diffs', () => {
-      const largeDiff = `diff --git a/test.js b/test.js\n${  'a'.repeat(500000)}`;
+      const largeDiff = `diff --git a/test.js b/test.js\n${'a'.repeat(500000)}`;
       const result = generator.manageDiffForAI(largeDiff);
 
       expect(result.strategy).toBe('smart-truncated');
@@ -287,14 +287,20 @@ new file mode 100644
 +++ b/new-feature/new-file.js
 @@ -0,0 +1,500 @@
 +console.log('new file');
-+${Array(700).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
++${Array(700)
+        .fill(0)
+        .map((_, i) => `+const x${i} = ${i};`)
+        .join('\n')}
 diff --git a/old-file.js b/old-file.js
 --- a/old-file.js
 +++ b/old-file.js
 @@ -1,3 +1,503 @@
  const x = 1;
 +const added = 'change';
-+${Array(700).fill(0).map((_, i) => `+const y${i} = ${i};`).join('\n')}
++${Array(700)
+        .fill(0)
+        .map((_, i) => `+const y${i} = ${i};`)
+        .join('\n')}
  const y = 2;`;
       const result = generator.manageDiffForAI(newFileDiff);
       expect(result.info.strategy).toBe('smart-truncated');
@@ -307,7 +313,10 @@ diff --git a/old-file.js b/old-file.js
 +++ b/src/main.js
 @@ -1,2 +1,1000 @@
  console.log('hello');
-+${Array(1400).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
++${Array(1400)
+        .fill(0)
+        .map((_, i) => `+const x${i} = ${i};`)
+        .join('\n')}
 diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 --- a/node_modules/some-lib/index.js
 +++ b/node_modules/some-lib/index.js
@@ -322,8 +331,11 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
     });
 
     it('should include summary of skipped files', () => {
-      const largeFileContent = Array(1000).fill(0).map((_, i) => `+const x${i} = ${i} && console.log('line ${i}');`).join('\n');
-      
+      const largeFileContent = Array(1000)
+        .fill(0)
+        .map((_, i) => `+const x${i} = ${i} && console.log('line ${i}');`)
+        .join('\n');
+
       // Create 30 large files to ensure headers don't all fit in budget
       const files = [];
       for (let i = 1; i <= 30; i++) {
@@ -334,8 +346,8 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 console.log('${i}');
 ${largeFileContent}`);
       }
-      
-      const largeDiff = `${files.join('\n')  }
+
+      const largeDiff = `${files.join('\n')}
 diff --git a/wp-content/plugins/wordpress-seo/plugin.php b/wp-content/plugins/wordpress-seo/plugin.php
 --- a/wp-content/plugins/wordpress-seo/plugin.php
 +++ b/wp-content/plugins/wordpress-seo/plugin.php
@@ -347,7 +359,10 @@ diff --git a/wp-content/themes/twentytwenty/style.css b/wp-content/themes/twenty
 +++ b/wp-content/themes/twentytwenty/style.css
 @@ -1,2 +1,1000 @@
 body {}
-${Array(1000).fill(0).map((_, i) => `+.class${i} { color: red; }`).join('\n')}
+${Array(1000)
+  .fill(0)
+  .map((_, i) => `+.class${i} { color: red; }`)
+  .join('\n')}
 diff --git a/assets/bundle.js b/assets/bundle.js
 --- a/assets/bundle.js
 +++ b/assets/bundle.js
@@ -359,17 +374,23 @@ diff --git a/vendor/composer/installed.json b/vendor/composer/installed.json
 +++ b/vendor/composer/installed.json
 @@ -1,2 +1,1000 @@
 {}
-${Array(1000).fill(0).map((_, i) => `+"key${i}": "value${i}"`).join('\n')}
+${Array(1000)
+  .fill(0)
+  .map((_, i) => `+"key${i}": "value${i}"`)
+  .join('\n')}
 diff --git a/config.json b/config.json
 --- a/config.json
 +++ b/config.json
 @@ -1,2 +1,1000 @@
 {}
-${Array(1000).fill(0).map((_, i) => `+"key${i}": "value${i}"`).join('\n')}`;
-      
+${Array(1000)
+  .fill(0)
+  .map((_, i) => `+"key${i}": "value${i}"`)
+  .join('\n')}`;
+
       const result = generator.manageDiffForAI(largeDiff);
       expect(result.info.strategy).toBe('smart-truncated');
-      
+
       // With 30+ files, some should be truly skipped (beyond header budget)
       if (result.info.skippedFiles.length > 0) {
         expect(result.data).toContain('# SKIPPED FILES');
@@ -401,9 +422,9 @@ diff --git a/src/utils.js b/src/utils.js
         files: {
           semantic: {
             'src/main.js': { significance: 'high', functions: ['main'] },
-            'src/utils.js': { significance: 'low', functions: [] }
-          }
-        }
+            'src/utils.js': { significance: 'low', functions: [] },
+          },
+        },
       };
       const result = generator.manageDiffForAI(multiFileDiff, { context: semanticContext });
       expect(result.data).toContain('src/main.js');
@@ -415,7 +436,10 @@ diff --git a/src/utils.js b/src/utils.js
 +++ b/src/main.js
 @@ -1,2 +1,1000 @@
  console.log('hello');
-+${Array(1400).fill(0).map((_, i) => `+const x${i} = ${i};`).join('\n')}
++${Array(1400)
+        .fill(0)
+        .map((_, i) => `+const x${i} = ${i};`)
+        .join('\n')}
 diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 --- a/node_modules/some-lib/index.js
 +++ b/node_modules/some-lib/index.js

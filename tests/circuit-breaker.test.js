@@ -13,7 +13,7 @@ describe('CircuitBreaker', () => {
     circuitBreaker = new CircuitBreaker({
       failureThreshold: 3,
       timeout: 1000,
-      monitoringPeriod: 100
+      monitoringPeriod: 100,
     });
   });
 
@@ -33,7 +33,7 @@ describe('CircuitBreaker', () => {
       const cb = new CircuitBreaker({
         failureThreshold: 10,
         timeout: 5000,
-        monitoringPeriod: 2000
+        monitoringPeriod: 2000,
       });
       expect(cb.failureThreshold).toBe(10);
       expect(cb.timeout).toBe(5000);
@@ -75,8 +75,7 @@ describe('CircuitBreaker', () => {
       circuitBreaker.lastFailureTime = Date.now();
       const operation = jest.fn();
 
-      await expect(circuitBreaker.execute(operation))
-        .rejects.toThrow('Circuit breaker is OPEN');
+      await expect(circuitBreaker.execute(operation)).rejects.toThrow('Circuit breaker is OPEN');
       expect(operation).not.toHaveBeenCalled();
     });
 
@@ -95,8 +94,7 @@ describe('CircuitBreaker', () => {
       const operation = jest.fn().mockRejectedValue(new Error('fail'));
       const context = { provider: 'test' };
 
-      await expect(circuitBreaker.execute(operation, context))
-        .rejects.toThrow('fail');
+      await expect(circuitBreaker.execute(operation, context)).rejects.toThrow('fail');
       expect(operation).toHaveBeenCalledTimes(1);
       expect(circuitBreaker.metrics.failedRequests).toBe(1);
     });
@@ -104,8 +102,7 @@ describe('CircuitBreaker', () => {
     it('should increment failure count on error', async () => {
       const operation = jest.fn().mockRejectedValue(new Error('fail'));
 
-      await expect(circuitBreaker.execute(operation))
-        .rejects.toThrow('fail');
+      await expect(circuitBreaker.execute(operation)).rejects.toThrow('fail');
       expect(circuitBreaker.failureCount).toBe(1);
     });
 

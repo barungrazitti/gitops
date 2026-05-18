@@ -3,11 +3,8 @@
  */
 
 class ResponseParser {
-  constructor() {}
-
   /**
    * Parse AI response into commit messages
-   * Handles various response formats from different AI providers
    */
   parseResponse(response) {
     if (!response) {
@@ -68,11 +65,11 @@ class ResponseParser {
       const lowerLine = line.toLowerCase();
       return !(
         lowerLine.startsWith('here') ||
-        lowerLine.startsWith('the ') &&
-        (lowerLine.includes('commit') || lowerLine.includes('message')) ||
+        (lowerLine.startsWith('the ') &&
+          (lowerLine.includes('commit') || lowerLine.includes('message'))) ||
         lowerLine.startsWith('you can') ||
-        lowerLine.startsWith('this ') &&
-        (lowerLine.includes('commit') || lowerLine.includes('message')) ||
+        (lowerLine.startsWith('this ') &&
+          (lowerLine.includes('commit') || lowerLine.includes('message'))) ||
         lowerLine.includes('as an ai') ||
         lowerLine.includes('i am') ||
         lowerLine.startsWith('note:') ||

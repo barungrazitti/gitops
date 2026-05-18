@@ -17,7 +17,7 @@ class ImpactFormatter {
       minor: { label: 'Minor impact', icon: '⚠' },
       moderate: { label: 'Moderate impact', icon: '⚠⚠' },
       major: { label: 'Major impact', icon: '⚠⚠⚠' },
-      critical: { label: 'Critical impact', icon: '🚨' }
+      critical: { label: 'Critical impact', icon: '🚨' },
     };
 
     this.breakingPatterns = [
@@ -28,7 +28,7 @@ class ImpactFormatter {
       /removed?\s*(function|method|class|interface|export)/i,
       /renamed?\s*(function|method|class|interface|export)/i,
       /changed\s*(parameter|argument|return\s*type)/i,
-      /migrat(e|ion)\s*(required|needed)/i
+      /migrat(e|ion)\s*(required|needed)/i,
     ];
   }
 
@@ -90,11 +90,12 @@ class ImpactFormatter {
    */
   _detectBreakingChanges(message, context) {
     const isBreaking = this.breakingPatterns.some(pattern => pattern.test(message));
-    
+
     // Check context for breaking change indicators
-    const hasBreakingContext = context?.conventions?.breakingChange ||
-                               context?.dependencies?.breakingChange ||
-                               context?.components?.breakingChange;
+    const hasBreakingContext =
+      context?.conventions?.breakingChange ||
+      context?.dependencies?.breakingChange ||
+      context?.components?.breakingChange;
 
     if (!isBreaking && !hasBreakingContext) {
       return null;
@@ -159,7 +160,9 @@ class ImpactFormatter {
     const topAffected = affected.slice(0, 5);
     if (topAffected.length > 0) {
       const moduleList = topAffected.map(m => this._truncateModule(m, 30)).join(', ');
-      lines.push(`  Affected: ${moduleList}${affected.length > 5 ? ` (+${affected.length - 5} more)` : ''}`);
+      lines.push(
+        `  Affected: ${moduleList}${affected.length > 5 ? ` (+${affected.length - 5} more)` : ''}`
+      );
     }
 
     // Import/export changes
@@ -190,7 +193,9 @@ class ImpactFormatter {
     const topDownstream = downstream.slice(0, 5);
     if (topDownstream.length > 0) {
       const moduleList = topDownstream.map(m => this._truncateModule(m, 30)).join(', ');
-      lines.push(`  Modules: ${moduleList}${downstream.length > 5 ? ` (+${downstream.length - 5} more)` : ''}`);
+      lines.push(
+        `  Modules: ${moduleList}${downstream.length > 5 ? ` (+${downstream.length - 5} more)` : ''}`
+      );
     }
 
     return lines.join('\n');
@@ -225,7 +230,7 @@ class ImpactFormatter {
     }
 
     const lines = ['Required actions:'];
-    
+
     for (const action of actions.slice(0, 5)) {
       lines.push(`  • ${action}`);
     }

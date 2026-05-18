@@ -28,12 +28,40 @@ class PerformanceUtils {
    */
   static isCodeContent(text) {
     const codeIndicators = [
-      'function', 'class', 'const', 'let', 'var', 'import', 'export',
-      'if ', 'else ', 'for ', 'while ', 'def ', 'class ', '{', '}',
-      'return', 'async', 'await', 'try', 'catch', 'throw', '=>',
-      '===', '==', '=', '+', '-', '*', '/', '%', '||', '&&'
+      'function',
+      'class',
+      'const',
+      'let',
+      'var',
+      'import',
+      'export',
+      'if ',
+      'else ',
+      'for ',
+      'while ',
+      'def ',
+      'class ',
+      '{',
+      '}',
+      'return',
+      'async',
+      'await',
+      'try',
+      'catch',
+      'throw',
+      '=>',
+      '===',
+      '==',
+      '=',
+      '+',
+      '-',
+      '*',
+      '/',
+      '%',
+      '||',
+      '&&',
     ];
-    
+
     const sample = text.slice(0, 500).toLowerCase();
     return codeIndicators.some(indicator => sample.includes(indicator));
   }
@@ -42,17 +70,14 @@ class PerformanceUtils {
    * Parallel processing for AI provider calls
    */
   static async executeInParallel(tasks, options = {}) {
-    const { 
-      maxConcurrent = 3, 
-      timeout = 30000 
-    } = options;
+    const { maxConcurrent = 3, timeout = 30000 } = options;
 
     const results = [];
     const errors = [];
 
     for (let i = 0; i < tasks.length; i += maxConcurrent) {
       const batch = tasks.slice(i, i + maxConcurrent);
-      
+
       try {
         const batchPromises = batch.map(task => task());
         const batchResults = await Promise.allSettled(
@@ -65,7 +90,7 @@ class PerformanceUtils {
           } else {
             errors.push({
               index: i + index,
-              error: result.reason
+              error: result.reason,
             });
           }
         });
@@ -108,13 +133,13 @@ class PerformanceUtils {
    */
   static throttle(func, limit) {
     let inThrottle;
-    return function() {
+    return function () {
       const args = arguments;
       const context = this;
       if (!inThrottle) {
         func.apply(context, args);
         inThrottle = true;
-        setTimeout(() => inThrottle = false, limit);
+        setTimeout(() => (inThrottle = false), limit);
       }
     };
   }
@@ -124,7 +149,7 @@ class PerformanceUtils {
    */
   static memoize(fn) {
     const cache = new Map();
-    return function(...args) {
+    return function (...args) {
       const key = JSON.stringify(args);
       if (cache.has(key)) {
         return cache.get(key);
@@ -156,16 +181,13 @@ class PerformanceUtils {
    * Batch process items with concurrency control
    */
   static async batchProcess(items, processor, options = {}) {
-    const {
-      batchSize = 10,
-      delay = 0
-    } = options;
+    const { batchSize = 10, delay = 0 } = options;
 
     const results = [];
-    
+
     for (let i = 0; i < items.length; i += batchSize) {
       const batch = items.slice(i, i + batchSize);
-      
+
       const batchPromises = batch.map(async (item, index) => {
         if (delay && index > 0) {
           await new Promise(resolve => setTimeout(resolve, delay));
@@ -195,11 +217,11 @@ class PerformanceUtils {
   static getMemoryUsage() {
     const used = process.memoryUsage();
     return {
-      rss: Math.round(used.rss / 1024 / 1024 * 100) / 100,
-      heapTotal: Math.round(used.heapTotal / 1024 / 1024 * 100) / 100,
-      heapUsed: Math.round(used.heapUsed / 1024 / 1024 * 100) / 100,
-      external: Math.round(used.external / 1024 / 1024 * 100) / 100,
-      arrayBuffers: Math.round(used.arrayBuffers / 1024 / 1024 * 100) / 100
+      rss: Math.round((used.rss / 1024 / 1024) * 100) / 100,
+      heapTotal: Math.round((used.heapTotal / 1024 / 1024) * 100) / 100,
+      heapUsed: Math.round((used.heapUsed / 1024 / 1024) * 100) / 100,
+      external: Math.round((used.external / 1024 / 1024) * 100) / 100,
+      arrayBuffers: Math.round((used.arrayBuffers / 1024 / 1024) * 100) / 100,
     };
   }
 
@@ -209,42 +231,48 @@ class PerformanceUtils {
   static optimizeDiffProcessing(diff, options = {}) {
     const {
       maxDiffSize = 50000, // 50KB
-      maxLineLength = 500
+      maxLineLength = 500,
     } = options;
 
     if (diff.length > maxDiffSize) {
       // For very large diffs, we need to optimize processing
       const lines = diff.split('\n');
       const processedLines = [];
-      
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        
+
         // Preserve diff headers and context markers
-        if (line.startsWith('diff --git') || 
-            line.startsWith('index ') || 
-            line.startsWith('---') || 
-            line.startsWith('+++') || 
-            line.startsWith('@@')) {
+        if (
+          line.startsWith('diff --git') ||
+          line.startsWith('index ') ||
+          line.startsWith('---') ||
+          line.startsWith('+++') ||
+          line.startsWith('@@')
+        ) {
           processedLines.push(line);
           continue;
         }
-        
+
         // Truncate very long lines
         if (line.length > maxLineLength) {
-          processedLines.push(`${line.substring(0, maxLineLength)  }...[truncated]`);
+          processedLines.push(`${line.substring(0, maxLineLength)}...[truncated]`);
           continue;
         }
-        
+
         // Keep code changes but limit context
         if (line.startsWith('+') || line.startsWith('-')) {
           processedLines.push(line);
         } else if (line.startsWith(' ')) {
           // Only keep context lines around changes
-          const hasNearbyChange = 
-            (i > 0 && lines[i - 1] && (lines[i - 1].startsWith('+') || lines[i - 1].startsWith('-'))) ||
-            (i < lines.length - 1 && lines[i + 1] && (lines[i + 1].startsWith('+') || lines[i + 1].startsWith('-')));
-          
+          const hasNearbyChange =
+            (i > 0 &&
+              lines[i - 1] &&
+              (lines[i - 1].startsWith('+') || lines[i - 1].startsWith('-'))) ||
+            (i < lines.length - 1 &&
+              lines[i + 1] &&
+              (lines[i + 1].startsWith('+') || lines[i + 1].startsWith('-')));
+
           if (hasNearbyChange) {
             processedLines.push(line);
           }
@@ -252,10 +280,10 @@ class PerformanceUtils {
           processedLines.push(line);
         }
       }
-      
+
       return processedLines.join('\n');
     }
-    
+
     return diff;
   }
 }

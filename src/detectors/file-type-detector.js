@@ -47,26 +47,15 @@ const EXT_TO_LANGUAGE = {
   '.less': 'css',
   '.html': 'html',
   '.svelte': 'svelte',
-  '.vue': 'vue'
+  '.vue': 'vue',
 };
 
 /** Framework detection patterns */
 const FRAMEWORK_PATTERNS = {
-  react: [
-    /import\s+.*?\s+from\s+['"]react['"]/,
-    /require\s*\(\s*['"]react['"]\s*\)/
-  ],
-  angular: [
-    /@angular\/core/
-  ],
-  nextjs: [
-    /from\s+['"]next(?:\/|['"])/,
-    /require\s*\(\s*['"]next(?:\/|['"])\s*\)/
-  ],
-  express: [
-    /express\s*\(\s*\)/,
-    /require\s*\(\s*['"]express['"]\s*\)/
-  ]
+  react: [/import\s+.*?\s+from\s+['"]react['"]/, /require\s*\(\s*['"]react['"]\s*\)/],
+  angular: [/@angular\/core/],
+  nextjs: [/from\s+['"]next(?:\/|['"])/, /require\s*\(\s*['"]next(?:\/|['"])\s*\)/],
+  express: [/express\s*\(\s*\)/, /require\s*\(\s*['"]express['"]\s*\)/],
 };
 
 class FileTypeDetector {
@@ -182,8 +171,12 @@ class FileTypeDetector {
   detectBatch(filePaths, contents = null) {
     const files = [];
     const countByType = {
-      source: 0, test: 0, config: 0,
-      docs: 0, asset: 0, other: 0
+      source: 0,
+      test: 0,
+      config: 0,
+      docs: 0,
+      asset: 0,
+      other: 0,
     };
     const countByLanguage = {};
     const frameworksDetected = new Set();
@@ -194,7 +187,7 @@ class FileTypeDetector {
 
       files.push({
         path: filePath,
-        ...result
+        ...result,
       });
 
       // Aggregate counts
@@ -215,8 +208,8 @@ class FileTypeDetector {
         totalFiles: files.length,
         countByType,
         countByLanguage,
-        frameworksDetected: Array.from(frameworksDetected).sort()
-      }
+        frameworksDetected: Array.from(frameworksDetected).sort(),
+      },
     };
   }
 }

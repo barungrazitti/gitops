@@ -48,7 +48,7 @@ class MessageFormatter {
 
     const type = options.type || this.inferType(message);
     const scope = options.scope || this.inferScope(message, options.context);
-    let conventional = type + (scope ? `(${scope})` : '') + ': ';
+    const conventional = type + (scope ? `(${scope})` : '') + ': ';
     return conventional + this.cleanDescription(message);
   }
 
@@ -125,8 +125,7 @@ class MessageFormatter {
     if (title.length > 72) {
       const truncated = title.substring(0, 72);
       const lastSpace = truncated.lastIndexOf(' ');
-      formattedTitle =
-        lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated;
+      formattedTitle = lastSpace > 40 ? truncated.substring(0, lastSpace) : truncated;
     }
     return body ? formattedTitle + '\n\n' + body : formattedTitle;
   }
@@ -145,8 +144,8 @@ class MessageFormatter {
    * Validate commit message
    */
   validate(message, options = {}) {
-    const errors = [],
-      warnings = [];
+    const errors = [];
+    const warnings = [];
     if (!message || typeof message !== 'string') {
       errors.push('Message is required');
       return { valid: false, errors, warnings };
@@ -154,15 +153,11 @@ class MessageFormatter {
     const trimmed = message.trim();
     const title = trimmed.split('\n')[0];
     if (title.length === 0) errors.push('Title cannot be empty');
-    else if (title.length > 72)
-      warnings.push('Title should be 72 characters or less');
+    else if (title.length > 72) warnings.push('Title should be 72 characters or less');
     if (options.conventional && !this.isConventionalFormat(title)) {
-      errors.push(
-        'Conventional commit format required: type(scope): description'
-      );
+      errors.push('Conventional commit format required: type(scope): description');
     }
-    if (title.endsWith('.'))
-      warnings.push('Title should not end with a period');
+    if (title.endsWith('.')) warnings.push('Title should not end with a period');
     return { valid: errors.length === 0, errors, warnings };
   }
 
@@ -185,7 +180,7 @@ class MessageFormatter {
       /^(\w+)(\(.+\))?: .+/,
       /^(add|fix|remove|update|create|delete|implement|refactor)/i,
     ];
-    return valid.some((p) => p.test(trimmed));
+    return valid.some(p => p.test(trimmed));
   }
 
   /**
@@ -195,20 +190,11 @@ class MessageFormatter {
     let score = 50;
     const trimmed = message.toLowerCase().trim();
     if (/^\w+\(\w+\):/.test(message)) score += 15;
-    const actions = [
-      'add',
-      'fix',
-      'remove',
-      'update',
-      'improve',
-      'optimize',
-      'refactor',
-    ];
-    if (actions.some((w) => trimmed.includes(w))) score += 10;
-    if (/\((auth|api|ui|db|config|theme|plugin|utils|test)\)/.test(message))
-      score += 10;
+    const actions = ['add', 'fix', 'remove', 'update', 'improve', 'optimize', 'refactor'];
+    if (actions.some(w => trimmed.includes(w))) score += 10;
+    if (/\((auth|api|ui|db|config|theme|plugin|utils|test)\)/.test(message)) score += 10;
     const vague = ['update', 'change', 'modify', 'improve'];
-    score -= vague.filter((t) => trimmed.includes(t)).length * 5;
+    score -= vague.filter(t => trimmed.includes(t)).length * 5;
     return Math.max(0, Math.min(100, score));
   }
 }

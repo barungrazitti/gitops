@@ -72,7 +72,9 @@ describe('GitManager', () => {
     it('should handle validation errors', async () => {
       mockGit.checkIsRepo.mockRejectedValue(new Error('Git error'));
 
-      await expect(gitManager.validateRepository()).rejects.toThrow('Git repository validation failed');
+      await expect(gitManager.validateRepository()).rejects.toThrow(
+        'Git repository validation failed'
+      );
     });
   });
 
@@ -102,7 +104,13 @@ describe('GitManager', () => {
     it('should get commit history with default limit', async () => {
       mockGit.log.mockResolvedValue({
         all: [
-          { hash: 'abc', message: 'test commit', author_name: 'test', date: '2024-01-01', refs: 'HEAD -> main' },
+          {
+            hash: 'abc',
+            message: 'test commit',
+            author_name: 'test',
+            date: '2024-01-01',
+            refs: 'HEAD -> main',
+          },
         ],
       });
 
@@ -199,7 +207,9 @@ describe('GitManager', () => {
 
   describe('getRepositoryInfo', () => {
     it('should get repository information', async () => {
-      mockGit.getRemotes.mockResolvedValue([{ name: 'origin', refs: { fetch: 'https://github.com/test/repo.git' } }]);
+      mockGit.getRemotes.mockResolvedValue([
+        { name: 'origin', refs: { fetch: 'https://github.com/test/repo.git' } },
+      ]);
 
       const result = await gitManager.getRepositoryInfo();
 
@@ -214,8 +224,20 @@ describe('GitManager', () => {
     it('should analyze commit patterns', async () => {
       mockGit.log.mockResolvedValue({
         all: [
-          { hash: 'abc', message: 'feat: add feature', author_name: 'test', date: '2024-01-01', refs: '' },
-          { hash: 'def', message: 'fix: bug fix', author_name: 'test', date: '2024-01-02', refs: '' },
+          {
+            hash: 'abc',
+            message: 'feat: add feature',
+            author_name: 'test',
+            date: '2024-01-01',
+            refs: '',
+          },
+          {
+            hash: 'def',
+            message: 'fix: bug fix',
+            author_name: 'test',
+            date: '2024-01-02',
+            refs: '',
+          },
         ],
       });
 

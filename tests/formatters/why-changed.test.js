@@ -20,7 +20,7 @@ describe('WhyChangedFormatter', () => {
     it('should detect bug fix motivation', () => {
       const context = {};
       const result = formatter.format(context, 'Fix login crash on invalid credentials');
-      
+
       expect(result).toContain('Why:');
       expect(result.toLowerCase()).toMatch(/fix|bug|issue|error/);
     });
@@ -28,7 +28,7 @@ describe('WhyChangedFormatter', () => {
     it('should detect feature motivation', () => {
       const context = {};
       const result = formatter.format(context, 'Add new user dashboard');
-      
+
       expect(result).toContain('Why:');
       expect(result.toLowerCase()).toMatch(/add|new|feature|functionality/);
     });
@@ -36,7 +36,7 @@ describe('WhyChangedFormatter', () => {
     it('should detect refactor motivation', () => {
       const context = {};
       const result = formatter.format(context, 'Refactor authentication module');
-      
+
       expect(result).toMatch(/Why:|Why \(inferred\):/);
       expect(result.toLowerCase()).toMatch(/refactor|improve|optimize/);
     });
@@ -44,7 +44,7 @@ describe('WhyChangedFormatter', () => {
     it('should detect docs motivation', () => {
       const context = {};
       const result = formatter.format(context, 'Add documentation for API endpoints');
-      
+
       expect(result).toContain('Why:');
       expect(result.toLowerCase()).toMatch(/doc|guide|document/);
     });
@@ -52,7 +52,7 @@ describe('WhyChangedFormatter', () => {
     it('should detect performance motivation', () => {
       const context = {};
       const result = formatter.format(context, 'Optimize database queries for faster loading');
-      
+
       expect(result).toContain('Why:');
       expect(result.toLowerCase()).toMatch(/performance|optimize|speed/);
     });
@@ -60,11 +60,11 @@ describe('WhyChangedFormatter', () => {
     it('should use convention context to boost detection', () => {
       const context = {
         conventions: {
-          commitType: 'fix'
-        }
+          commitType: 'fix',
+        },
       };
       const result = formatter.format(context, 'Resolve issue with session');
-      
+
       expect(result).toContain('Why:');
     });
 
@@ -72,19 +72,19 @@ describe('WhyChangedFormatter', () => {
       const context = {
         files: {
           types: {
-            'test.js': 5
-          }
-        }
+            'test.js': 5,
+          },
+        },
       };
       const result = formatter.format(context, 'Add tests for auth');
-      
+
       expect(result).toContain('Why:');
     });
 
     it('should handle low confidence with indicator', () => {
       const context = {};
       const result = formatter.format(context, 'Update some stuff');
-      
+
       // Low confidence should show indicator
       expect(result).toMatch(/(Why:|Why \(inferred\):)/);
     });
@@ -92,7 +92,7 @@ describe('WhyChangedFormatter', () => {
     it('should format generic why for fix messages', () => {
       const context = {};
       const result = formatter.format(context, 'Fix the bug');
-      
+
       expect(result).toContain('Why:');
       expect(result).toMatch(/fix|issue|bug/i);
     });
@@ -100,7 +100,7 @@ describe('WhyChangedFormatter', () => {
     it('should format generic why for add messages', () => {
       const context = {};
       const result = formatter.format(context, 'Add new feature');
-      
+
       expect(result).toContain('Why:');
       expect(result).toMatch(/new|functionality/i);
     });
@@ -108,7 +108,7 @@ describe('WhyChangedFormatter', () => {
     it('should format generic why for update messages', () => {
       const context = {};
       const result = formatter.format(context, 'Update dependencies');
-      
+
       expect(result).toMatch(/Why:|Why \(inferred\):/);
       expect(result).toMatch(/update|modify|dependencies/i);
     });
@@ -174,8 +174,8 @@ describe('WhyChangedFormatter', () => {
     it('should extract component from context', () => {
       const context = {
         components: {
-          packages: ['@myapp/auth']
-        }
+          packages: ['@myapp/auth'],
+        },
       };
       expect(formatter._extractComponent(context)).toBe('@myapp/auth');
     });

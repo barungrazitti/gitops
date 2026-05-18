@@ -57,10 +57,7 @@ class EfficientPromptBuilder {
     options.diffCategory = diffCategory;
 
     // Add most relevant context (prioritized) - must be before small/large diff handling
-    const relevantContext = this.extractRelevantContext(
-      context,
-      changeAnalysis
-    );
+    const relevantContext = this.extractRelevantContext(context, changeAnalysis);
 
     // Extract entities for small diffs
     if (diffCategory.category === 'small') {
@@ -85,9 +82,7 @@ class EfficientPromptBuilder {
       const chunks = this.diffProcessor.processDiffWithStrategy(diff);
       const processingAnalysis = this.diffProcessor.analyzeDiff(diff);
 
-      console.log(
-        `Chunking strategy: ${processingAnalysis.processingStrategy}`
-      );
+      console.log(`Chunking strategy: ${processingAnalysis.processingStrategy}`);
 
       // Extract file chunks and summarize
       const fileChunks = this.diffSummarizer.extractFileChunks(diff);
@@ -95,10 +90,7 @@ class EfficientPromptBuilder {
         this.diffSummarizer.summarizeChunk(chunk, index, fileChunks.length)
       );
 
-      const combined = this.diffSummarizer.combineSummaries(
-        summaries,
-        conventional
-      );
+      const combined = this.diffSummarizer.combineSummaries(summaries, conventional);
 
       options.chunkSummaries = summaries;
       options.combinedSummary = combined;
@@ -267,29 +259,19 @@ Single best commit message:`;
       const limitedDiff = this.limitContextLines(diff, 3);
       options.truncatedDiff = limitedDiff;
       // Replace diff in prompt with limited version
-      prompt = prompt.replace(
-        /```diff\n[\s\S]*?```/,
-        `\`\`\`diff\n${limitedDiff}\n\`\`\``
-      );
+      prompt = prompt.replace(/```diff\n[\s\S]*?```/, `\`\`\`diff\n${limitedDiff}\n\`\`\``);
 
       // Add single-line change highlighting
       if (this.isSingleLineChange(diff)) {
         const highlighted = this.highlightSingleLine(diff);
-        const singleLinePrompt =
-          PromptTemplates.buildSingleLineChangePrompt(highlighted);
+        const singleLinePrompt = PromptTemplates.buildSingleLineChangePrompt(highlighted);
         prompt += '\n\n' + singleLinePrompt;
       }
     }
 
     // Compress if still too long
     if (this.tokenCounter.countTokens(prompt) > this.maxPromptLength) {
-      prompt = this.compressPrompt(
-        prompt,
-        diff,
-        count,
-        conventional,
-        isWordPressFile
-      );
+      prompt = this.compressPrompt(prompt, diff, count, conventional, isWordPressFile);
     }
 
     return prompt;
@@ -409,24 +391,17 @@ Single best commit message:`;
       return '';
     }
 
-    const summaryTexts = summaries.map((s) => {
+    const summaryTexts = summaries.map(s => {
       if (s.keyChanges && s.keyChanges.length > 0) {
         return `${s.fileName}: ${s.keyChanges.slice(0, 2).join('; ')}`;
       }
-      if (
-        s.entities &&
-        s.entities.functions &&
-        s.entities.functions.length > 0
-      ) {
+      if (s.entities && s.entities.functions && s.entities.functions.length > 0) {
         return `${s.fileName}: ${s.entities.functions.slice(0, 2).join(', ')}`;
       }
       return `${s.fileName}: No specific changes`;
     });
 
-    const prompt = PromptTemplates.buildCombineSummariesPrompt(
-      summaryTexts,
-      conventional
-    );
+    const prompt = PromptTemplates.buildCombineSummariesPrompt(summaryTexts, conventional);
     return prompt;
   }
 
@@ -447,21 +422,13 @@ Single best commit message:`;
 
     // Mixed language detection (PHP + HTML + JS)
     const hasMixedLanguages =
-      /<\?php/.test(diff) &&
-      /<[^>]+>/.test(diff) &&
-      /function|var|let|const/.test(diff);
+      /<\?php/.test(diff) && /<[^>]+>/.test(diff) && /function|var|let|const/.test(diff);
 
     // Repetitive pattern detection (like banner arrays)
     const hasRepetitivePatterns =
-      /(array|data)\s*=\s*\[.*?\]/s.test(diff) &&
-      (diff.match(/['"][^'"]*['"]/g) || []).length > 10;
+      /(array|data)\s*=\s*\[.*?\]/s.test(diff) && (diff.match(/['"][^'"]*['"]/g) || []).length > 10;
 
-    return (
-      isLargeDiff ||
-      isWordPressTheme ||
-      hasMixedLanguages ||
-      hasRepetitivePatterns
-    );
+    return isLargeDiff || isWordPressTheme || hasMixedLanguages || hasRepetitivePatterns;
   }
 
   /**
@@ -494,7 +461,7 @@ Single best commit message:`;
     ];
 
     return (
-      wordpressPatterns.some((pattern) => pattern.test(diff)) ||
+      wordpressPatterns.some(pattern => pattern.test(diff)) ||
       context?.project?.primary === 'wordpress' ||
       context?.files?.wordpress?.isWordPress
     );
@@ -503,11 +470,7 @@ Single best commit message:`;
   /**
    * Build enhanced instructions for problematic cases
    */
-  buildEnhancedInstructions(
-    isProblematicCase,
-    isWordPressFile,
-    promptInstructions
-  ) {
+  buildEnhancedInstructions(isProblematicCase, isWordPressFile, promptInstructions) {
     let instructions = '\n\nCRITICAL INSTRUCTIONS:';
 
     if (promptInstructions) {
@@ -645,10 +608,7 @@ REQUIREMENTS:
       }
 
       // PHP function changes are important
-      if (
-        line.startsWith('+') &&
-        /function\s+\w+|add_action|add_filter|add_shortcode/.test(line)
-      ) {
+      if (line.startsWith('+') && /function\s+\w+|add_action|add_filter|add_shortcode/.test(line)) {
         inImportantSection = true;
         result.push(line);
         continue;
@@ -666,10 +626,7 @@ REQUIREMENTS:
       }
 
       // Skip repetitive HTML/template content
-      if (
-        line.startsWith('+') &&
-        /<div|<span|<p|<h[1-6]|class=|id=/.test(line)
-      ) {
+      if (line.startsWith('+') && /<div|<span|<p|<h[1-6]|class=|id=/.test(line)) {
         // Only keep every 3rd HTML line to reduce noise
         if (Math.random() < 0.3) {
           result.push(line);
@@ -819,31 +776,25 @@ ${this.buildPrompt(diff, options)}`;
 
     // Breaking changes detection
     impact.breaking =
-      /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(
-        lowerDiff
-      );
+      /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(lowerDiff);
 
     // User-facing changes
     impact.userFacing =
-      /ui|component|view|template|style|css|user.*interface|frontend/i.test(
-        lowerDiff
-      ) ||
+      /ui|component|view|template|style|css|user.*interface|frontend/i.test(lowerDiff) ||
       context?.files?.fileTypes?.jsx > 0 ||
       context?.files?.fileTypes?.tsx > 0 ||
       context?.files?.fileTypes?.vue > 0 ||
       context?.files?.fileTypes?.html > 0;
 
     // Performance changes
-    impact.performance =
-      /performance|optimize|cache|memo|lazy|async|await|promise/i.test(
-        lowerDiff
-      );
+    impact.performance = /performance|optimize|cache|memo|lazy|async|await|promise/i.test(
+      lowerDiff
+    );
 
     // Security changes
-    impact.security =
-      /security|auth|token|password|encrypt|decrypt|hash|validation|sanitize/i.test(
-        lowerDiff
-      );
+    impact.security = /security|auth|token|password|encrypt|decrypt|hash|validation|sanitize/i.test(
+      lowerDiff
+    );
 
     // Dependency changes
     impact.dependency =
@@ -916,10 +867,7 @@ ${this.buildPrompt(diff, options)}`;
 
     // Most relevant file types based on change type
     if (context.files?.fileTypes) {
-      const relevantTypes = this.getRelevantFileTypes(
-        context.files.fileTypes,
-        changeAnalysis
-      );
+      const relevantTypes = this.getRelevantFileTypes(context.files.fileTypes, changeAnalysis);
       if (relevantTypes.length > 0) {
         contextParts.push(relevantTypes.join(', '));
       }
@@ -934,14 +882,10 @@ ${this.buildPrompt(diff, options)}`;
         keyInfo.push(`new: ${semantic.functions.slice(0, 2).join(', ')}`);
       }
       if (semantic.components?.length > 0) {
-        keyInfo.push(
-          `components: ${semantic.components.slice(0, 2).join(', ')}`
-        );
+        keyInfo.push(`components: ${semantic.components.slice(0, 2).join(', ')}`);
       }
       if (semantic.wordpress_hooks?.length > 0) {
-        keyInfo.push(
-          `hooks: ${semantic.wordpress_hooks.slice(0, 2).join(', ')}`
-        );
+        keyInfo.push(`hooks: ${semantic.wordpress_hooks.slice(0, 2).join(', ')}`);
       }
 
       if (keyInfo.length > 0) {
@@ -969,8 +913,7 @@ ${this.buildPrompt(diff, options)}`;
       refactor: ['js', 'ts', 'py', 'php', 'java'],
     };
 
-    const priorities =
-      typePriorities[changeAnalysis.type] || Object.keys(fileTypes);
+    const priorities = typePriorities[changeAnalysis.type] || Object.keys(fileTypes);
 
     for (const type of priorities) {
       if (fileTypes[type] > 0) {
@@ -1005,9 +948,7 @@ ${this.buildPrompt(diff, options)}`;
       case 'perf':
         examples.push('perf(database): optimize query with index');
         if (context?.project?.primary === 'wordpress') {
-          examples.push(
-            'perf(theme): change sort order for better performance'
-          );
+          examples.push('perf(theme): change sort order for better performance');
         }
         break;
       case 'refactor':
@@ -1056,56 +997,26 @@ ${this.buildPrompt(diff, options)}`;
     const hasChanges = /^[\+\-][^\+\-]/m.test(diff);
     if (hasFileHeaders && !hasChanges) {
       const isNew =
-        /new file mode|mode:/m.test(diff) &&
-        !/deleted file mode|mode: 000000/m.test(diff);
+        /new file mode|mode:/m.test(diff) && !/deleted file mode|mode: 000000/m.test(diff);
       const isDeleted = /deleted file mode|mode: 000000/m.test(diff);
       analysis.type = 'binary';
       analysis.confidence = 0.9;
-      analysis.keywords = [
-        'binary',
-        isNew ? 'added' : isDeleted ? 'removed' : 'changed',
-      ];
+      analysis.keywords = ['binary', isNew ? 'added' : isDeleted ? 'removed' : 'changed'];
       return analysis;
     }
 
     // Look for specific patterns that indicate change type
     const patterns = {
       test: {
-        keywords: [
-          'test',
-          'spec',
-          'describe',
-          'it',
-          'expect',
-          'assert',
-          'jest',
-          'mocha',
-        ],
+        keywords: ['test', 'spec', 'describe', 'it', 'expect', 'assert', 'jest', 'mocha'],
         regex: /test|spec|describe|it\(|expect|assert|coverage/i,
       },
       perf: {
-        keywords: [
-          'perf',
-          'performance',
-          'optimize',
-          'cache',
-          'memo',
-          'speed',
-          'fast',
-        ],
-        regex:
-          /performance|optimize|cache|lazy|memo|speed|fast|efficien|bottleneck/i,
+        keywords: ['perf', 'performance', 'optimize', 'cache', 'memo', 'speed', 'fast'],
+        regex: /performance|optimize|cache|lazy|memo|speed|fast|efficien|bottleneck/i,
       },
       fix: {
-        keywords: [
-          'fix',
-          'bug',
-          'error',
-          'issue',
-          'problem',
-          'resolve',
-          'correct',
-        ],
+        keywords: ['fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'correct'],
         regex: /fix|bug|error|issue|problem|resolve|correct|patch|resolve/i,
       },
       feat: {
@@ -1113,16 +1024,8 @@ ${this.buildPrompt(diff, options)}`;
         regex: /add|new|implement|feature|create|introduce|enhance/i,
       },
       refactor: {
-        keywords: [
-          'refactor',
-          'restructure',
-          'reorganize',
-          'clean',
-          'improve',
-          'move',
-        ],
-        regex:
-          /refactor|restructure|reorganize|clean|improve|reorganize|restructure/i,
+        keywords: ['refactor', 'restructure', 'reorganize', 'clean', 'improve', 'move'],
+        regex: /refactor|restructure|reorganize|clean|improve|reorganize|restructure/i,
       },
       docs: {
         keywords: ['doc', 'readme', 'comment', 'documentation', 'guide'],
@@ -1149,9 +1052,7 @@ ${this.buildPrompt(diff, options)}`;
 
       // Score based on keyword occurrences
       for (const keyword of pattern.keywords) {
-        const keywordMatches = lowerDiff.match(
-          new RegExp(`\\b${keyword}\\b`, 'gi')
-        );
+        const keywordMatches = lowerDiff.match(new RegExp(`\\b${keyword}\\b`, 'gi'));
         if (keywordMatches) {
           score += keywordMatches.length;
         }

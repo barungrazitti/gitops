@@ -52,11 +52,13 @@ class CacheManager {
       .filter(line => {
         const trimmed = line.substring(1).trim();
         // Focus on actual code changes, not context
-        return (line.startsWith('+') || line.startsWith('-')) &&
-               trimmed.length > 3 &&
-               !trimmed.startsWith('//') &&
-               !trimmed.startsWith('*') &&
-               !trimmed.startsWith('*/');
+        return (
+          (line.startsWith('+') || line.startsWith('-')) &&
+          trimmed.length > 3 &&
+          !trimmed.startsWith('//') &&
+          !trimmed.startsWith('*') &&
+          !trimmed.startsWith('*/')
+        );
       })
       .map(line => line.substring(1).trim())
       .join('|');
@@ -69,7 +71,10 @@ class CacheManager {
    */
   extractStructuralFingerprint(diff) {
     const files = diff.match(/\+\+\+ b\/(.+)/g) || [];
-    const fileNames = files.map(f => f.replace('+++ b/', '').trim()).sort().join(',');
+    const fileNames = files
+      .map(f => f.replace('+++ b/', '').trim())
+      .sort()
+      .join(',');
     return crypto.createHash('md5').update(fileNames).digest('hex').substring(0, 16);
   }
 
@@ -86,10 +91,9 @@ class CacheManager {
         // Validate semantic similarity before returning
         if (this.validateSemanticSimilarity(diff, cached.diff || '')) {
           return cached.messages;
-        } 
-          // Remove invalid cache entry
-          this.memoryCache.del(key);
-        
+        }
+        // Remove invalid cache entry
+        this.memoryCache.del(key);
       }
 
       // Try persistent cache
@@ -99,16 +103,16 @@ class CacheManager {
 
         // Check if cache is still valid
         const now = Date.now();
-        if (now - cacheData.timestamp < 86400000) { // 24 hours
+        if (now - cacheData.timestamp < 86400000) {
+          // 24 hours
           // Validate semantic similarity
           if (this.validateSemanticSimilarity(diff, cacheData.diff || '')) {
             // Add to memory cache for faster access
             this.memoryCache.set(key, cacheData);
             return cacheData.messages;
-          } 
-            // Remove invalid cache file
-            await fs.remove(cacheFile);
-          
+          }
+          // Remove invalid cache file
+          await fs.remove(cacheFile);
         } else {
           // Remove expired cache file
           await fs.remove(cacheFile);
@@ -151,7 +155,7 @@ class CacheManager {
    * Truncate diff for storage (keep more content for debugging)
    */
   truncateDiff(diff) {
-    return diff.length > 2000 ? `${diff.substring(0, 2000)  }...` : diff;
+    return diff.length > 2000 ? `${diff.substring(0, 2000)}...` : diff;
   }
 
   /**
@@ -161,7 +165,7 @@ class CacheManager {
     try {
       const key = this.generateKey(diff);
       this.memoryCache.del(key);
-      
+
       const cacheFile = path.join(this.cacheDir, `${key}.json`);
       if (await fs.pathExists(cacheFile)) {
         await fs.remove(cacheFile);
@@ -182,9 +186,7 @@ class CacheManager {
       // Clear persistent cache
       if (await fs.pathExists(this.cacheDir)) {
         const files = await fs.readdir(this.cacheDir);
-        await Promise.all(
-          files.map((file) => fs.remove(path.join(this.cacheDir, file)))
-        );
+        await Promise.all(files.map(file => fs.remove(path.join(this.cacheDir, file))));
       }
     } catch (error) {
       console.warn('Cache clear error:', error.message);
@@ -254,7 +256,10 @@ class CacheManager {
           const filePath = path.join(this.cacheDir, file);
           try {
             const cacheData = await fs.readJson(filePath);
-            if (cacheData.diff && this.validateSemanticSimilarity(targetDiff, cacheData.diff, threshold)) {
+            if (
+              cacheData.diff &&
+              this.validateSemanticSimilarity(targetDiff, cacheData.diff, threshold)
+            ) {
               return file.replace('.json', '');
             }
           } catch (error) {
@@ -334,13 +339,15 @@ class CacheManager {
     return lines
       .filter(line => {
         const trimmed = line.substring(1).trim();
-        return (line.startsWith('+') || line.startsWith('-')) &&
-               trimmed.length > 3 &&
-               !trimmed.startsWith('//') &&
-               !trimmed.startsWith('*') &&
-               !trimmed.startsWith('*/') &&
-               !trimmed.match(/^\/\/\s*$/) &&
-               !trimmed.match(/^\/\*.*\*\/$/);
+        return (
+          (line.startsWith('+') || line.startsWith('-')) &&
+          trimmed.length > 3 &&
+          !trimmed.startsWith('//') &&
+          !trimmed.startsWith('*') &&
+          !trimmed.startsWith('*/') &&
+          !trimmed.match(/^\/\/\s*$/) &&
+          !trimmed.match(/^\/\*.*\*\/$/)
+        );
       })
       .map(line => line.substring(1).trim().toLowerCase());
   }
@@ -384,15 +391,16 @@ class CacheManager {
         keys: memoryStats.keys,
         hits: memoryStats.hits,
         misses: memoryStats.misses,
-        hitRate: memoryStats.hits + memoryStats.misses > 0
-          ? (memoryStats.hits / (memoryStats.hits + memoryStats.misses)) * 100
-          : 0
+        hitRate:
+          memoryStats.hits + memoryStats.misses > 0
+            ? (memoryStats.hits / (memoryStats.hits + memoryStats.misses)) * 100
+            : 0,
       },
       persistent: {
         directory: this.cacheDir,
-        fileCount: persistentCount
+        fileCount: persistentCount,
       },
-      totalSize: memoryStats.keys + persistentCount
+      totalSize: memoryStats.keys + persistentCount,
     };
   }
 }

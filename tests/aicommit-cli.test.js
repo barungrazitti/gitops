@@ -9,13 +9,15 @@ const mockSetup = jest.fn();
 const mockHook = jest.fn();
 const mockStats = jest.fn();
 
-jest.mock('../src/index.js', () => jest.fn().mockImplementation(() => ({
-      generate: mockGenerate,
-      config: mockConfig,
-      setup: mockSetup,
-      hook: mockHook,
-      stats: mockStats,
-    })));
+jest.mock('../src/index.js', () =>
+  jest.fn().mockImplementation(() => ({
+    generate: mockGenerate,
+    config: mockConfig,
+    setup: mockSetup,
+    hook: mockHook,
+    stats: mockStats,
+  }))
+);
 
 // Import the handlers after the mock is set up
 const {
@@ -27,7 +29,6 @@ const {
 } = require('../bin/aicommit.js');
 
 describe('aicommit CLI Action Handlers', () => {
-
   beforeEach(() => {
     // Clear all mocks before each test
     mockGenerate.mockClear();

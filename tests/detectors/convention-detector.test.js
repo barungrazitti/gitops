@@ -12,9 +12,9 @@ jest.mock('fs-extra', () => {
     existsSync: jest.fn().mockReturnValue(false),
     readdirSync: jest.fn().mockReturnValue([]),
     statSync: jest.fn().mockImplementation(() => ({
-      isDirectory: () => false
+      isDirectory: () => false,
     })),
-    readFileSync: jest.fn().mockReturnValue('')
+    readFileSync: jest.fn().mockReturnValue(''),
   };
 });
 
@@ -33,14 +33,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('src')) {
           return ['getUser.js', 'setUser.js', 'deleteUser.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
 
       const result = detector.analyze();
@@ -52,14 +52,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('src')) {
           return ['get_user.py', 'set_user.py', 'delete_user.py'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
 
       const result = detector.analyze();
@@ -71,14 +71,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('src')) {
           return ['get-user.js', 'set-user.js', 'delete-user.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
 
       const result = detector.analyze();
@@ -90,14 +90,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('src')) {
           return ['UserService.js', 'AuthService.js', 'PaymentService.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
 
       const result = detector.analyze();
@@ -109,14 +109,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('src')) {
           return ['getUser.js', 'get_user.py', 'get-user.js', 'UserService.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
 
       const result = detector.analyze();
@@ -130,7 +130,7 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('/src')) {
           return ['auth', 'payments', 'shared'];
         }
@@ -143,7 +143,7 @@ describe('ConventionDetector', () => {
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => true
+        isDirectory: () => true,
       }));
 
       const result = detector.analyze();
@@ -155,14 +155,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('/src')) {
           return ['controllers', 'models', 'views', 'services', 'utils'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => true
+        isDirectory: () => true,
       }));
 
       const result = detector.analyze();
@@ -174,14 +174,14 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('/src')) {
           return ['main.js', 'helper.js', 'config.js', 'utils.js'];
         }
         return [];
       });
-      fs.statSync.mockImplementation((filePath) => ({
-        isDirectory: () => false
+      fs.statSync.mockImplementation(filePath => ({
+        isDirectory: () => false,
       }));
 
       const result = detector.analyze();
@@ -195,16 +195,16 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('/src')) {
           return ['auth.js', 'utils.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
-      fs.readFileSync.mockImplementation((filePath) => {
+      fs.readFileSync.mockImplementation(filePath => {
         if (filePath.includes('auth.js')) {
           return "const utils = require('./utils');\nconst helper = require('../lib/helper');";
         }
@@ -220,16 +220,16 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('/src')) {
           return ['auth.js', 'utils.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
-      fs.readFileSync.mockImplementation((filePath) => {
+      fs.readFileSync.mockImplementation(filePath => {
         if (filePath.includes('auth.js')) {
           return "import { auth } from '@company/auth';\nimport { util } from '@company/utils';";
         }
@@ -245,16 +245,16 @@ describe('ConventionDetector', () => {
       const detector = new ConventionDetector(repoRoot);
 
       fs.existsSync.mockReturnValue(true);
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('/src')) {
           return ['auth.js', 'utils.js'];
         }
         return [];
       });
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => false
+        isDirectory: () => false,
       }));
-      fs.readFileSync.mockImplementation((filePath) => {
+      fs.readFileSync.mockImplementation(filePath => {
         if (filePath.includes('auth.js')) {
           return "const utils = require('./utils');\nimport { auth } from '@company/auth';";
         }
@@ -295,7 +295,7 @@ describe('ConventionDetector', () => {
       fs.existsSync.mockReturnValue(true);
       fs.readdirSync.mockReturnValue([]);
       fs.statSync.mockImplementation(() => ({
-        isDirectory: () => true
+        isDirectory: () => true,
       }));
 
       const result = detector.analyze();

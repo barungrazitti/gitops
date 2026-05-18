@@ -29,7 +29,7 @@ describe('EntityExtractor', () => {
     test('removes duplicates - same entity mentioned twice appears only once', () => {
       const diff = '+ function calculateTotal() {}\n+ const calculateTotal = 5';
       const result = extractor.extractEntities(diff);
-      const funcs = result.functions.filter((f) => f === 'calculateTotal');
+      const funcs = result.functions.filter(f => f === 'calculateTotal');
       expect(funcs).toHaveLength(1);
     });
 

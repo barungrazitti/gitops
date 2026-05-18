@@ -45,7 +45,7 @@ describe('MessageValidator', () => {
         'general improvements',
         'bug fix',
         'make changes',
-        'apply fixes'
+        'apply fixes',
       ];
 
       generic.forEach(msg => {
@@ -62,7 +62,7 @@ describe('MessageValidator', () => {
         'feat(auth): add JWT token validation',
         'refactor(api): extract user validation logic',
         'perf(cache): implement LRU eviction strategy',
-        'fix(utils): prevent null pointer in formatDate()'
+        'fix(utils): prevent null pointer in formatDate()',
       ];
 
       specific.forEach(msg => {
@@ -99,7 +99,7 @@ describe('MessageValidator', () => {
         'fix validation to prevent errors',
         'refactor auth module for better security',
         'update API to support new features',
-        'add logging because debugging is hard'
+        'add logging because debugging is hard',
       ];
 
       withReasoning.forEach(msg => {
@@ -113,19 +113,21 @@ describe('MessageValidator', () => {
         'add caching',
         'fix validation',
         'refactor auth module',
-        'update API'
+        'update API',
       ];
 
       withoutReasoning.forEach(msg => {
         const result = validator.validate(msg);
         expect(result.issues).toContain('no-reasoning');
-        expect(result.suggestions).toContain('Add why: "to fix X bug", "enables Y feature", "improves Z performance"');
+        expect(result.suggestions).toContain(
+          'Add why: "to fix X bug", "enables Y feature", "improves Z performance"'
+        );
       });
     });
 
     it('should check component scope when context provided', () => {
       const context = {
-        components: ['auth', 'api', 'utils']
+        components: ['auth', 'api', 'utils'],
       };
 
       const withScope = validator.validate('feat(auth): add login validation', context);
@@ -144,7 +146,8 @@ describe('MessageValidator', () => {
     });
 
     it('should warn about very long messages', () => {
-      const longMsg = 'add authentication and authorization and validation and logging and caching and monitoring and testing and documentation and configuration and deployment scripts and database migrations and api endpoints and user interfaces and backend services and frontend components and middleware layers and security protocols and performance optimizations and code refactoring and bug fixes and feature additions and documentation updates and test coverage improvements';
+      const longMsg =
+        'add authentication and authorization and validation and logging and caching and monitoring and testing and documentation and configuration and deployment scripts and database migrations and api endpoints and user interfaces and backend services and frontend components and middleware layers and security protocols and performance optimizations and code refactoring and bug fixes and feature additions and documentation updates and test coverage improvements';
       const result = validator.validate(longMsg);
 
       // Message over 50 words should trigger too-long
@@ -193,7 +196,7 @@ describe('MessageValidator', () => {
         'feat(auth): add JWT validation',
         'update code',
         'fix: resolve race condition in login',
-        'misc changes'
+        'misc changes',
       ];
 
       const result = validator.validateBatch(messages);
@@ -204,11 +207,7 @@ describe('MessageValidator', () => {
     });
 
     it('should track generic count', () => {
-      const messages = [
-        'update code',
-        'fix bug',
-        'feat(api): add endpoint'
-      ];
+      const messages = ['update code', 'fix bug', 'feat(api): add endpoint'];
 
       const result = validator.validateBatch(messages);
 
@@ -219,7 +218,7 @@ describe('MessageValidator', () => {
       const messages = [
         'add caching to improve performance',
         'fix validation to prevent errors',
-        'update code' // This one has no reasoning
+        'update code', // This one has no reasoning
       ];
 
       const result = validator.validateBatch(messages);
@@ -229,11 +228,7 @@ describe('MessageValidator', () => {
     });
 
     it('should calculate quality rate', () => {
-      const messages = [
-        'feat(auth): add validation',
-        'update code',
-        'fix: resolve issue'
-      ];
+      const messages = ['feat(auth): add validation', 'update code', 'fix: resolve issue'];
 
       const result = validator.validateBatch(messages);
 
@@ -248,17 +243,15 @@ describe('MessageValidator', () => {
           total: 100,
           genericCount: 4, // 4%
           withReasoning: 95,
-          validCount: 90
-        }
+          validCount: 90,
+        },
       };
 
       const result = validator.checkQualityThresholds(batchResult);
 
       expect(result.qual01Pass).toBe(true);
       expect(result.failures).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ requirement: 'QUAL-01' })
-        ])
+        expect.arrayContaining([expect.objectContaining({ requirement: 'QUAL-01' })])
       );
     });
 
@@ -268,8 +261,8 @@ describe('MessageValidator', () => {
           total: 100,
           genericCount: 6, // 6%
           withReasoning: 95,
-          validCount: 85
-        }
+          validCount: 85,
+        },
       };
 
       const result = validator.checkQualityThresholds(batchResult);
@@ -279,8 +272,8 @@ describe('MessageValidator', () => {
         expect.arrayContaining([
           expect.objectContaining({
             requirement: 'QUAL-01',
-            description: 'Too many generic messages'
-          })
+            description: 'Too many generic messages',
+          }),
         ])
       );
     });
@@ -291,17 +284,15 @@ describe('MessageValidator', () => {
           total: 100,
           genericCount: 3,
           withReasoning: 90, // 90%
-          validCount: 90
-        }
+          validCount: 90,
+        },
       };
 
       const result = validator.checkQualityThresholds(batchResult);
 
       expect(result.qual02Pass).toBe(true);
       expect(result.failures).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ requirement: 'QUAL-02' })
-        ])
+        expect.arrayContaining([expect.objectContaining({ requirement: 'QUAL-02' })])
       );
     });
 
@@ -311,8 +302,8 @@ describe('MessageValidator', () => {
           total: 100,
           genericCount: 3,
           withReasoning: 80, // 80%
-          validCount: 85
-        }
+          validCount: 85,
+        },
       };
 
       const result = validator.checkQualityThresholds(batchResult);
@@ -322,8 +313,8 @@ describe('MessageValidator', () => {
         expect.arrayContaining([
           expect.objectContaining({
             requirement: 'QUAL-02',
-            description: 'Insufficient reasoning in messages'
-          })
+            description: 'Insufficient reasoning in messages',
+          }),
         ])
       );
     });
@@ -334,8 +325,8 @@ describe('MessageValidator', () => {
           total: 0,
           genericCount: 0,
           withReasoning: 0,
-          validCount: 0
-        }
+          validCount: 0,
+        },
       };
 
       const result = validator.checkQualityThresholds(batchResult);
@@ -350,13 +341,19 @@ describe('MessageValidator', () => {
     it('should generate suggestions for generic messages', () => {
       const suggestions = validator.generateSuggestions(['generic']);
       expect(suggestions).toContain('Be more specific: mention function/class names changed');
-      expect(suggestions).toContain('Example: "fix AuthService token validation" instead of "fix bug"');
+      expect(suggestions).toContain(
+        'Example: "fix AuthService token validation" instead of "fix bug"'
+      );
     });
 
     it('should generate suggestions for missing reasoning', () => {
       const suggestions = validator.generateSuggestions(['no-reasoning']);
-      expect(suggestions).toContain('Add why: "to fix X bug", "enables Y feature", "improves Z performance"');
-      expect(suggestions).toContain('Example: "add caching to reduce API calls" instead of "add caching"');
+      expect(suggestions).toContain(
+        'Add why: "to fix X bug", "enables Y feature", "improves Z performance"'
+      );
+      expect(suggestions).toContain(
+        'Example: "add caching to reduce API calls" instead of "add caching"'
+      );
     });
 
     it('should generate suggestions for missing scope', () => {
@@ -383,33 +380,70 @@ describe('MessageValidator', () => {
 
   describe('checkRelevance()', () => {
     const deletionOnlyFacts = {
-      patterns: { isDeletionOnly: true, isConfigOnly: false, isDocsOnly: false, isMostlyRemovals: false, isFileDeletion: false, detectedOperations: [] },
+      patterns: {
+        isDeletionOnly: true,
+        isConfigOnly: false,
+        isDocsOnly: false,
+        isMostlyRemovals: false,
+        isFileDeletion: false,
+        detectedOperations: [],
+      },
       recommendation: { type: 'chore', confidence: 0.9 },
-      stats: { totalAdditions: 0, totalDeletions: 10 }
+      stats: { totalAdditions: 0, totalDeletions: 10 },
     };
 
     const configOnlyFacts = {
-      patterns: { isDeletionOnly: false, isConfigOnly: true, isDocsOnly: false, isMostlyRemovals: false, isFileDeletion: false, detectedOperations: [] },
+      patterns: {
+        isDeletionOnly: false,
+        isConfigOnly: true,
+        isDocsOnly: false,
+        isMostlyRemovals: false,
+        isFileDeletion: false,
+        detectedOperations: [],
+      },
       recommendation: { type: 'chore', confidence: 0.85 },
-      stats: { totalAdditions: 2, totalDeletions: 0 }
+      stats: { totalAdditions: 2, totalDeletions: 0 },
     };
 
     const docsOnlyFacts = {
-      patterns: { isDeletionOnly: false, isConfigOnly: false, isDocsOnly: true, isMostlyRemovals: false, isFileDeletion: false, detectedOperations: [] },
+      patterns: {
+        isDeletionOnly: false,
+        isConfigOnly: false,
+        isDocsOnly: true,
+        isMostlyRemovals: false,
+        isFileDeletion: false,
+        detectedOperations: [],
+      },
       recommendation: { type: 'docs', confidence: 0.9 },
-      stats: { totalAdditions: 5, totalDeletions: 0 }
+      stats: { totalAdditions: 5, totalDeletions: 0 },
     };
 
     const consoleRemovalFacts = {
-      patterns: { isDeletionOnly: true, isConfigOnly: false, isDocsOnly: false, isMostlyRemovals: true, isFileDeletion: false, detectedOperations: [{ type: 'remove-console-logs', description: 'removed console statements' }] },
+      patterns: {
+        isDeletionOnly: true,
+        isConfigOnly: false,
+        isDocsOnly: false,
+        isMostlyRemovals: true,
+        isFileDeletion: false,
+        detectedOperations: [
+          { type: 'remove-console-logs', description: 'removed console statements' },
+        ],
+      },
       recommendation: { type: 'refactor', confidence: 0.9 },
-      stats: { totalAdditions: 0, totalDeletions: 22 }
+      stats: { totalAdditions: 0, totalDeletions: 22 },
     };
 
     const fileDeletionFacts = {
-      patterns: { isDeletionOnly: true, isConfigOnly: false, isDocsOnly: false, isMostlyRemovals: true, isFileDeletion: true, detectedOperations: [] },
+      patterns: {
+        isDeletionOnly: true,
+        isConfigOnly: false,
+        isDocsOnly: false,
+        isMostlyRemovals: true,
+        isFileDeletion: true,
+        detectedOperations: [],
+      },
       recommendation: { type: 'chore', confidence: 0.9 },
-      stats: { totalAdditions: 0, totalDeletions: 30 }
+      stats: { totalAdditions: 0, totalDeletions: 30 },
     };
 
     it('should return no penalty for null facts', () => {
@@ -450,7 +484,10 @@ describe('MessageValidator', () => {
     });
 
     it('should penalize "improved" for console.log removal', () => {
-      const result = validator.checkRelevance('feat(auto-git): Improve error handling', consoleRemovalFacts);
+      const result = validator.checkRelevance(
+        'feat(auto-git): Improve error handling',
+        consoleRemovalFacts
+      );
       expect(result.penalty).toBeGreaterThan(0);
       expect(result.issues).toContain('hallucinated-improvement');
     });

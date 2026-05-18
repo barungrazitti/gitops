@@ -13,17 +13,38 @@ const path = require('path');
 
 /** @type {Set<string>} Directories to skip during recursive scanning */
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.svn', 'dist', 'build',
-  'coverage', '.next', '.nuxt', '__pycache__',
-  '.cache', '.turbo', '.tmp', 'vendor'
+  'node_modules',
+  '.git',
+  '.svn',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '__pycache__',
+  '.cache',
+  '.turbo',
+  '.tmp',
+  'vendor',
 ]);
 
 /** Directories that indicate feature-based structure */
 const FEATURE_INDICATORS = ['features', 'modules', 'domains', 'screens', 'views'];
 
 /** Directories that indicate layered structure */
-const LAYER_INDICATORS = ['controllers', 'models', 'views', 'services', 'utils',
-  'middleware', 'repositories', 'entities', 'dto', 'routes', 'handlers'];
+const LAYER_INDICATORS = [
+  'controllers',
+  'models',
+  'views',
+  'services',
+  'utils',
+  'middleware',
+  'repositories',
+  'entities',
+  'dto',
+  'routes',
+  'handlers',
+];
 
 class ConventionDetector {
   /**
@@ -113,7 +134,7 @@ class ConventionDetector {
       snake_case: 0,
       'kebab-case': 0,
       PascalCase: 0,
-      other: 0
+      other: 0,
     };
 
     for (const filePath of filePaths) {
@@ -135,8 +156,7 @@ class ConventionDetector {
       }
     }
 
-    const total = counts.camelCase + counts.snake_case +
-      counts['kebab-case'] + counts.PascalCase;
+    const total = counts.camelCase + counts.snake_case + counts['kebab-case'] + counts.PascalCase;
 
     if (total === 0) return 'unknown';
 
@@ -197,14 +217,13 @@ class ConventionDetector {
       const subDirSets = topDirs.map(dir => {
         try {
           return new Set(
-            fs.readdirSync(path.join(targetDir, dir))
-              .filter(sub => {
-                try {
-                  return fs.statSync(path.join(targetDir, dir, sub)).isDirectory();
-                } catch {
-                  return false;
-                }
-              })
+            fs.readdirSync(path.join(targetDir, dir)).filter(sub => {
+              try {
+                return fs.statSync(path.join(targetDir, dir, sub)).isDirectory();
+              } catch {
+                return false;
+              }
+            })
           );
         } catch {
           return new Set();
@@ -317,14 +336,12 @@ class ConventionDetector {
           const trimmed = line.trim();
 
           // Relative require/import
-          if (/require\s*\(\s*['"]\.\.?\//.test(trimmed) ||
-              /from\s+['"]\.\.?\//.test(trimmed)) {
+          if (/require\s*\(\s*['"]\.\.?\//.test(trimmed) || /from\s+['"]\.\.?\//.test(trimmed)) {
             relative++;
             totalImportLines++;
           }
           // Absolute require/import (scoped packages, aliased paths)
-          else if (/require\s*\(\s*['"]@/.test(trimmed) ||
-                   /from\s+['"]@/.test(trimmed)) {
+          else if (/require\s*\(\s*['"]@/.test(trimmed) || /from\s+['"]@/.test(trimmed)) {
             absolute++;
             totalImportLines++;
           }
@@ -381,8 +398,9 @@ class ConventionDetector {
     }
 
     const naming = this._detectNaming(filePaths);
-    const imports = this._detectImports(filePaths.filter(f =>
-      f.endsWith('.js') || f.endsWith('.mjs') || f.endsWith('.jsx')));
+    const imports = this._detectImports(
+      filePaths.filter(f => f.endsWith('.js') || f.endsWith('.mjs') || f.endsWith('.jsx'))
+    );
 
     // Structure analysis requires filesystem — not available from file paths alone
     const structure = 'unknown';

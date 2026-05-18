@@ -11,12 +11,12 @@ class OllamaProvider extends BaseProvider {
     super();
     this.name = 'ollama';
     this.baseURL = 'http://localhost:11434';
-    
+
     // Initialize circuit breaker for Ollama
     this.circuitBreaker = new CircuitBreaker({
       failureThreshold: 3,
       timeout: 120000, // 2 minutes for local models
-      monitoringPeriod: 30000 // 30 seconds
+      monitoringPeriod: 30000, // 30 seconds
     });
   }
 
@@ -30,31 +30,37 @@ class OllamaProvider extends BaseProvider {
     // Add context isolation to prevent hallucination
     const isolatedPrompt = `CRITICAL: Output ONLY commit messages. No instructions, warnings, or explanations. Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
 
-    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
-        const response = await axios.post(
-          `${this.baseURL}/api/generate`,
-          {
-            model,
-            prompt: isolatedPrompt,
-            stream: false,
-            options: {
-              temperature: config.temperature || 0.3,
-              num_predict: config.maxTokens || 150,
-            },
+    return await this.withRetry(
+      async () =>
+        await this.circuitBreaker.execute(
+          async () => {
+            const response = await axios.post(
+              `${this.baseURL}/api/generate`,
+              {
+                model,
+                prompt: isolatedPrompt,
+                stream: false,
+                options: {
+                  temperature: config.temperature || 0.3,
+                  num_predict: config.maxTokens || 150,
+                },
+              },
+              {
+                timeout: config.timeout || 120000, // Increased timeout for large files (2 minutes)
+              }
+            );
+
+            const content = response.data.response;
+            if (!content) {
+              throw new Error('No response content from Ollama');
+            }
+
+            const messages = this.parseResponse(content);
+            return messages.filter(msg => this.validateMessage(msg));
           },
-          {
-            timeout: config.timeout || 120000, // Increased timeout for large files (2 minutes)
-          }
-        );
-
-        const content = response.data.response;
-        if (!content) {
-          throw new Error('No response content from Ollama');
-        }
-
-        const messages = this.parseResponse(content);
-        return messages.filter((msg) => this.validateMessage(msg));
-      }, { provider: 'ollama' }));
+          { provider: 'ollama' }
+        )
+    );
   }
 
   /**
@@ -66,30 +72,36 @@ class OllamaProvider extends BaseProvider {
 
     const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
 
-    return await this.withRetry(async () => await this.circuitBreaker.execute(async () => {
-        const response = await axios.post(
-          `${this.baseURL}/api/generate`,
-          {
-            model,
-            prompt: fullPrompt,
-            stream: false,
-            options: {
-              temperature: options.temperature || 0.3,
-              num_predict: options.maxTokens || 2000,
-            },
+    return await this.withRetry(
+      async () =>
+        await this.circuitBreaker.execute(
+          async () => {
+            const response = await axios.post(
+              `${this.baseURL}/api/generate`,
+              {
+                model,
+                prompt: fullPrompt,
+                stream: false,
+                options: {
+                  temperature: options.temperature || 0.3,
+                  num_predict: options.maxTokens || 2000,
+                },
+              },
+              {
+                timeout: config.timeout || 60000, // Longer timeout for code fixing
+              }
+            );
+
+            const content = response.data.response;
+            if (!content) {
+              throw new Error('No response content from Ollama');
+            }
+
+            return [content.trim()];
           },
-          {
-            timeout: config.timeout || 60000, // Longer timeout for code fixing
-          }
-        );
-
-        const content = response.data.response;
-        if (!content) {
-          throw new Error('No response content from Ollama');
-        }
-
-        return [content.trim()];
-      }, { provider: 'ollama' }));
+          { provider: 'ollama' }
+        )
+    );
   }
 
   /**
@@ -118,11 +130,11 @@ class OllamaProvider extends BaseProvider {
       const model = config.model || 'deepseek-v3.1:671b-cloud';
       const availableModels = tagsResponse.data.models || [];
 
-      if (!availableModels.some((m) => m.name === model)) {
+      if (!availableModels.some(m => m.name === model)) {
         return {
           success: false,
-          message: `Model "${model}" not found. Available models: ${availableModels.map((m) => m.name).join(', ')}`,
-          availableModels: availableModels.map((m) => m.name),
+          message: `Model "${model}" not found. Available models: ${availableModels.map(m => m.name).join(', ')}`,
+          availableModels: availableModels.map(m => m.name),
         };
       }
 
@@ -152,7 +164,7 @@ class OllamaProvider extends BaseProvider {
         message: 'Ollama connection successful',
         model,
         response: content.trim(),
-        availableModels: availableModels.map((m) => m.name),
+        availableModels: availableModels.map(m => m.name),
       };
     } catch (error) {
       if (error.code === 'ECONNREFUSED') {
@@ -181,7 +193,7 @@ class OllamaProvider extends BaseProvider {
       });
       const models = response.data.models || [];
 
-      return models.map((model) => ({
+      return models.map(model => ({
         id: model.name,
         name: model.name,
         description: this.getModelDescription(model.name),
@@ -196,16 +208,14 @@ class OllamaProvider extends BaseProvider {
         {
           id: 'deepseek-v3.1:671b-cloud',
           name: 'DeepSeek V3.1 (671B)',
-          description:
-            'Large language model with advanced reasoning capabilities',
+          description: 'Large language model with advanced reasoning capabilities',
           available: true,
           recommended: true,
         },
         {
           id: 'qwen3-coder:480b-cloud',
           name: 'Qwen3 Coder (480B)',
-          description:
-            'Code-specialized model with excellent programming skills',
+          description: 'Code-specialized model with excellent programming skills',
           available: true,
           recommended: false,
         },
@@ -243,10 +253,8 @@ class OllamaProvider extends BaseProvider {
         'Large language model with advanced reasoning capabilities (671B parameters)',
       'qwen3-coder:480b-cloud':
         'Code-specialized model with excellent programming skills (480B parameters)',
-      'qwen2.5-coder:latest':
-        'Efficient code generation model (7.6B parameters)',
-      'mistral:7b-instruct':
-        'Instruction-tuned model for general tasks (7.2B parameters)',
+      'qwen2.5-coder:latest': 'Efficient code generation model (7.6B parameters)',
+      'mistral:7b-instruct': 'Instruction-tuned model for general tasks (7.2B parameters)',
       'deepseek-r1:8b': 'Reasoning-optimized model (8.2B parameters)',
     };
     return descriptions[modelName] || `AI model: ${modelName}`;
@@ -260,7 +268,7 @@ class OllamaProvider extends BaseProvider {
 
     const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
-    return `${(bytes / 1024**i).toFixed(1)} ${sizes[i]}`;
+    return `${(bytes / 1024 ** i).toFixed(1)} ${sizes[i]}`;
   }
 
   /**
@@ -296,9 +304,7 @@ class OllamaProvider extends BaseProvider {
    */
   handleError(error, providerName) {
     if (error.code === 'ECONNREFUSED') {
-      throw new Error(
-        'Ollama service is not running. Please start Ollama with "ollama serve".'
-      );
+      throw new Error('Ollama service is not running. Please start Ollama with "ollama serve".');
     }
 
     if (error.response && error.response.status === 404) {

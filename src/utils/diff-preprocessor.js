@@ -10,8 +10,7 @@ class DiffPreprocessor {
   constructor(options = {}) {
     // Groq has 6000 TPM limit, reserve margin for prompt overhead
     this.maxPromptLength = options.maxPromptLength || 4500;
-    this.preserveContext =
-      options.preserveContext !== undefined ? options.preserveContext : true;
+    this.preserveContext = options.preserveContext !== undefined ? options.preserveContext : true;
     this.optimizedDiffProcessor = new OptimizedDiffProcessor();
   }
 
@@ -107,18 +106,12 @@ class DiffPreprocessor {
             'gz',
           ];
 
-          if (
-            assetExtensions.includes(ext) ||
-            /^Binary files/.test(lines[i + 1] || '')
-          ) {
+          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
             assetFiles.push(filePath);
             filteredLines.push(`# Asset file added: ${filePath}`);
 
             // Skip ahead to next diff --git (don't include asset content)
-            while (
-              i + 1 < lines.length &&
-              !lines[i + 1].startsWith('diff --git')
-            ) {
+            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
               i++;
             }
             continue;
@@ -152,7 +145,7 @@ class DiffPreprocessor {
     if (!assetFiles || assetFiles.length === 0) return '';
 
     const extensions = {};
-    assetFiles.forEach((file) => {
+    assetFiles.forEach(file => {
       const ext = file.split('.').pop().toLowerCase();
       extensions[ext] = (extensions[ext] || 0) + 1;
     });

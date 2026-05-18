@@ -4,8 +4,8 @@
 
 const chalk = require('chalk');
 const ora = require('ora');
-const SecretScanner = require('../utils/secret-scanner');
 const fs = require('fs-extra');
+const SecretScanner = require('../utils/secret-scanner');
 
 class GenerateCommand {
   constructor(generator) {
@@ -32,11 +32,11 @@ class GenerateCommand {
   async execute(options = {}) {
     const spinner = ora({
       text: chalk.blue('🚀 Initializing AI commit generator...'),
-      spinner: 'clock'
+      spinner: 'clock',
     }).start();
     const startTime = Date.now();
     let mergedOptions = {};
-    let diff = '';
+    const diff = '';
 
     try {
       await this.activityLogger.info('generate_started', { options });
@@ -55,9 +55,7 @@ class GenerateCommand {
       let diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
-        spinner.fail(
-          chalk.red('❌ No staged changes found. Please stage your changes first.')
-        );
+        spinner.fail(chalk.red('❌ No staged changes found. Please stage your changes first.'));
         await this.activityLogger.warn('generate_failed', { reason: 'no_staged_changes' });
         return;
       }
@@ -74,14 +72,18 @@ class GenerateCommand {
         const redactionSummary = secretScanner.getRedactionSummary();
 
         if (redactionSummary.found) {
-          console.log(chalk.yellow(`\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`));
+          console.log(
+            chalk.yellow(`\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`)
+          );
 
           // Group by category for cleaner output
           const categories = Object.entries(redactionSummary.byCategory || {});
           if (categories.length > 0) {
             categories.forEach(([category, count]) => {
               const categoryEmoji = category === 'pii' ? '👤' : '🔑';
-              console.log(chalk.gray(`   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`));
+              console.log(
+                chalk.gray(`   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`)
+              );
             });
           }
 
@@ -91,11 +93,11 @@ class GenerateCommand {
             console.log(chalk.yellow('\n💡 Recommendations:'));
             const recommendations = secretScanner._generateRecommendations(redactionSummary);
             recommendations.forEach(rec => console.log(chalk.gray(`   ${rec}`)));
-            
+
             await this.activityLogger.warn('enterprise_mode_blocked', {
               redacted: redactionSummary.redacted,
               byCategory: redactionSummary.byCategory,
-              byType: redactionSummary.byType
+              byType: redactionSummary.byType,
             });
             return;
           }
@@ -106,7 +108,7 @@ class GenerateCommand {
             byCategory: redactionSummary.byCategory,
             byType: redactionSummary.byType,
             originalSize: originalLength,
-            sanitizedSize: diff.length
+            sanitizedSize: diff.length,
           });
 
           spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
@@ -141,15 +143,19 @@ class GenerateCommand {
 
         // Generate commit messages with sequential fallback
         spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
-        messages = await this.providerOrchestrator.generateWithSequentialFallback(diff, {
-          context,
-          count: parseInt(mergedOptions.count) || 1,
-          type: mergedOptions.type,
-          language: mergedOptions.language || 'en',
-          conventional:
-            mergedOptions.conventional || config.conventionalCommits,
-          preferredProvider: mergedOptions.provider || config.defaultProvider,
-        }, this.activityLogger, this.statsManager);
+        messages = await this.providerOrchestrator.generateWithSequentialFallback(
+          diff,
+          {
+            context,
+            count: parseInt(mergedOptions.count) || 1,
+            type: mergedOptions.type,
+            language: mergedOptions.language || 'en',
+            conventional: mergedOptions.conventional || config.conventionalCommits,
+            preferredProvider: mergedOptions.provider || config.defaultProvider,
+          },
+          this.activityLogger,
+          this.statsManager
+        );
 
         // Cache results (simple exact match)
         if (mergedOptions.cache !== false) {
@@ -160,10 +166,10 @@ class GenerateCommand {
       spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
       // Format messages with context enrichment (Phase 3: Formatters Module)
-      const formattedMessages = messages.map((msg) =>
+      const formattedMessages = messages.map(msg =>
         this.messageFormatter.formatWithContext(msg, context, {
           conventional: mergedOptions.conventional || config.conventionalCommits,
-          includeSections: ['what', 'why', 'impact']
+          includeSections: ['what', 'why', 'impact'],
         })
       );
 
@@ -173,7 +179,9 @@ class GenerateCommand {
         formattedMessages.forEach((msg, index) => {
           console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
         });
-        await this.activityLogger.info('dry_run_completed', { messagesCount: formattedMessages.length });
+        await this.activityLogger.info('dry_run_completed', {
+          messagesCount: formattedMessages.length,
+        });
         return;
       }
 
@@ -184,19 +192,17 @@ class GenerateCommand {
         console.log(chalk.green('\n✅ Commit created successfully!'));
 
         // Update statistics
-        await this.statsManager.recordCommit(
-          mergedOptions.provider || config.defaultProvider
-        );
+        await this.statsManager.recordCommit(mergedOptions.provider || config.defaultProvider);
 
         // Log successful commit
-        await this.activityLogger.logGitOperation('commit', { 
+        await this.activityLogger.logGitOperation('commit', {
           message: selectedMessage,
           success: true,
           duration: Date.now() - startTime,
         });
 
         // Update commit generation log with selected message
-        await this.activityLogger.info('commit_completed', { 
+        await this.activityLogger.info('commit_completed', {
           selectedMessage,
           messagesGenerated: messages.length,
         });
@@ -232,7 +238,9 @@ class GenerateCommand {
       console.log(chalk.yellow('   Try again later or consider using Ollama (local) provider'));
     } else if (error.message.includes('timeout')) {
       console.log(chalk.yellow('\n💡 Suggestion: The request timed out'));
-      console.log(chalk.yellow('   Try again with a smaller diff or check your internet connection'));
+      console.log(
+        chalk.yellow('   Try again with a smaller diff or check your internet connection')
+      );
     } else if (error.message.includes('network')) {
       console.log(chalk.yellow('\n💡 Suggestion: Network error encountered'));
       console.log(chalk.yellow('   Check your internet connection and try again'));

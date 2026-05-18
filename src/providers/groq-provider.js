@@ -29,9 +29,7 @@ class GroqProvider extends BaseProvider {
     const config = await this.getConfig();
 
     if (!config.apiKey) {
-      throw new Error(
-        'Groq API key not configured. Run "aicommit setup" to configure.'
-      );
+      throw new Error('Groq API key not configured. Run "aicommit setup" to configure.');
     }
 
     this.client = new Groq({
@@ -72,7 +70,7 @@ class GroqProvider extends BaseProvider {
             });
 
             const messages = this.parseResponse(response);
-            return messages.filter((msg) => this.validateMessage(msg));
+            return messages.filter(msg => this.validateMessage(msg));
           },
           { provider: 'groq' }
         )
@@ -106,11 +104,7 @@ class GroqProvider extends BaseProvider {
       if (estimatedTokens > maxInputTokens) {
         // Truncate to stay under Groq's 6000 TPM limit
         const truncatedPrompt = fullPrompt.substring(0, maxInputTokens * 4); // ~4 chars per token
-        return await this.generateSingleResponse(
-          truncatedPrompt,
-          options,
-          config
-        );
+        return await this.generateSingleResponse(truncatedPrompt, options, config);
       }
       return await this.generateSingleResponse(fullPrompt, options, config);
     } catch (error) {
@@ -254,8 +248,7 @@ class GroqProvider extends BaseProvider {
           content: prompt,
         },
       ],
-      temperature:
-        options.temperature ?? config.temperature ?? this.temperature,
+      temperature: options.temperature ?? config.temperature ?? this.temperature,
       max_tokens: options.maxTokens ?? config.maxTokens ?? this.maxTokens,
       timeout: options.timeout ?? config.timeout ?? this.timeout,
     };
@@ -281,8 +274,8 @@ class GroqProvider extends BaseProvider {
     // Split content by newlines and clean up
     const messages = content
       .split('\n')
-      .map((msg) => msg.trim())
-      .filter((msg) => msg.length > 0);
+      .map(msg => msg.trim())
+      .filter(msg => msg.length > 0);
 
     return messages;
   }
@@ -293,17 +286,14 @@ class GroqProvider extends BaseProvider {
   async makeDirectAPIRequest(endpoint, params = {}) {
     try {
       const config = await this.getConfig();
-      const response = await this.sendHTTPRequest(
-        `${this.baseURL}${endpoint}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${config.apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          ...params,
-        }
-      );
+      const response = await this.sendHTTPRequest(`${this.baseURL}${endpoint}`, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${config.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        ...params,
+      });
       return response;
     } catch (error) {
       throw new Error(`Groq direct API request failed: ${error.message}`);

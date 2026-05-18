@@ -62,7 +62,7 @@ class CommitGenerator {
       language: 'en',
       dryRun: false,
       cache: true,
-      ...options
+      ...options,
     };
 
     let diff = null;
@@ -95,7 +95,7 @@ class CommitGenerator {
           type: mergedOptions.type,
           language: mergedOptions.language,
           conventional: mergedOptions.conventional,
-          preferredProvider: mergedOptions.provider || config.defaultProvider
+          preferredProvider: mergedOptions.provider || config.defaultProvider,
         },
         this.activityLogger,
         this.statsManager
@@ -121,17 +121,17 @@ class CommitGenerator {
       }
 
       // Step 7: Format messages with context enrichment
-      const formattedMessages = messages.map((msg) =>
+      const formattedMessages = messages.map(msg =>
         this.messageFormatter.formatWithContext(msg, enrichedContext, {
           conventional: mergedOptions.conventional,
-          includeSections: ['what', 'why', 'impact']
+          includeSections: ['what', 'why', 'impact'],
         })
       );
 
       // Step 8: Handle dry run or create commit
       if (mergedOptions.dryRun) {
         await this.activityLogger.info('dry_run_completed', {
-          messagesCount: formattedMessages.length
+          messagesCount: formattedMessages.length,
         });
         return formattedMessages;
       }
@@ -141,21 +141,19 @@ class CommitGenerator {
       await this.gitManager.commit(selectedMessage);
 
       // Update statistics
-      await this.statsManager.recordCommit(
-        mergedOptions.provider || config.defaultProvider
-      );
+      await this.statsManager.recordCommit(mergedOptions.provider || config.defaultProvider);
 
       // Log successful commit
       await this.activityLogger.logGitOperation('commit', {
         message: selectedMessage,
         success: true,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       });
 
       await this.activityLogger.info('commit_completed', {
         selectedMessage,
         messagesGenerated: messages.length,
-        duration: Date.now() - startTime
+        duration: Date.now() - startTime,
       });
 
       return formattedMessages;
@@ -164,7 +162,7 @@ class CommitGenerator {
         operation: 'commit_generation',
         duration: Date.now() - startTime,
         provider: options.provider,
-        diffLength: diff?.length
+        diffLength: diff?.length,
       });
       throw error;
     }
@@ -185,7 +183,7 @@ class CommitGenerator {
     // Run detectors in parallel
     const [componentResults, fileTypeResults] = await Promise.all([
       componentDetector.detect(filePaths),
-      fileTypeDetector.detectBatch(filePaths)
+      fileTypeDetector.detectBatch(filePaths),
     ]);
 
     // For dependency mapping, we need file contents
@@ -195,7 +193,7 @@ class CommitGenerator {
     return {
       components: componentResults,
       fileTypes: fileTypeResults,
-      dependencies: dependencyResults
+      dependencies: dependencyResults,
     };
   }
 
@@ -230,9 +228,7 @@ class CommitGenerator {
     const dependencies = detectorResults.dependencies || { imports: [], exports: [], affected: [] };
 
     // Extract component summary
-    const componentList = components
-      .filter(c => c && c.component)
-      .map(c => c.component);
+    const componentList = components.filter(c => c && c.component).map(c => c.component);
     const uniqueComponents = [...new Set(componentList)];
 
     // Extract file type summary
@@ -243,21 +239,19 @@ class CommitGenerator {
       components: {
         list: uniqueComponents,
         count: uniqueComponents.length,
-        details: components
+        details: components,
       },
       fileTypes: {
         summary: fileTypeSummary,
         countByType: fileTypeSummary.countByType || {},
-        countByLanguage: fileTypeSummary.countByLanguage || {}
+        countByLanguage: fileTypeSummary.countByLanguage || {},
       },
       dependencies: {
         imports: dependencies.imports || [],
         exports: dependencies.exports || [],
-        affected: dependencies.affected || []
+        affected: dependencies.affected || [],
       },
-      hasSemanticContext: !!(
-        fileTypes.files && fileTypes.files.length > 0
-      )
+      hasSemanticContext: !!(fileTypes.files && fileTypes.files.length > 0),
     };
 
     return context;
@@ -296,9 +290,7 @@ class CommitGenerator {
     const promptParts = [diff];
 
     // Add component context
-    const componentList = components
-      .filter(c => c.component)
-      .map(c => c.component);
+    const componentList = components.filter(c => c.component).map(c => c.component);
     const uniqueComponents = [...new Set(componentList)];
 
     if (uniqueComponents.length > 0) {

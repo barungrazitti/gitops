@@ -67,7 +67,7 @@ class AIProviderFactory {
    */
   static isProviderAvailable(providerName) {
     const providers = this.getAvailableProviders();
-    return providers.some((p) => p.name === providerName.toLowerCase());
+    return providers.some(p => p.name === providerName.toLowerCase());
   }
 
   /**
@@ -141,9 +141,7 @@ class AIProviderFactory {
 
       return await provider.getAvailableModels();
     } catch (error) {
-      console.warn(
-        `Failed to get models for ${providerName}: ${error.message}`
-      );
+      console.warn(`Failed to get models for ${providerName}: ${error.message}`);
       return [];
     }
   }
@@ -161,9 +159,7 @@ class AIProviderFactory {
     }
 
     const availableProviders = this.getAvailableProviders();
-    const providerInfo = availableProviders.find(
-      (p) => p.name === providerName.toLowerCase()
-    );
+    const providerInfo = availableProviders.find(p => p.name === providerName.toLowerCase());
 
     if (!providerInfo) {
       throw new Error(
@@ -223,16 +219,10 @@ class AIProviderFactory {
 
     for (const providerName of providerPriority) {
       const providerData = allModels[providerName];
-      if (
-        providerData &&
-        providerData.available &&
-        providerData.models.length > 0
-      ) {
+      if (providerData && providerData.available && providerData.models.length > 0) {
         // Find recommended model or use first available
-        const recommendedModel = providerData.models.find(
-          (m) => m.recommended && m.available
-        );
-        const firstAvailable = providerData.models.find((m) => m.available);
+        const recommendedModel = providerData.models.find(m => m.recommended && m.available);
+        const firstAvailable = providerData.models.find(m => m.available);
 
         const selectedModel = recommendedModel || firstAvailable;
 
@@ -256,9 +246,7 @@ class AIProviderFactory {
     const bestOption = await this.getBestAvailableModel(configs);
 
     if (!bestOption) {
-      throw new Error(
-        'No available AI providers found. Please configure at least one provider.'
-      );
+      throw new Error('No available AI providers found. Please configure at least one provider.');
     }
 
     return {
@@ -267,8 +255,8 @@ class AIProviderFactory {
       recommendation: {
         reason: `Selected ${bestOption.model.name} from ${bestOption.providerInfo.displayName}`,
         alternatives: Object.keys(configs)
-          .filter((p) => ['groq', 'ollama'].includes(p))
-          .filter((p) => p !== bestOption.provider),
+          .filter(p => ['groq', 'ollama'].includes(p))
+          .filter(p => p !== bestOption.provider),
       },
     };
   }

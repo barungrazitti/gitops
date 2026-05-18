@@ -14,7 +14,7 @@ class MemoryEfficientCacheManager {
       maxKeys: options.maxKeys || 1000, // Maximum number of keys to store
       maxSize: options.maxSize || 50 * 1024 * 1024, // 50MB max cache size
       useClones: false, // Don't clone objects to save memory
-      ...options
+      ...options,
     };
 
     this.cache = new NodeCache(this.options);
@@ -48,9 +48,10 @@ class MemoryEfficientCacheManager {
   wouldExceedLimits(key, value) {
     const itemSize = this.calculateSize(value);
     const totalSizeAfterAdd = this.currentSize + itemSize;
-    
-    return totalSizeAfterAdd > this.options.maxSize || 
-           this.cache.keys().length >= this.options.maxKeys;
+
+    return (
+      totalSizeAfterAdd > this.options.maxSize || this.cache.keys().length >= this.options.maxKeys
+    );
   }
 
   /**
@@ -121,7 +122,7 @@ class MemoryEfficientCacheManager {
   del(key) {
     const itemSize = this.keySizes.get(key) || 0;
     const deleted = this.cache.del(key);
-    
+
     if (deleted) {
       this.keySizes.delete(key);
       this.currentSize -= itemSize;
@@ -150,7 +151,7 @@ class MemoryEfficientCacheManager {
       utilization: (this.currentSize / this.options.maxSize) * 100,
       hitCount: this.cache.getStats().hits,
       missCount: this.cache.getStats().misses,
-      hitRate: this.cache.getStats().hitRate
+      hitRate: this.cache.getStats().hitRate,
     };
   }
 
@@ -200,7 +201,7 @@ class MemoryEfficientCacheManager {
           similarResults.push({
             similarity,
             messages,
-            key
+            key,
           });
         }
       }
@@ -215,7 +216,9 @@ class MemoryEfficientCacheManager {
    */
   calculateTextSimilarity(text1, text2) {
     // Normalize the texts
-    const normalize = (text) => text.toLowerCase()
+    const normalize = text =>
+      text
+        .toLowerCase()
         .replace(/\s+/g, ' ')
         .replace(/[^\w\s]/g, '')
         .trim();
@@ -245,7 +248,7 @@ class MemoryEfficientCacheManager {
 
     // First, check if there's already a very similar diff cached
     const similarResults = await this.findSimilar(diff, 0.95); // Very high threshold for deduplication
-    
+
     if (similarResults.length > 0) {
       // If we already have a nearly identical diff, don't cache again
       return false;
@@ -271,10 +274,10 @@ class MemoryEfficientCacheManager {
     // Then try similar matches
     const similarResults = await this.findSimilar(diff, threshold);
     if (similarResults.length > 0) {
-      return { 
-        exact: false, 
+      return {
+        exact: false,
         result: similarResults[0].messages,
-        similarity: similarResults[0].similarity
+        similarity: similarResults[0].similarity,
       };
     }
 
@@ -287,7 +290,7 @@ class MemoryEfficientCacheManager {
   cleanExpired() {
     const allKeys = this.cache.keys();
     const now = Date.now();
-    
+
     for (const key of allKeys) {
       const ttl = this.cache.getTtl(key);
       if (ttl && ttl.end < now) {
@@ -303,10 +306,10 @@ class MemoryEfficientCacheManager {
     const usage = process.memoryUsage();
     return {
       cacheSize: this.currentSize,
-      cacheUtilization: `${(this.currentSize / this.options.maxSize * 100).toFixed(2)  }%`,
+      cacheUtilization: `${((this.currentSize / this.options.maxSize) * 100).toFixed(2)}%`,
       heapUsed: usage.heapUsed,
       heapTotal: usage.heapTotal,
-      rss: usage.rss
+      rss: usage.rss,
     };
   }
 }

@@ -117,8 +117,7 @@ class StatsManager {
       const data = this.stats.store;
 
       // Calculate derived statistics
-      const totalCacheRequests =
-        (data.cacheHits || 0) + (data.cacheMisses || 0);
+      const totalCacheRequests = (data.cacheHits || 0) + (data.cacheMisses || 0);
       const cacheHitRate =
         totalCacheRequests > 0
           ? (((data.cacheHits || 0) / totalCacheRequests) * 100).toFixed(1)
@@ -128,15 +127,14 @@ class StatsManager {
       const averageResponseTime =
         responseTimeHistory.length > 0
           ? Math.round(
-            responseTimeHistory.reduce((sum, entry) => sum + entry.time, 0) /
+              responseTimeHistory.reduce((sum, entry) => sum + entry.time, 0) /
                 responseTimeHistory.length
-          )
+            )
           : 0;
 
       const providerUsage = data.providerUsage || {};
       const mostUsedProvider =
-        Object.entries(providerUsage).sort((a, b) => b[1] - a[1])[0]?.[0] ||
-        'none';
+        Object.entries(providerUsage).sort((a, b) => b[1] - a[1])[0]?.[0] || 'none';
 
       const daysSinceFirstUse = data.firstUsed
         ? Math.floor((Date.now() - data.firstUsed) / (1000 * 60 * 60 * 24))
@@ -156,16 +154,10 @@ class StatsManager {
           hitRate: parseFloat(cacheHitRate),
         },
         usage: {
-          firstUsed: data.firstUsed
-            ? new Date(data.firstUsed).toISOString()
-            : null,
-          lastUsed: data.lastUsed
-            ? new Date(data.lastUsed).toISOString()
-            : null,
+          firstUsed: data.firstUsed ? new Date(data.firstUsed).toISOString() : null,
+          lastUsed: data.lastUsed ? new Date(data.lastUsed).toISOString() : null,
           commitsPerDay:
-            daysSinceFirstUse > 0
-              ? ((data.totalCommits || 0) / daysSinceFirstUse).toFixed(1)
-              : 0,
+            daysSinceFirstUse > 0 ? ((data.totalCommits || 0) / daysSinceFirstUse).toFixed(1) : 0,
         },
       };
     } catch (error) {
@@ -228,10 +220,8 @@ class StatsManager {
       };
     }
 
-    const recentAvg =
-      recent.reduce((sum, entry) => sum + entry.time, 0) / recent.length;
-    const previousAvg =
-      previous.reduce((sum, entry) => sum + entry.time, 0) / previous.length;
+    const recentAvg = recent.reduce((sum, entry) => sum + entry.time, 0) / recent.length;
+    const previousAvg = previous.reduce((sum, entry) => sum + entry.time, 0) / previous.length;
 
     const responseTimeTrend =
       recentAvg > previousAvg * 1.1
@@ -244,7 +234,7 @@ class StatsManager {
     const now = Date.now();
     const dayMs = 24 * 60 * 60 * 1000;
     const recentCommits = responseTimeHistory.filter(
-      (entry) => now - entry.timestamp < 7 * dayMs
+      entry => now - entry.timestamp < 7 * dayMs
     ).length;
 
     const usagePattern =

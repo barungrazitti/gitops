@@ -40,7 +40,7 @@ describe('FormatterFactory', () => {
 
     it('should create composite formatter with custom sections', () => {
       const composite = factory.createCompositeFormatter({
-        includeSections: ['what', 'why']
+        includeSections: ['what', 'why'],
       });
       expect(composite).toBeDefined();
       expect(composite.includeSections).toEqual(['what', 'why']);
@@ -98,8 +98,8 @@ describe('ConventionalFormatter', () => {
     it('should infer type from context', () => {
       const context = {
         conventions: {
-          commitType: 'fix'
-        }
+          commitType: 'fix',
+        },
       };
       const result = formatter.format('Resolve issue', context);
       expect(result).toMatch(/^fix(\(.+\))?:/);
@@ -108,8 +108,8 @@ describe('ConventionalFormatter', () => {
     it('should infer scope from components context', () => {
       const context = {
         components: {
-          scope: 'auth-module'
-        }
+          scope: 'auth-module',
+        },
       };
       const result = formatter.format('Update auth', context);
       expect(result).toMatch(/^\w+\(auth-module\):/);
@@ -120,9 +120,9 @@ describe('ConventionalFormatter', () => {
         files: {
           wordpress: {
             isWordPress: true,
-            plugins: ['woocommerce']
-          }
-        }
+            plugins: ['woocommerce'],
+          },
+        },
       };
       const result = formatter.format('Update plugin', context);
       expect(result).toMatch(/^\w+\(woocommerce\):/);
@@ -198,9 +198,9 @@ describe('ConventionalFormatter', () => {
         files: {
           wordpress: {
             isWordPress: true,
-            plugins: ['woocommerce']
-          }
-        }
+            plugins: ['woocommerce'],
+          },
+        },
       };
       expect(formatter.inferScope('Update', context)).toBe('woocommerce');
     });
@@ -280,7 +280,7 @@ describe('CompositeFormatter', () => {
     const factory = new FormatterFactory();
     composite = factory.createCompositeFormatter({
       conventional: true,
-      includeSections: ['what', 'why', 'impact']
+      includeSections: ['what', 'why', 'impact'],
     });
   });
 
@@ -288,7 +288,7 @@ describe('CompositeFormatter', () => {
     it('should format with all sections', () => {
       const context = {
         components: { packages: ['auth'] },
-        dependencies: { affected: [] }
+        dependencies: { affected: [] },
       };
       const message = 'Add authentication feature';
 
@@ -312,12 +312,12 @@ describe('CompositeFormatter', () => {
     it('should respect includeSections option', () => {
       const factory = new FormatterFactory();
       const custom = factory.createCompositeFormatter({
-        includeSections: ['what']
+        includeSections: ['what'],
       });
 
       const context = {
         components: { packages: ['auth'] },
-        dependencies: { affected: [] }
+        dependencies: { affected: [] },
       };
 
       const result = custom.format('Update', context);

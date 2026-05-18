@@ -3,16 +3,19 @@
  */
 
 // Mock the secret-scanner module
-jest.mock('../src/utils/secret-scanner', () => class MockSecretScanner {
-    scanAndRedact(input) {
-      return input;
+jest.mock(
+  '../src/utils/secret-scanner',
+  () =>
+    class MockSecretScanner {
+      scanAndRedact(input) {
+        return input;
+      }
     }
-  });
+);
 
 const InputSanitizer = require('../src/utils/input-sanitizer');
 
 describe('InputSanitizer', () => {
-
   describe('sanitizeFilePath', () => {
     it('should return null for null input', () => {
       expect(InputSanitizer.sanitizeFilePath(null)).toBeNull();

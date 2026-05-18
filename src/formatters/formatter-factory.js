@@ -17,7 +17,7 @@ class FormatterFactory {
   constructor() {
     this.formatters = {
       conventional: new ConventionalFormatter(),
-      freeform: new FreeformFormatter()
+      freeform: new FreeformFormatter(),
     };
     this.defaultFormat = 'conventional';
   }
@@ -65,8 +65,16 @@ class FormatterFactory {
 class ConventionalFormatter {
   constructor() {
     this.types = [
-      'feat', 'fix', 'docs', 'style', 'refactor',
-      'perf', 'test', 'chore', 'ci', 'build'
+      'feat',
+      'fix',
+      'docs',
+      'style',
+      'refactor',
+      'perf',
+      'test',
+      'chore',
+      'ci',
+      'build',
     ];
   }
 
@@ -131,7 +139,7 @@ class ConventionalFormatter {
       test: /test|spec|coverage|jest|mock/i,
       chore: /chore|update|upgrade|bump|dependency/i,
       ci: /ci|pipeline|workflow|action|deploy/i,
-      build: /build|webpack|rollup|babel|compile/i
+      build: /build|webpack|rollup|babel|compile/i,
     };
 
     for (const [type, pattern] of Object.entries(typePatterns)) {
@@ -252,7 +260,7 @@ class CompositeFormatter {
     const baseFormatter = this.options.conventional
       ? new ConventionalFormatter()
       : new FreeformFormatter();
-    
+
     const baseMessage = baseFormatter.format(message, context, this.options);
     if (baseMessage) {
       lines.push(baseMessage);

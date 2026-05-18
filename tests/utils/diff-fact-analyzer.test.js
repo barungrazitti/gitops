@@ -72,7 +72,9 @@ index abc1234..def5678 100644
 +  const x = 1;`;
 
       const result = analyzer.analyze(diff);
-      const consoleOp = result.patterns.detectedOperations.find(op => op.type === 'remove-console-logs');
+      const consoleOp = result.patterns.detectedOperations.find(
+        op => op.type === 'remove-console-logs'
+      );
       expect(consoleOp).toBeDefined();
       expect(consoleOp.description).toContain('removed console');
     });

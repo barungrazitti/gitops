@@ -6,15 +6,15 @@
 class FallbackCommitGenerator {
   constructor() {
     this.changeTypes = {
-      'feat': ['add', 'create', 'implement', 'new'],
-      'fix': ['fix', 'bug', 'resolve', 'patch', 'correct'],
-      'docs': ['doc', 'readme', 'comment', 'documentation'],
-      'style': ['format', 'lint', 'whitespace', 'prettier', 'style'],
-      'refactor': ['refactor', 'rewrite', 'restructure', 'rename', 'move'],
-      'test': ['test', 'spec', 'jest', 'cypress'],
-      'chore': ['update', 'upgrade', 'maintain', 'config', 'build']
+      feat: ['add', 'create', 'implement', 'new'],
+      fix: ['fix', 'bug', 'resolve', 'patch', 'correct'],
+      docs: ['doc', 'readme', 'comment', 'documentation'],
+      style: ['format', 'lint', 'whitespace', 'prettier', 'style'],
+      refactor: ['refactor', 'rewrite', 'restructure', 'rename', 'move'],
+      test: ['test', 'spec', 'jest', 'cypress'],
+      chore: ['update', 'upgrade', 'maintain', 'config', 'build'],
     };
-    
+
     this.genericMessages = [
       'Update files',
       'Make changes',
@@ -25,7 +25,7 @@ class FallbackCommitGenerator {
       'Update dependencies',
       'Clean up code',
       'Improve performance',
-      'Fix typo'
+      'Fix typo',
     ];
   }
 
@@ -39,14 +39,13 @@ class FallbackCommitGenerator {
 
     // Analyze the diff to determine the most appropriate commit type
     const analysis = this.analyzeDiff(diff);
-    
+
     // Generate message based on analysis
     if (analysis.primaryChangeType) {
       return this.generateMessageWithType(analysis);
-    } 
-      // Fallback to generic message
-      return this.generateGenericMessage(diff, analysis);
-    
+    }
+    // Fallback to generic message
+    return this.generateGenericMessage(diff, analysis);
   }
 
   /**
@@ -62,7 +61,7 @@ class FallbackCommitGenerator {
       primaryChangeType: null,
       fileCount: 0,
       hasNewFiles: false,
-      hasDeletedFiles: false
+      hasDeletedFiles: false,
     };
 
     // Count additions and deletions
@@ -101,8 +100,7 @@ class FallbackCommitGenerator {
 
     // Determine primary change type
     if (analysis.changeTypes.size > 0) {
-      const sortedTypes = Array.from(analysis.changeTypes.entries())
-        .sort((a, b) => b[1] - a[1]);
+      const sortedTypes = Array.from(analysis.changeTypes.entries()).sort((a, b) => b[1] - a[1]);
       analysis.primaryChangeType = sortedTypes[0][0];
     }
 
@@ -114,7 +112,7 @@ class FallbackCommitGenerator {
    */
   generateMessageWithType(analysis) {
     const type = analysis.primaryChangeType;
-    
+
     switch (type) {
       case 'feat':
         return `feat: Add new functionality`;
@@ -143,18 +141,19 @@ class FallbackCommitGenerator {
     const functionsAdded = (diff.match(/\+.*function\s+\w+/g) || []).length;
     const classesAdded = (diff.match(/\+.*class\s+\w+/g) || []).length;
     const filesModified = analysis.fileCount;
-    
+
     if (functionsAdded > 0) {
       return `Add ${functionsAdded} function${functionsAdded > 1 ? 's' : ''}`;
-    } if (classesAdded > 0) {
+    }
+    if (classesAdded > 0) {
       return `Add ${classesAdded} class${classesAdded > 1 ? 'es' : ''}`;
-    } if (filesModified > 0) {
+    }
+    if (filesModified > 0) {
       return `Update ${filesModified} file${filesModified > 1 ? 's' : ''}`;
-    } 
-      // Pick a random generic message
-      const randomIndex = Math.floor(Math.random() * this.genericMessages.length);
-      return this.genericMessages[randomIndex];
-    
+    }
+    // Pick a random generic message
+    const randomIndex = Math.floor(Math.random() * this.genericMessages.length);
+    return this.genericMessages[randomIndex];
   }
 
   /**
@@ -162,21 +161,20 @@ class FallbackCommitGenerator {
    */
   generateByFileTypes(diff) {
     const analysis = this.analyzeDiff(diff);
-    
+
     if (analysis.fileTypes.size === 0) {
       return 'Update files';
     }
 
     const fileTypes = Array.from(analysis.fileTypes);
     const typeCounts = {};
-    
+
     for (const fileType of fileTypes) {
       typeCounts[fileType] = typeCounts[fileType] ? typeCounts[fileType] + 1 : 1;
     }
 
     // Determine the predominant file type
-    const predominantType = Object.entries(typeCounts)
-      .sort((a, b) => b[1] - a[1])[0][0];
+    const predominantType = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0][0];
 
     switch (predominantType) {
       case 'js':

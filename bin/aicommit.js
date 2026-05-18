@@ -90,10 +90,7 @@ program
   .option('--reset', 'Reset configuration to defaults')
   .action(handleConfig);
 
-program
-  .command('setup')
-  .description('Interactive setup wizard')
-  .action(handleSetup);
+program.command('setup').description('Interactive setup wizard').action(handleSetup);
 
 program
   .command('hook')

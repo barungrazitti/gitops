@@ -18,7 +18,7 @@ class CommitMessageValidator {
       try {
         const messages = await provider.generateCommitMessages(diff, {
           ...options,
-          attempt: attempt
+          attempt: attempt,
         });
 
         const validMessages = [];
@@ -39,7 +39,7 @@ class CommitMessageValidator {
               issues: validation.issues,
               isExplanatory: validation.isExplanatory,
               isGeneric: validation.isGeneric,
-              relevanceScore
+              relevanceScore,
             });
           }
         }
@@ -49,7 +49,10 @@ class CommitMessageValidator {
         if (validMessages.length === 0 && messageScores.length > 0) {
           const bestMessage = messageScores[0];
           if (bestMessage.relevanceScore >= 40) {
-            const suggestions = messageFormatter.getImprovedMessageSuggestions(bestMessage.message, options.context);
+            const suggestions = messageFormatter.getImprovedMessageSuggestions(
+              bestMessage.message,
+              options.context
+            );
             if (suggestions.length > 0) {
               validMessages.push(suggestions[0]);
             }
@@ -59,39 +62,54 @@ class CommitMessageValidator {
         if (validMessages.length > 0) {
           if (provider.activityLogger) {
             await provider.activityLogger.info('commit_message_validation', {
-              provider: provider.name, attempt, validMessages: validMessages.length,
-              invalidMessages: invalidMessages.length, totalMessages: messages.length
+              provider: provider.name,
+              attempt,
+              validMessages: validMessages.length,
+              invalidMessages: invalidMessages.length,
+              totalMessages: messages.length,
             });
           }
           return validMessages;
         }
 
         const errorDetails = {
-          provider: provider.name, attempt, invalidMessages,
+          provider: provider.name,
+          attempt,
+          invalidMessages,
           allExplanatory: invalidMessages.every(m => m.isExplanatory),
-          allGeneric: invalidMessages.every(m => m.isGeneric)
+          allGeneric: invalidMessages.every(m => m.isGeneric),
         };
 
         if (provider.activityLogger) {
           await provider.activityLogger.warn('commit_message_validation_failed', errorDetails);
         }
 
-        const error = new Error(`All generated commit messages are invalid: ${invalidMessages.map(m => m.issues.join('; ')).join(' | ')}`);
+        const error = new Error(
+          `All generated commit messages are invalid: ${invalidMessages.map(m => m.issues.join('; ')).join(' | ')}`
+        );
         error.validationDetails = errorDetails;
         throw error;
       } catch (error) {
         lastError = error;
-        if (error.message.includes('Authentication') || error.message.includes('permission') || error.message.includes('401') || error.message.includes('403')) {
+        if (
+          error.message.includes('Authentication') ||
+          error.message.includes('permission') ||
+          error.message.includes('401') ||
+          error.message.includes('403')
+        ) {
           throw error;
         }
         if (provider.activityLogger) {
           await provider.activityLogger.debug('commit_generation_retry', {
-            provider: provider.name, attempt, maxRetries, error: error.message,
-            willRetry: attempt < maxRetries
+            provider: provider.name,
+            attempt,
+            maxRetries,
+            error: error.message,
+            willRetry: attempt < maxRetries,
           });
         }
         if (attempt === maxRetries) break;
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000);
+        const delay = Math.min(1000 * 2 ** (attempt - 1), 5000);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
@@ -100,23 +118,31 @@ class CommitMessageValidator {
       try {
         if (provider.activityLogger) {
           await provider.activityLogger.info('fallback_to_groq', {
-            originalProvider: provider.name, originalError: lastError.message, attempts: maxRetries
+            originalProvider: provider.name,
+            originalError: lastError.message,
+            attempts: maxRetries,
           });
         }
         const GroqProvider = require('../providers/groq-provider');
         const groqProvider = new GroqProvider();
         if (provider.activityLogger) groqProvider.activityLogger = provider.activityLogger;
         return await groqProvider.generateCommitMessagesWithValidation(diff, {
-          ...options, maxRetries: 1, enableFallback: false, isFallback: true
+          ...options,
+          maxRetries: 1,
+          enableFallback: false,
+          isFallback: true,
         });
       } catch (fallbackError) {
         if (provider.activityLogger) {
           await provider.activityLogger.error('fallback_to_groq_failed', {
-            originalProvider: provider.name, originalError: lastError.message,
-            fallbackError: fallbackError.message
+            originalProvider: provider.name,
+            originalError: lastError.message,
+            fallbackError: fallbackError.message,
           });
         }
-        const combinedError = new Error(`Primary provider (${provider.name}) failed after ${maxRetries} attempts: ${lastError.message}. Fallback to Groq also failed: ${fallbackError.message}`);
+        const combinedError = new Error(
+          `Primary provider (${provider.name}) failed after ${maxRetries} attempts: ${lastError.message}. Fallback to Groq also failed: ${fallbackError.message}`
+        );
         combinedError.originalError = lastError;
         combinedError.fallbackError = fallbackError;
         throw combinedError;

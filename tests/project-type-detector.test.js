@@ -12,7 +12,7 @@ const ProjectTypeDetector = require('../src/utils/project-type-detector');
 describe('ProjectTypeDetector', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     path.join.mockImplementation((...args) => args.join('/'));
     path.isAbsolute.mockReturnValue(false);
   });
@@ -22,7 +22,7 @@ describe('ProjectTypeDetector', () => {
       fs.pathExists.mockResolvedValue(true);
       fs.readJson.mockResolvedValue({
         dependencies: {},
-        devDependencies: {}
+        devDependencies: {},
       });
 
       const result = await ProjectTypeDetector.detectProjectType('/test/repo');
@@ -31,7 +31,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect Python project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('requirements.txt')) return true;
         if (p.includes('node_modules')) return false;
         return false;
@@ -43,13 +43,13 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect React project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('package.json')) return true;
         return false;
       });
       fs.readJson.mockResolvedValue({
         dependencies: { react: '^18.0.0' },
-        devDependencies: {}
+        devDependencies: {},
       });
 
       const result = await ProjectTypeDetector.detectProjectType('/test/repo');
@@ -58,7 +58,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect WordPress project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('wp-config.php')) return true;
         if (p.includes('wp-content')) return true;
         if (p.includes('wp-includes')) return true;
@@ -74,13 +74,13 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect Vue project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('package.json')) return true;
         return false;
       });
       fs.readJson.mockResolvedValue({
         dependencies: { vue: '^3.0.0' },
-        devDependencies: {}
+        devDependencies: {},
       });
 
       const result = await ProjectTypeDetector.detectProjectType('/test/repo');
@@ -89,14 +89,14 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect Angular project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('package.json')) return true;
         if (p.includes('angular.json')) return true;
         return false;
       });
       fs.readJson.mockResolvedValue({
         dependencies: { '@angular/core': '^17.0.0' },
-        devDependencies: {}
+        devDependencies: {},
       });
 
       const result = await ProjectTypeDetector.detectProjectType('/test/repo');
@@ -105,7 +105,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect Docker project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('Dockerfile')) return true;
         if (p.includes('node_modules')) return false;
         return false;
@@ -117,7 +117,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect Java project', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('pom.xml')) return true;
         if (p.includes('node_modules')) return false;
         return false;
@@ -138,7 +138,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should prioritize WordPress over Node.js', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('wp-config.php')) return true;
         if (p.includes('wp-content')) return true;
         if (p.includes('package.json')) return true;
@@ -147,7 +147,7 @@ describe('ProjectTypeDetector', () => {
       });
       fs.readJson.mockResolvedValue({
         dependencies: { react: '^18.0.0' },
-        devDependencies: {}
+        devDependencies: {},
       });
 
       const result = await ProjectTypeDetector.detectProjectType('/test/repo');
@@ -172,7 +172,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect WordPress themes', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('wp-config.php')) return true;
         if (p.includes('wp-content')) return true;
         if (p.includes('themes')) return true;
@@ -185,7 +185,7 @@ describe('ProjectTypeDetector', () => {
     });
 
     it('should detect WordPress plugins', async () => {
-      fs.pathExists.mockImplementation((p) => {
+      fs.pathExists.mockImplementation(p => {
         if (p.includes('wp-config.php')) return true;
         if (p.includes('wp-content')) return true;
         if (p.includes('plugins')) return true;

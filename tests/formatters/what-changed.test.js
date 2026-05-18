@@ -22,12 +22,12 @@ describe('WhatChangedFormatter', () => {
         components: {
           packages: ['@myapp/auth', '@myapp/api'],
           custom: ['UserService'],
-          boundaries: ['auth-module']
-        }
+          boundaries: ['auth-module'],
+        },
       };
 
       const result = formatter.format(context, 'Add authentication');
-      
+
       expect(result).toContain('Affected packages: @myapp/auth, @myapp/api');
       expect(result).toContain('Affected components: UserService');
       expect(result).toContain('Module boundaries: auth-module');
@@ -39,13 +39,13 @@ describe('WhatChangedFormatter', () => {
           changed: [
             { path: 'src/auth/login.js' },
             { path: 'src/auth/logout.js' },
-            { path: 'src/utils/helper.js' }
-          ]
-        }
+            { path: 'src/utils/helper.js' },
+          ],
+        },
       };
 
       const result = formatter.format(context, 'Update auth');
-      
+
       expect(result).toContain('src/auth:');
       expect(result).toContain('src/utils:');
     });
@@ -59,13 +59,13 @@ describe('WhatChangedFormatter', () => {
             plugins: ['woocommerce'],
             themes: [],
             specificPages: ['single-product'],
-            components: ['widgets']
-          }
-        }
+            components: ['widgets'],
+          },
+        },
       };
 
       const result = formatter.format(context, 'Update WooCommerce');
-      
+
       expect(result).toContain('WordPress plugin changes');
       expect(result).toContain('Plugins affected: woocommerce');
       expect(result).toContain('Pages/templates: single-product');
@@ -74,29 +74,24 @@ describe('WhatChangedFormatter', () => {
     it('should handle root level files', () => {
       const context = {
         files: {
-          changed: [
-            { path: 'package.json' },
-            { path: 'README.md' }
-          ]
-        }
+          changed: [{ path: 'package.json' }, { path: 'README.md' }],
+        },
       };
 
       const result = formatter.format(context, 'Update docs');
-      
+
       expect(result).toContain('Root files:');
     });
 
     it('should truncate long file names', () => {
       const context = {
         files: {
-          changed: [
-            { path: 'src/components/very-long-component-name-that-exceeds-limit.js' }
-          ]
-        }
+          changed: [{ path: 'src/components/very-long-component-name-that-exceeds-limit.js' }],
+        },
       };
 
       const result = formatter.format(context, 'Update component');
-      
+
       expect(result.length).toBeLessThan(200);
     });
 
@@ -115,7 +110,7 @@ describe('WhatChangedFormatter', () => {
         { path: 'src/auth/login.js' },
         { path: 'src/auth/logout.js' },
         { path: 'src/utils/helper.js' },
-        { path: 'package.json' }
+        { path: 'package.json' },
       ];
 
       const grouped = formatter._groupFilesByDirectory(files);

@@ -9,15 +9,17 @@ describe('ActivityLogger', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
-    
+
     // Mock conf
-    jest.mock('conf', () => jest.fn().mockImplementation(() => ({
-        get: jest.fn((key) => {
+    jest.mock('conf', () =>
+      jest.fn().mockImplementation(() => ({
+        get: jest.fn(key => {
           if (key === 'logLevel') return 'info';
           return null;
         }),
-      })));
-    
+      }))
+    );
+
     // Mock fs-extra
     jest.mock('fs-extra', () => ({
       ensureDir: jest.fn().mockResolvedValue(),
@@ -26,13 +28,13 @@ describe('ActivityLogger', () => {
       appendFile: jest.fn().mockResolvedValue(),
       remove: jest.fn().mockResolvedValue(),
     }));
-    
+
     // Mock os
     jest.mock('os', () => ({
       platform: () => 'darwin',
       homedir: () => '/Users/test',
     }));
-    
+
     ActivityLogger = require('../src/core/activity-logger');
     logger = new ActivityLogger();
   });

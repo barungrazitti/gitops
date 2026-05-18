@@ -62,7 +62,8 @@ class MessageValidator {
     ];
 
     // Conventional commit type pattern
-    this.conventionalTypePattern = /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/i;
+    this.conventionalTypePattern =
+      /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/i;
   }
 
   /**
@@ -77,7 +78,7 @@ class MessageValidator {
         valid: false,
         score: 0,
         issues: ['empty-message'],
-        suggestions: ['Provide a non-empty commit message']
+        suggestions: ['Provide a non-empty commit message'],
       };
     }
 
@@ -210,8 +211,8 @@ class MessageValidator {
           validCount: 0,
           genericCount: 0,
           withReasoning: 0,
-          qualityRate: 0
-        }
+          qualityRate: 0,
+        },
       };
     }
 
@@ -225,7 +226,7 @@ class MessageValidator {
       const messageData = {
         message,
         score: result.score,
-        issues: result.issues
+        issues: result.issues,
       };
 
       if (result.valid) {
@@ -233,7 +234,7 @@ class MessageValidator {
       } else {
         invalidMessages.push({
           ...messageData,
-          suggestions: result.suggestions
+          suggestions: result.suggestions,
         });
       }
 
@@ -257,8 +258,8 @@ class MessageValidator {
         validCount: validMessages.length,
         genericCount,
         withReasoning,
-        qualityRate
-      }
+        qualityRate,
+      },
     };
   }
 
@@ -275,7 +276,7 @@ class MessageValidator {
       return {
         qual01Pass: true,
         qual02Pass: true,
-        failures: []
+        failures: [],
       };
     }
 
@@ -291,25 +292,25 @@ class MessageValidator {
         requirement: 'QUAL-01',
         description: 'Too many generic messages',
         threshold: '<5% generic',
-        actual: `${(genericRate * 100).toFixed(1)}% generic`
+        actual: `${(genericRate * 100).toFixed(1)}% generic`,
       });
     }
 
     // QUAL-02: >90% with reasoning
-    const qual02Pass = reasoningRate >= 0.90;
+    const qual02Pass = reasoningRate >= 0.9;
     if (!qual02Pass) {
       failures.push({
         requirement: 'QUAL-02',
         description: 'Insufficient reasoning in messages',
         threshold: '>90% with reasoning',
-        actual: `${(reasoningRate * 100).toFixed(1)}% with reasoning`
+        actual: `${(reasoningRate * 100).toFixed(1)}% with reasoning`,
       });
     }
 
     return {
       qual01Pass,
       qual02Pass,
-      failures
+      failures,
     };
   }
 
@@ -366,12 +367,16 @@ class MessageValidator {
     const { patterns, recommendation, stats } = diffFacts;
     const typeMatch = message.match(/^([a-z]+)(\(.+\))?:/i);
     const msgType = typeMatch ? typeMatch[1].toLowerCase() : '';
-    const msgBody = typeMatch ? message.substring(typeMatch[0].length).toLowerCase() : message.toLowerCase();
+    const msgBody = typeMatch
+      ? message.substring(typeMatch[0].length).toLowerCase()
+      : message.toLowerCase();
 
     if (patterns.isDeletionOnly && (msgType === 'feat' || msgType === 'fix')) {
       result.penalty += 40;
       result.issues.push('type-mismatch-deletion');
-      result.suggestions.push(`Diff contains ONLY deletions. Use "chore" or "refactor", not "${msgType}".`);
+      result.suggestions.push(
+        `Diff contains ONLY deletions. Use "chore" or "refactor", not "${msgType}".`
+      );
     }
 
     if (patterns.isConfigOnly && msgType === 'feat') {
@@ -391,22 +396,27 @@ class MessageValidator {
       if (featWords.some(w => msgBody.includes(w))) {
         result.penalty += 20;
         result.issues.push('claims-addition-for-deletion');
-        result.suggestions.push('Diff is predominantly deletions. Describe what was removed, not what was "improved".');
+        result.suggestions.push(
+          'Diff is predominantly deletions. Describe what was removed, not what was "improved".'
+        );
       }
     }
 
-    const hasConsoleRemoval = patterns.detectedOperations &&
+    const hasConsoleRemoval =
+      patterns.detectedOperations &&
       patterns.detectedOperations.some(op => op.type === 'remove-console-logs');
     if (hasConsoleRemoval && stats.totalAdditions <= 5) {
       const hallucinationPatterns = [
         /improve.*(?:handling|processing|resolution|experience)/i,
         /enhance.*(?:handling|processing|resolution|experience)/i,
-        /better.*(?:handling|processing|resolution)/i
+        /better.*(?:handling|processing|resolution)/i,
       ];
       if (hallucinationPatterns.some(p => p.test(message))) {
         result.penalty += 25;
         result.issues.push('hallucinated-improvement');
-        result.suggestions.push('Only console.log statements were removed. Describe the removal, not an "improvement".');
+        result.suggestions.push(
+          'Only console.log statements were removed. Describe the removal, not an "improvement".'
+        );
       }
     }
 
@@ -416,14 +426,17 @@ class MessageValidator {
       result.suggestions.push('Files were deleted. Use "chore", not "feat".');
     }
 
-    const validAlternatives = patterns.isDeletionOnly && recommendation.type === 'chore'
-      ? ['chore', 'refactor']
-      : [recommendation.type];
+    const validAlternatives =
+      patterns.isDeletionOnly && recommendation.type === 'chore'
+        ? ['chore', 'refactor']
+        : [recommendation.type];
 
     if (recommendation.confidence >= 0.85 && !validAlternatives.includes(msgType)) {
       result.penalty += 10;
       result.issues.push('type-override');
-      result.suggestions.push(`Recommended type "${recommendation.type}" (${recommendation.reason}).`);
+      result.suggestions.push(
+        `Recommended type "${recommendation.type}" (${recommendation.reason}).`
+      );
     }
 
     return result;
@@ -439,9 +452,8 @@ class MessageValidator {
     }
 
     const lowerMessage = message.toLowerCase();
-    return components.some(comp =>
-      lowerMessage.includes(comp.toLowerCase()) ||
-      message.includes(`(${comp})`)
+    return components.some(
+      comp => lowerMessage.includes(comp.toLowerCase()) || message.includes(`(${comp})`)
     );
   }
 
@@ -454,7 +466,7 @@ class MessageValidator {
       valid,
       score: Math.round(score),
       issues,
-      suggestions: suggestions.length > 0 ? suggestions : []
+      suggestions: suggestions.length > 0 ? suggestions : [],
     };
   }
 }

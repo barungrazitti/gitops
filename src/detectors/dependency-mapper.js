@@ -30,9 +30,19 @@ const ESM_REEXPORT_EXPORT = /export\s+\{[^}]*\}\s+from/g;
 
 /** Directories to skip when scanning */
 const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.svn', 'dist', 'build',
-  'coverage', '.next', '.nuxt', '__pycache__',
-  '.cache', '.turbo', '.tmp', 'vendor'
+  'node_modules',
+  '.git',
+  '.svn',
+  'dist',
+  'build',
+  'coverage',
+  '.next',
+  '.nuxt',
+  '__pycache__',
+  '.cache',
+  '.turbo',
+  '.tmp',
+  'vendor',
 ]);
 
 class DependencyMapper {
@@ -138,8 +148,12 @@ class DependencyMapper {
     }
 
     // module.exports = { ... } (object literal, not a named thing)
-    if (/module\.exports\s*=\s*\{/.test(fileContent) &&
-        !/module\.exports\s*=\s*\w+/.test(fileContent.replace(/module\.exports\s*=\s*\{[^}]*\}\s*;?\s*$/m, ''))) {
+    if (
+      /module\.exports\s*=\s*\{/.test(fileContent) &&
+      !/module\.exports\s*=\s*\w+/.test(
+        fileContent.replace(/module\.exports\s*=\s*\{[^}]*\}\s*;?\s*$/m, '')
+      )
+    ) {
       // Only add default if not already captured by named pattern above
       if (!exports.some(e => e.type === 'default')) {
         exports.push({ name: 'module.exports', type: 'default' });
@@ -180,7 +194,7 @@ class DependencyMapper {
         imports.push({
           file: filePath,
           module: imp.module,
-          type: imp.type
+          type: imp.type,
         });
       }
 
@@ -189,7 +203,7 @@ class DependencyMapper {
         exports.push({
           file: filePath,
           name: exp.name,
-          type: exp.type
+          type: exp.type,
         });
       }
     }
@@ -288,7 +302,11 @@ class DependencyMapper {
     const sourceDir = path.dirname(sourceFile);
     let resolvedImport;
 
-    if (importModule.startsWith('/') || importModule.startsWith('./') || importModule.startsWith('../')) {
+    if (
+      importModule.startsWith('/') ||
+      importModule.startsWith('./') ||
+      importModule.startsWith('../')
+    ) {
       resolvedImport = path.normalize(path.join(sourceDir, importModule));
     } else {
       resolvedImport = importModule;
@@ -338,7 +356,7 @@ class DependencyMapper {
           if (this._importReferencesFile(imp.module, sourceFile, new Set([normalizedChanged]))) {
             dependents.push({
               file: sourceFile,
-              importStatement: imp.module
+              importStatement: imp.module,
             });
             break;
           }

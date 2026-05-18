@@ -28,7 +28,10 @@ class AutoGit {
     // Handle dry run mode
     if (options.dryRun) {
       await this.activityLogger.info('auto_git_started', { options });
-      await this.activityLogger.info('auto_git_completed', { reason: 'dry_run', duration: Date.now() - startTime });
+      await this.activityLogger.info('auto_git_completed', {
+        reason: 'dry_run',
+        duration: Date.now() - startTime,
+      });
       return;
     }
 
@@ -41,7 +44,10 @@ class AutoGit {
       // Step 2: Check for changes
       const hasChanges = await this.checkForChanges();
       if (!hasChanges && !options.force) {
-        await this.activityLogger.info('auto_git_completed', { reason: 'no_changes', duration: Date.now() - startTime });
+        await this.activityLogger.info('auto_git_completed', {
+          reason: 'no_changes',
+          duration: Date.now() - startTime,
+        });
         return;
       }
 
@@ -81,7 +87,9 @@ class AutoGit {
           if (skipPull) {
             await this.activityLogger.warn('pull_skipped', { reason: pullError.message });
           } else {
-            await this.activityLogger.info('auto_git_cancelled', { reason: 'pull_failed_cancelled' });
+            await this.activityLogger.info('auto_git_cancelled', {
+              reason: 'pull_failed_cancelled',
+            });
             return;
           }
         }
@@ -245,7 +253,7 @@ class AutoGit {
     }
   }
 
-/**
+  /**
    * Pull latest changes and handle any conflicts
    */
   async pullAndHandleConflicts() {
@@ -308,7 +316,9 @@ class AutoGit {
           console.log(chalk.dim('   1. Resolve conflicts in your editor'));
           console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
           console.log(chalk.dim('   3. Continue with: git commit'));
-          throw new Error('Manual conflict resolution required. Please resolve conflicts and run again.');
+          throw new Error(
+            'Manual conflict resolution required. Please resolve conflicts and run again.'
+          );
         }
 
         try {
@@ -323,7 +333,9 @@ class AutoGit {
             }
 
             await this.git.add('.');
-            await this.git.commit(`Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`);
+            await this.git.commit(
+              `Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`
+            );
 
             console.log(chalk.green(`✓ Resolved ${status.conflicted.length} conflict(s)`));
             this.spinner.succeed('Pull and conflict resolution complete');
@@ -397,17 +409,12 @@ class AutoGit {
         ]);
 
         if (fallback === 'cancel') {
-          await this.activityLogger.logConflictResolution(
-            conflictedFiles,
-            'ai',
-            false,
-            {
-              error: error.message,
-              file,
-              fallbackUsed: fallback,
-              resolutionTime: Date.now() - resolutionStartTime,
-            }
-          );
+          await this.activityLogger.logConflictResolution(conflictedFiles, 'ai', false, {
+            error: error.message,
+            file,
+            fallbackUsed: fallback,
+            resolutionTime: Date.now() - resolutionStartTime,
+          });
           throw new Error('Operation cancelled due to resolution failure');
         }
 
@@ -419,16 +426,11 @@ class AutoGit {
     await this.git.add('.');
     await this.git.commit('AI-resolved merge conflicts with intelligent merging');
 
-    await this.activityLogger.logConflictResolution(
-      conflictedFiles,
-      'ai',
-      true,
-      {
-        resolutionTime: Date.now() - resolutionStartTime,
-        fallbackUsed: false,
-        chunkingUsed: false,
-      }
-    );
+    await this.activityLogger.logConflictResolution(conflictedFiles, 'ai', true, {
+      resolutionTime: Date.now() - resolutionStartTime,
+      fallbackUsed: false,
+      chunkingUsed: false,
+    });
   }
 
   /**
@@ -440,13 +442,13 @@ class AutoGit {
       const fileContent = await this.git.show([`HEAD:${filePath}`]);
       const currentContent = await this.git.show([`--theirs`, `:${filePath}`]);
       const incomingContent = await this.git.show([`--ours`, `:${filePath}`]);
-      
+
       // Get the current conflicted file to see conflict markers
       const repoRoot = await this.git.revparse(['--show-toplevel']);
       const fullPath = require('path').join(repoRoot, filePath);
       const fs = require('fs-extra');
       const conflictedContent = await fs.readFile(fullPath, 'utf8');
-      
+
       // Create conflict context for AI
       const conflictContext = {
         filePath,
@@ -456,13 +458,12 @@ class AutoGit {
         conflictedContent,
         timestamp: Date.now(),
       };
-      
+
       // Use AI to resolve conflicts
       const resolvedContent = await this.aiCommit.resolveConflictWithAI(conflictContext);
-      
+
       // Write the resolved content back to the file
       await fs.writeFile(fullPath, resolvedContent, 'utf8');
-      
     } catch (error) {
       throw new Error(`Failed to resolve conflicts in ${filePath}: ${error.message}`);
     }

@@ -1,55 +1,73 @@
 {
-  "extends": ["airbnb-base", "prettier"],
+  "extends": [
+    "airbnb-base",
+    "prettier"
+  ],
   "env": {
     "node": true,
-    "jest": true,
-    "es2021": true
+    "es6": true,
+    "jest": true
   },
   "parserOptions": {
-    "ecmaVersion": 2021,
+    "ecmaVersion": 2022,
     "sourceType": "script"
   },
   "rules": {
-    "no-console": "warn",
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
-    "import/extensions": ["error", "ignorePackages", { "js": "never" }],
+    "import/extensions": "off",
+    "import/prefer-default-export": "off",
+    "import/no-unresolved": "off",
+    "import/no-dynamic-require": "off",
     "no-restricted-syntax": "off",
     "no-await-in-loop": "off",
-    "no-plusplus": "off",
+    "no-console": "warn",
+    "no-underscore-dangle": "off",
+    "no-param-reassign": "off",
     "class-methods-use-this": "off",
+    "no-return-await": "off",
+    "no-unused-vars": "off",
+    "no-plusplus": "off",
+    "no-continue": "off",
+    "no-shadow": "off",
+    "prefer-const": "off",
     "prefer-template": "off",
     "prefer-destructuring": "off",
-    "no-continue": "off",
+    "global-require": "off",
+    "no-useless-escape": "off",
     "no-nested-ternary": "off",
     "consistent-return": "off",
-    "no-param-reassign": "off",
-    "no-shadow": "off",
-    "no-useless-escape": "off",
+    "radix": "off",
+    "new-cap": "off",
+    "arrow-body-style": "off",
+    "object-shorthand": "off",
+    "no-useless-constructor": "off",
+    "no-empty": "off",
+    "no-control-regex": "off",
+    "camelcase": "off",
+    "no-throw-literal": "off",
+    "no-template-curly-in-string": "off",
+    "no-undef": "warn",
+    "no-restricted-globals": "off",
     "no-new": "off",
     "default-case": "off",
-    "global-require": "off",
-    "no-control-regex": "off",
+    "no-cond-assign": "off",
+    "no-use-before-define": "off",
+    "max-classes-per-file": "off",
     "no-promise-executor-return": "off",
-    "no-throw-literal": "off",
-    "no-empty": "off",
-    "no-return-assign": "off",
     "no-useless-catch": "off",
-    "prefer-rest-params": "off",
-    "no-const-assign": "off",
     "no-dupe-class-members": "off",
     "no-unreachable": "off",
-    "radix": "off",
-    "no-underscore-dangle": "off",
-    "no-return-await": "off",
-    "no-cond-assign": "off",
-    "new-cap": "off",
-    "no-restricted-globals": "off"
+    "prefer-rest-params": "off",
+    "no-return-assign": "off",
+    "no-const-assign": "off",
+    "require-jsdoc": "off",
+    "valid-jsdoc": "off"
   },
-  "settings": {
-    "import/resolver": {
-      "node": {
-        "extensions": [".js"]
+  "overrides": [
+    {
+      "files": ["tests/**/*.js", "tests/*.js"],
+      "rules": {
+        "no-console": "off"
       }
     }
-  }
+  ]
 }

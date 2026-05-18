@@ -100,13 +100,13 @@ class DiffCategorizer {
    */
   resolveCategory(categories) {
     // If all agree, return that category
-    if (categories.every((c) => c === 'small')) {
+    if (categories.every(c => c === 'small')) {
       return 'small';
     }
-    if (categories.every((c) => c === 'medium')) {
+    if (categories.every(c => c === 'medium')) {
       return 'medium';
     }
-    if (categories.every((c) => c === 'large')) {
+    if (categories.every(c => c === 'large')) {
       return 'large';
     }
 

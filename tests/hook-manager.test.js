@@ -9,7 +9,7 @@ describe('HookManager', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
-    
+
     jest.mock('fs-extra', () => ({
       ensureDir: jest.fn().mockResolvedValue(),
       pathExists: jest.fn().mockResolvedValue(false),
@@ -19,11 +19,13 @@ describe('HookManager', () => {
       remove: jest.fn().mockResolvedValue(),
       readdir: jest.fn().mockResolvedValue([]),
     }));
-    
-    jest.mock('../src/core/git-manager', () => jest.fn().mockImplementation(() => ({
+
+    jest.mock('../src/core/git-manager', () =>
+      jest.fn().mockImplementation(() => ({
         getRepositoryRoot: jest.fn().mockResolvedValue('/test/repo'),
-      })));
-    
+      }))
+    );
+
     HookManager = require('../src/core/hook-manager');
     hookManager = new HookManager();
   });
@@ -40,14 +42,16 @@ describe('HookManager', () => {
       expect(result.success).toBe(true);
     });
 
-     it('should throw if hook already installed', async () => {
-       const fs = require('fs-extra');
-       fs.pathExists.mockResolvedValue(true);
-       // Mock content that indicates our hook is already installed
-       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# ');
-       
-       await expect(hookManager.install()).rejects.toThrow('already installed');
-     });
+    it('should throw if hook already installed', async () => {
+      const fs = require('fs-extra');
+      fs.pathExists.mockResolvedValue(true);
+      // Mock content that indicates our hook is already installed
+      fs.readFile.mockResolvedValue(
+        '#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# '
+      );
+
+      await expect(hookManager.install()).rejects.toThrow('already installed');
+    });
   });
 
   describe('uninstall', () => {
@@ -59,17 +63,19 @@ describe('HookManager', () => {
       const fs = require('fs-extra');
       fs.pathExists.mockResolvedValue(true);
       fs.readFile.mockResolvedValue('#!/bin/bash\necho "other"');
-      
+
       await expect(hookManager.uninstall()).rejects.toThrow();
     });
 
-     it('should uninstall successfully', async () => {
-       const fs = require('fs-extra');
-       fs.pathExists.mockResolvedValue(true);
-       // Mock content that indicates our hook is installed
-       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# ');
-       
-       const result = await hookManager.uninstall();
+    it('should uninstall successfully', async () => {
+      const fs = require('fs-extra');
+      fs.pathExists.mockResolvedValue(true);
+      // Mock content that indicates our hook is installed
+      fs.readFile.mockResolvedValue(
+        '#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# '
+      );
+
+      const result = await hookManager.uninstall();
       expect(result.success).toBe(true);
     });
   });
@@ -82,32 +88,34 @@ describe('HookManager', () => {
     });
   });
 
-   describe('checkHookInstalled', () => {
-     it('should return true when hook is installed', async () => {
-       const fs = require('fs-extra');
-       fs.pathExists.mockResolvedValue(true);
-       // Mock content that indicates our hook is installed
-       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# ');
-       
-       const result = await hookManager.isInstalled();
-       expect(result).toBe(true);
-     });
+  describe('checkHookInstalled', () => {
+    it('should return true when hook is installed', async () => {
+      const fs = require('fs-extra');
+      fs.pathExists.mockResolvedValue(true);
+      // Mock content that indicates our hook is installed
+      fs.readFile.mockResolvedValue(
+        '#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# '
+      );
 
-     it('should return false when not installed', async () => {
-       const fs = require('fs-extra');
-       fs.pathExists.mockResolvedValue(true);
-       // Mock content that does NOT indicate our hook is installed
-       fs.readFile.mockResolvedValue('#!/bin/bash\naic commit');
-       
-       const result = await hookManager.isInstalled();
-       expect(result).toBe(false);
-     });
-   });
+      const result = await hookManager.isInstalled();
+      expect(result).toBe(true);
+    });
 
-   describe('getHookPath', () => {
-     it('should return correct path', async () => {
-       const hookPath = await hookManager.getHookPath();
-       expect(hookPath).toContain('.git/hooks/prepare-commit-msg');
-     });
-   });
+    it('should return false when not installed', async () => {
+      const fs = require('fs-extra');
+      fs.pathExists.mockResolvedValue(true);
+      // Mock content that does NOT indicate our hook is installed
+      fs.readFile.mockResolvedValue('#!/bin/bash\naic commit');
+
+      const result = await hookManager.isInstalled();
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('getHookPath', () => {
+    it('should return correct path', async () => {
+      const hookPath = await hookManager.getHookPath();
+      expect(hookPath).toContain('.git/hooks/prepare-commit-msg');
+    });
+  });
 });

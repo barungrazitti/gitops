@@ -10,9 +10,9 @@ jest.mock('fs-extra', () => {
     existsSync: jest.fn().mockReturnValue(false),
     readdirSync: jest.fn().mockReturnValue([]),
     statSync: jest.fn().mockImplementation(() => ({
-      isDirectory: () => false
+      isDirectory: () => false,
     })),
-    readFileSync: jest.fn().mockReturnValue('')
+    readFileSync: jest.fn().mockReturnValue(''),
   };
 });
 
@@ -199,7 +199,8 @@ describe('FileTypeDetector', () => {
 
     describe('framework detection', () => {
       it('should detect React framework from content', () => {
-        const content = "import React from 'react';\nexport default function App() { return <div />; }";
+        const content =
+          "import React from 'react';\nexport default function App() { return <div />; }";
         const result = detector.detect('src/App.js', content);
         expect(result).toEqual({ type: 'source', language: 'javascript', framework: 'react' });
       });
@@ -223,7 +224,7 @@ describe('FileTypeDetector', () => {
       });
 
       it('should detect Express from content', () => {
-        const content = "const app = express();";
+        const content = 'const app = express();';
         const result = detector.detect('src/server.js', content);
         expect(result).toEqual({ type: 'source', language: 'javascript', framework: 'express' });
       });
@@ -249,11 +250,9 @@ describe('FileTypeDetector', () => {
         'package.json',
         'README.md',
         'styles/main.css',
-        'data/file.xyz'
+        'data/file.xyz',
       ];
-      const contents = new Map([
-        ['src/App.js', "import React from 'react';"]
-      ]);
+      const contents = new Map([['src/App.js', "import React from 'react';"]]);
 
       const result = detector.detectBatch(files, contents);
 

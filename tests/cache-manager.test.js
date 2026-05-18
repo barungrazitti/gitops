@@ -6,9 +6,9 @@ jest.mock('fs-extra');
 jest.mock('crypto', () => ({
   createHash: jest.fn().mockReturnValue({
     update: jest.fn().mockReturnValue({
-      digest: jest.fn().mockReturnValue('abc123')
-    })
-  })
+      digest: jest.fn().mockReturnValue('abc123'),
+    }),
+  }),
 }));
 
 const fs = require('fs-extra');
@@ -20,14 +20,14 @@ describe('CacheManager', () => {
   beforeEach(() => {
     jest.resetModules();
     jest.clearAllMocks();
-    
+
     fs.ensureDir.mockResolvedValue();
     fs.pathExists.mockResolvedValue(true);
     fs.readJson.mockResolvedValue({});
     fs.writeJson.mockResolvedValue();
     fs.readdir.mockResolvedValue([]);
     fs.remove.mockResolvedValue();
-    
+
     CacheManager = require('../src/core/cache-manager');
     cacheManager = new CacheManager();
   });

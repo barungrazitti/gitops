@@ -36,18 +36,11 @@ class ConfigManager {
       timeout: 120000, // 2 minutes for large files
       retries: 3,
       customPrompts: {},
-      excludeFiles: [
-        '*.log',
-        '*.tmp',
-        'node_modules/**',
-        '.git/**',
-        'dist/**',
-        'build/**',
-      ],
+      excludeFiles: ['*.log', '*.tmp', 'node_modules/**', '.git/**', 'dist/**', 'build/**'],
       // Security settings
       sanitize: true, // Auto-redact secrets and PII before sending to AI
       redactionLog: true, // Log what was redacted for transparency
-      
+
       // Test validation settings
       testValidation: {
         enabled: false,
@@ -258,7 +251,7 @@ class ConfigManager {
     try {
       // Strip any encryptedApiKey since ConfigManager doesn't handle encryption
       const { ...cleanValues } = values;
-       
+
       // Validate all values
       const testConfig = { ...this.config.store, ...cleanValues };
       const { error } = this.schema.validate(testConfig);
@@ -344,8 +337,8 @@ class ConfigManager {
 
       // Provider-specific model handling - don't use global model for different providers
       switch (provider) {
-      case 'groq':
-        providerConfig.model =
+        case 'groq':
+          providerConfig.model =
             config.model &&
             (config.model.includes('mixtral') ||
               config.model.includes('llama') ||
@@ -356,24 +349,24 @@ class ConfigManager {
               config.model.includes('qwen'))
               ? config.model
               : 'llama-3.1-8b-instant';
-        break;
-      case 'ollama': {
-        const ollamaModels = [
-          'qwen2.5-coder:latest',
-          'deepseek-v3.1:671b-cloud',
-          'qwen3-coder:480b-cloud',
-          'mistral:7b-instruct',
-          'deepseek-r1:8b',
-        ];
-        providerConfig.model = ollamaModels.includes(config.model || '')
-          ? config.model
-          : 'qwen2.5-coder:latest';
-        providerConfig.baseURL = 'http://localhost:11434';
-        break;
-      }
-      default:
-        providerConfig.model = config.model || 'default-model';
-        break;
+          break;
+        case 'ollama': {
+          const ollamaModels = [
+            'qwen2.5-coder:latest',
+            'deepseek-v3.1:671b-cloud',
+            'qwen3-coder:480b-cloud',
+            'mistral:7b-instruct',
+            'deepseek-r1:8b',
+          ];
+          providerConfig.model = ollamaModels.includes(config.model || '')
+            ? config.model
+            : 'qwen2.5-coder:latest';
+          providerConfig.baseURL = 'http://localhost:11434';
+          break;
+        }
+        default:
+          providerConfig.model = config.model || 'default-model';
+          break;
       }
 
       return providerConfig;
@@ -404,9 +397,7 @@ class ConfigManager {
     }
 
     if (!config.apiKey) {
-      throw new Error(
-        `API key not configured for ${provider}. Run 'aicommit setup' to configure.`
-      );
+      throw new Error(`API key not configured for ${provider}. Run 'aicommit setup' to configure.`);
     }
 
     return true;
@@ -424,7 +415,7 @@ class ConfigManager {
     if (!availableProviders.includes(provider.toLowerCase())) {
       return {
         valid: false,
-        errors: [`Unknown provider: ${provider}`]
+        errors: [`Unknown provider: ${provider}`],
       };
     }
 
@@ -446,10 +437,10 @@ class ConfigManager {
 
     return {
       valid: errors.length === 0,
-      errors
+      errors,
     };
   }
-  
+
   /**
    * Helper function to validate URL format
    */
@@ -474,7 +465,13 @@ class ConfigManager {
 
     for (const [key, value] of Object.entries(override)) {
       if (value !== undefined && value !== null) {
-        if (typeof value === 'object' && value !== null && !Array.isArray(value) && typeof result[key] === 'object' && result[key] !== null) {
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          !Array.isArray(value) &&
+          typeof result[key] === 'object' &&
+          result[key] !== null
+        ) {
           result[key] = this.mergeConfig(result[key], value);
         } else {
           result[key] = value;
@@ -492,7 +489,12 @@ class ConfigManager {
    * @returns {*} Nested value or undefined
    */
   getNestedValue(obj, path) {
-    return path.split('.').reduce((current, key) => (current && current[key] !== undefined ? current[key] : undefined), obj);
+    return path
+      .split('.')
+      .reduce(
+        (current, key) => (current && current[key] !== undefined ? current[key] : undefined),
+        obj
+      );
   }
 
   /**

@@ -26,7 +26,7 @@ describe('AutoGit', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     // Setup mock git
     mockGit = {
       raw: jest.fn(),
@@ -140,7 +140,9 @@ describe('AutoGit', () => {
       await autoGit.run({ manualMessage: 'custom message' });
 
       expect(autoGit.generateCommitMessage).not.toHaveBeenCalled();
-      expect(autoGit.commitChanges).toHaveBeenCalledWith('custom message', { manualMessage: 'custom message' });
+      expect(autoGit.commitChanges).toHaveBeenCalledWith('custom message', {
+        manualMessage: 'custom message',
+      });
     });
 
     it('should cancel when user cancels commit generation', async () => {
@@ -167,7 +169,7 @@ describe('AutoGit', () => {
     it('should handle pull failure and offer to skip', async () => {
       const pullError = new Error('Pull failed');
       autoGit.pullAndHandleConflicts.mockRejectedValue(pullError);
-      
+
       inquirer.prompt.mockResolvedValue({ skipPull: true });
 
       await autoGit.run();
@@ -185,7 +187,7 @@ describe('AutoGit', () => {
     it('should cancel when pull fails and user declines to skip', async () => {
       const pullError = new Error('Pull failed');
       autoGit.pullAndHandleConflicts.mockRejectedValue(pullError);
-      
+
       inquirer.prompt.mockResolvedValue({ skipPull: false });
 
       await autoGit.run();
@@ -196,7 +198,9 @@ describe('AutoGit', () => {
     it('should log workflow completion', async () => {
       await autoGit.run();
 
-      expect(mockAiCommit.activityLogger.info).toHaveBeenCalledWith('auto_git_started', { options: {} });
+      expect(mockAiCommit.activityLogger.info).toHaveBeenCalledWith('auto_git_started', {
+        options: {},
+      });
       expect(mockAiCommit.activityLogger.info).toHaveBeenCalledWith('auto_git_completed', {
         success: true,
         duration: expect.any(Number),
@@ -218,16 +222,16 @@ describe('AutoGit', () => {
   });
 
   describe('validateRepository', () => {
-     it('should validate successfully', async () => {
-       mockGit.checkIsRepo.mockResolvedValue(true);
+    it('should validate successfully', async () => {
+      mockGit.checkIsRepo.mockResolvedValue(true);
 
-       await autoGit.validateRepository();
+      await autoGit.validateRepository();
 
-       expect(mockSpinner.start).toHaveBeenCalled();
-       expect(mockSpinner.succeed).toHaveBeenCalledWith('Git repository validated');
-       // Spinner should remain as an ora instance, not be null
-       expect(autoGit.spinner).toBeDefined();
-     });
+      expect(mockSpinner.start).toHaveBeenCalled();
+      expect(mockSpinner.succeed).toHaveBeenCalledWith('Git repository validated');
+      // Spinner should remain as an ora instance, not be null
+      expect(autoGit.spinner).toBeDefined();
+    });
 
     it('should throw error for non-git repository', async () => {
       mockGit.checkIsRepo.mockResolvedValue(false);
@@ -335,20 +339,20 @@ describe('AutoGit', () => {
       expect(mockSpinner.succeed).toHaveBeenCalledWith('AI commit message generated');
     });
 
-     it('should handle no staged diff', async () => {
-       mockGit.diff.mockResolvedValue('');
+    it('should handle no staged diff', async () => {
+      mockGit.diff.mockResolvedValue('');
 
-       await expect(autoGit.generateCommitMessage()).rejects.toThrow('No staged changes available');
-       expect(mockSpinner.fail).toHaveBeenCalledWith('No staged changes available');
-     });
+      await expect(autoGit.generateCommitMessage()).rejects.toThrow('No staged changes available');
+      expect(mockSpinner.fail).toHaveBeenCalledWith('No staged changes available');
+    });
 
-     it('should handle generation errors', async () => {
-       const error = new Error('Generation error');
-       mockAiCommit.generateWithSequentialFallback.mockRejectedValue(error);
+    it('should handle generation errors', async () => {
+      const error = new Error('Generation error');
+      mockAiCommit.generateWithSequentialFallback.mockRejectedValue(error);
 
-       await expect(autoGit.generateCommitMessage()).rejects.toThrow('Generation error');
-       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to generate commit message');
-     });
+      await expect(autoGit.generateCommitMessage()).rejects.toThrow('Generation error');
+      expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to generate commit message');
+    });
 
     it('should pass options to AI generator', async () => {
       const options = { provider: 'ollama' };
@@ -410,7 +414,7 @@ describe('AutoGit', () => {
       mockGit.status.mockResolvedValue({
         conflicted: ['test.js'],
       });
-      
+
       autoGit.resolveConflictsWithAI = jest.fn().mockResolvedValue();
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'ai' });
 
@@ -424,10 +428,12 @@ describe('AutoGit', () => {
       mockGit.status.mockResolvedValue({
         conflicted: ['test.js'],
       });
-      
+
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'manual' });
 
-      await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow('Manual conflict resolution required');
+      await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow(
+        'Manual conflict resolution required'
+      );
     });
 
     it('should handle conflicts by keeping current changes', async () => {
@@ -435,7 +441,7 @@ describe('AutoGit', () => {
       mockGit.status.mockResolvedValue({
         conflicted: ['test.js'],
       });
-      
+
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'ours' });
       mockGit.add.mockResolvedValue();
       mockGit.commit.mockResolvedValue();
@@ -452,7 +458,7 @@ describe('AutoGit', () => {
       mockGit.status.mockResolvedValue({
         conflicted: ['test.js'],
       });
-      
+
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'theirs' });
       mockGit.add.mockResolvedValue();
       mockGit.commit.mockResolvedValue();
@@ -469,16 +475,18 @@ describe('AutoGit', () => {
       mockGit.status.mockResolvedValue({
         conflicted: ['test.js'],
       });
-      
+
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'cancel' });
 
-      await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow('Pull cancelled due to conflicts');
+      await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow(
+        'Pull cancelled due to conflicts'
+      );
     });
 
     it('should handle non-conflict pull errors', async () => {
       const error = new Error('Network error');
       mockGit.pull.mockRejectedValue(error);
-      
+
       inquirer.prompt.mockResolvedValue({ skipPull: true });
 
       await autoGit.pullAndHandleConflicts();
@@ -511,7 +519,9 @@ describe('AutoGit', () => {
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledTimes(2);
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledWith('file1.js');
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledWith('file2.js');
-      expect(mockGit.commit).toHaveBeenCalledWith('AI-resolved merge conflicts with intelligent merging');
+      expect(mockGit.commit).toHaveBeenCalledWith(
+        'AI-resolved merge conflicts with intelligent merging'
+      );
       expect(mockAiCommit.activityLogger.logConflictResolution).toHaveBeenCalledWith(
         conflictedFiles,
         'ai',
@@ -524,7 +534,7 @@ describe('AutoGit', () => {
       const conflictedFiles = ['file1.js'];
       const error = new Error('AI resolution failed');
       autoGit.resolveFileConflictsWithAI.mockRejectedValue(error);
-      
+
       inquirer.prompt.mockResolvedValue({ fallback: 'ours' });
       mockGit.raw.mockResolvedValue();
 
@@ -537,10 +547,12 @@ describe('AutoGit', () => {
       const conflictedFiles = ['file1.js'];
       const error = new Error('AI resolution failed');
       autoGit.resolveFileConflictsWithAI.mockRejectedValue(error);
-      
+
       inquirer.prompt.mockResolvedValue({ fallback: 'cancel' });
 
-      await expect(autoGit.resolveConflictsWithAI(conflictedFiles)).rejects.toThrow('Operation cancelled due to resolution failure');
+      await expect(autoGit.resolveConflictsWithAI(conflictedFiles)).rejects.toThrow(
+        'Operation cancelled due to resolution failure'
+      );
     });
   });
 
@@ -581,7 +593,9 @@ describe('AutoGit', () => {
       const error = new Error('Resolution failed');
       mockAiCommit.resolveConflictWithAI.mockRejectedValue(error);
 
-      await expect(autoGit.resolveFileConflictsWithAI('test.js')).rejects.toThrow('Failed to resolve conflicts in test.js: Resolution failed');
+      await expect(autoGit.resolveFileConflictsWithAI('test.js')).rejects.toThrow(
+        'Failed to resolve conflicts in test.js: Resolution failed'
+      );
     });
   });
 

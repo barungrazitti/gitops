@@ -40,12 +40,12 @@ describe('MessageFormatter (refactored)', () => {
     it('should format message with full context', () => {
       const context = {
         components: { packages: ['auth'] },
-        dependencies: { affected: [] }
+        dependencies: { affected: [] },
       };
       const message = 'Add authentication';
 
       const result = formatter.formatWithContext(message, context, {
-        conventional: true
+        conventional: true,
       });
 
       expect(result).toBeDefined();
@@ -56,12 +56,12 @@ describe('MessageFormatter (refactored)', () => {
       const context = {
         components: { packages: ['auth'] },
         dependencies: { affected: ['module-a'] },
-        conventions: { commitType: 'feat' }
+        conventions: { commitType: 'feat' },
       };
       const message = 'Add authentication';
 
       const result = formatter.formatWithContext(message, context, {
-        includeSections: ['what', 'why', 'impact']
+        includeSections: ['what', 'why', 'impact'],
       });
 
       expect(result).toMatch(/(Affected|Why|Impact)/i);
@@ -161,9 +161,9 @@ describe('MessageFormatter (refactored)', () => {
         files: {
           wordpress: {
             isWordPress: true,
-            plugins: ['woocommerce']
-          }
-        }
+            plugins: ['woocommerce'],
+          },
+        },
       };
       expect(formatter.inferScope('Update', context)).toBe('woocommerce');
     });

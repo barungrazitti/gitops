@@ -18,12 +18,7 @@ class ProjectTypeDetector {
       // Check for other project indicators
       const indicators = {
         nodejs: ['package.json', 'node_modules'],
-        python: [
-          'requirements.txt',
-          'setup.py',
-          'pyproject.toml',
-          '__pycache__',
-        ],
+        python: ['requirements.txt', 'setup.py', 'pyproject.toml', '__pycache__'],
         java: ['pom.xml', 'build.gradle', 'src/main/java'],
         react: ['package.json'], // Will check package.json content
         vue: ['package.json'], // Will check package.json content
@@ -94,7 +89,10 @@ class ProjectTypeDetector {
       }
 
       // Check for PHP-specific WordPress files when no clear WordPress detection but PHP exists
-      if (detectedTypes.includes('php') || await fs.pathExists(path.join(repoRoot, 'wp-config.php'))) {
+      if (
+        detectedTypes.includes('php') ||
+        (await fs.pathExists(path.join(repoRoot, 'wp-config.php')))
+      ) {
         if (!wordpressInfo.isWordPress) {
           // Check for WordPress patterns in PHP files
           const wordpressInPhP = await this.detectWordPressFromPHP(repoRoot);
@@ -111,7 +109,7 @@ class ProjectTypeDetector {
         if (!detectedTypes.includes('wordpress')) {
           detectedTypes.unshift('wordpress'); // Add to beginning to prioritize
         }
-        
+
         // Add WordPress-specific subtypes
         if (wordpressInfo.hasPlugins) {
           detectedTypes.push('wordpress-plugins');
@@ -126,10 +124,24 @@ class ProjectTypeDetector {
 
       // Determine primary type based on priority order
       const priorityOrder = [
-        'wordpress', 'wordpress-core', 'wordpress-themes', 'wordpress-plugins',
-        'react', 'vue', 'angular', 'nextjs', 'nodejs', 'backend',
-        'java', 'python', 'php', 'go', 'rust', 'dotnet', 
-        'docker', 'ruby'
+        'wordpress',
+        'wordpress-core',
+        'wordpress-themes',
+        'wordpress-plugins',
+        'react',
+        'vue',
+        'angular',
+        'nextjs',
+        'nodejs',
+        'backend',
+        'java',
+        'python',
+        'php',
+        'go',
+        'rust',
+        'dotnet',
+        'docker',
+        'ruby',
       ];
 
       let primary = 'unknown';
@@ -176,7 +188,7 @@ class ProjectTypeDetector {
       hasThemes: false,
       hasPlugins: false,
       hasConfig: false,
-      hasContent: false
+      hasContent: false,
     };
 
     // Check for WordPress core files
@@ -184,7 +196,7 @@ class ProjectTypeDetector {
     const wpContentPath = path.join(repoRoot, 'wp-content');
     const wpIncludesPath = path.join(repoRoot, 'wp-includes');
     const wpAdminPath = path.join(repoRoot, 'wp-admin');
-    
+
     info.hasConfig = await fs.pathExists(wpConfigPath);
     info.hasContent = await fs.pathExists(wpContentPath);
     info.hasCore = (await fs.pathExists(wpIncludesPath)) || (await fs.pathExists(wpAdminPath));
@@ -193,7 +205,7 @@ class ProjectTypeDetector {
     if (info.hasContent) {
       const themesPath = path.join(wpContentPath, 'themes');
       const pluginsPath = path.join(wpContentPath, 'plugins');
-      
+
       info.hasThemes = await fs.pathExists(themesPath);
       info.hasPlugins = await fs.pathExists(pluginsPath);
     }
@@ -213,7 +225,7 @@ class ProjectTypeDetector {
       hasThemes: false,
       hasPlugins: false,
       hasConfig: false,
-      hasContent: false
+      hasContent: false,
     };
 
     // Look for WordPress-specific PHP constants and functions
@@ -221,14 +233,14 @@ class ProjectTypeDetector {
     for (const phpFile of phpFiles) {
       try {
         const content = await fs.readFile(phpFile, 'utf8');
-        
+
         // Check for WordPress-specific patterns
         if (this.containsWordPressPatterns(content)) {
           info.isWordPress = true;
-          
+
           // Determine type based on file location
           const relativePath = path.relative(repoRoot, phpFile);
-          
+
           if (relativePath.includes('wp-content/themes')) {
             info.hasThemes = true;
           } else if (relativePath.includes('wp-content/plugins')) {
@@ -236,12 +248,12 @@ class ProjectTypeDetector {
           } else if (relativePath.includes('wp-includes') || relativePath.includes('wp-admin')) {
             info.hasCore = true;
           }
-          
+
           // If wp-config.php, mark as config
           if (relativePath.includes('wp-config.php')) {
             info.hasConfig = true;
           }
-          
+
           break; // Found WordPress patterns, exit early
         }
       } catch (error) {
@@ -374,7 +386,7 @@ class ProjectTypeDetector {
       'wp_insert_attachment',
       'wp_insert_comment',
       'wp_update_comment',
-      'wp_delete_comment'
+      'wp_delete_comment',
     ];
 
     const lowerContent = content.toLowerCase();
@@ -386,11 +398,11 @@ class ProjectTypeDetector {
    */
   static async findPHPTemplates(repoRoot, results = []) {
     const items = await fs.readdir(repoRoot);
-    
+
     for (const item of items) {
       const itemPath = path.join(repoRoot, item);
       const stat = await fs.stat(itemPath);
-      
+
       if (stat.isDirectory()) {
         if (!item.startsWith('.') && !item.startsWith('node_modules')) {
           await this.findPHPTemplates(itemPath, results);
@@ -399,7 +411,7 @@ class ProjectTypeDetector {
         results.push(itemPath);
       }
     }
-    
+
     return results;
   }
 

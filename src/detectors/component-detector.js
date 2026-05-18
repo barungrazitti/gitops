@@ -68,9 +68,7 @@ class ComponentDetector {
     const normalizedPath = filePath.replace(/\\/g, '/');
 
     // Sort prefixes by length (longest first) for most specific match
-    const sortedPrefixes = Object.keys(componentMap).sort(
-      (a, b) => b.length - a.length
-    );
+    const sortedPrefixes = Object.keys(componentMap).sort((a, b) => b.length - a.length);
 
     for (const prefix of sortedPrefixes) {
       const normalizedPrefix = prefix.replace(/\\/g, '/');
@@ -78,7 +76,7 @@ class ComponentDetector {
         return {
           component: componentMap[prefix],
           scope: normalizedPrefix,
-          boundary: 'config'
+          boundary: 'config',
         };
       }
     }
@@ -112,7 +110,7 @@ class ComponentDetector {
             return {
               component: pkg.name,
               scope: dirPath,
-              boundary: 'package'
+              boundary: 'package',
             };
           }
         }
@@ -131,10 +129,7 @@ class ComponentDetector {
    */
   _autoDetectPattern(filePath) {
     const normalizedPath = filePath.replace(/\\/g, '/');
-    const patterns = [
-      'packages/', 'apps/', 'services/',
-      'modules/', 'libs/', 'components/'
-    ];
+    const patterns = ['packages/', 'apps/', 'services/', 'modules/', 'libs/', 'components/'];
 
     for (const pattern of patterns) {
       const idx = normalizedPath.indexOf(pattern);
@@ -146,7 +141,7 @@ class ComponentDetector {
           return {
             component,
             scope: pattern + component,
-            boundary: 'directory'
+            boundary: 'directory',
           };
         }
       }
@@ -177,7 +172,7 @@ class ComponentDetector {
         return {
           component: segment,
           scope: segments.slice(0, i + 1).join('/'),
-          boundary: 'directory'
+          boundary: 'directory',
         };
       }
     }
@@ -279,7 +274,7 @@ class ComponentDetector {
 
     return {
       components,
-      filesByComponent
+      filesByComponent,
     };
   }
 }

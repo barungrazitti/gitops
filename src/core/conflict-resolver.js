@@ -48,7 +48,7 @@ RESOLVED CODE (output only):
     try {
       const config = await this.configManager.getAll();
       const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
-      
+
       const messages = await provider.generateCommitMessages(
         `RESOLVE CONFLICT IN ${filePath}:\n\n${prompt}`,
         { count: 1 }
@@ -56,10 +56,10 @@ RESOLVED CODE (output only):
 
       if (messages && messages.length > 0) {
         let resolved = messages[0].trim();
-        
+
         // Clean up any markdown code blocks if present
         resolved = resolved.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
-        
+
         return resolved;
       }
     } catch (error) {
@@ -96,10 +96,18 @@ RESOLVED CODE (output only):
       // Detect language from file extension
       const ext = filePath.split('.').pop();
       const langMap = {
-        'js': 'javascript', 'ts': 'typescript', 'py': 'python',
-        'php': 'php', 'html': 'html', 'css': 'css',
-        'json': 'json', 'md': 'markdown', 'sql': 'sql',
-        'java': 'java', 'go': 'go', 'rs': 'rust'
+        js: 'javascript',
+        ts: 'typescript',
+        py: 'python',
+        php: 'php',
+        html: 'html',
+        css: 'css',
+        json: 'json',
+        md: 'markdown',
+        sql: 'sql',
+        java: 'java',
+        go: 'go',
+        rs: 'rust',
       };
       const language = langMap[ext] || 'javascript';
 
@@ -125,18 +133,20 @@ RESOLVED CODE (output only):
       resolved.push({
         file: filePath,
         resolutionType: aiUsed ? 'ai-merged' : 'kept-current',
-        linesKept: resolvedVersion.split('\n').length
+        linesKept: resolvedVersion.split('\n').length,
       });
     }
 
     const successType = aiUsed ? 'AI-merged' : 'fallback';
-    console.log(chalk.green(`✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`));
+    console.log(
+      chalk.green(`✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`)
+    );
 
     return {
       cleanedDiff,
       hasConflicts: true,
       resolved,
-      aiUsed
+      aiUsed,
     };
   }
 
@@ -160,13 +170,13 @@ RESOLVED CODE (output only):
       files.push({ fileA: match[1], fileB: match[2] });
     }
 
-    let cleanedDiff = diff;
+    const cleanedDiff = diff;
     let totalResolved = 0;
     let aiUsed = false;
 
     for (const file of files) {
       // Extract file diff
-      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapeRegExp = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const fileDiffPattern = new RegExp(
         `diff --git a/${escapeRegExp(file.fileA)} b/${escapeRegExp(file.fileB)}[\\s\\S]*?(?=diff --git a|$)`,
         'g'
@@ -194,9 +204,15 @@ RESOLVED CODE (output only):
                 // Resolve each conflict block
                 const ext = file.fileB.split('.').pop();
                 const langMap = {
-                  'js': 'javascript', 'ts': 'typescript', 'py': 'python',
-                  'php': 'php', 'html': 'html', 'css': 'css',
-                  'json': 'json', 'md': 'markdown', 'sql': 'sql'
+                  js: 'javascript',
+                  ts: 'typescript',
+                  py: 'python',
+                  php: 'php',
+                  html: 'html',
+                  css: 'css',
+                  json: 'json',
+                  md: 'markdown',
+                  sql: 'sql',
                 };
                 const language = langMap[ext] || 'javascript';
 
@@ -207,20 +223,32 @@ RESOLVED CODE (output only):
                     conflict.incomingVersion,
                     language
                   );
-                  
+
                   // Replace the conflict block
-                  const conflictBlockStart = content.indexOf('<<<<<<<', conflict.startLine > 0 ? content.lastIndexOf('\n', conflict.startLine) : 0);
-                  const conflictBlockEnd = content.indexOf('>>>>>>>', conflictBlockStart) + content.substring(content.indexOf('>>>>>>>', conflictBlockStart)).indexOf('\n') + 1;
-                  
+                  const conflictBlockStart = content.indexOf(
+                    '<<<<<<<',
+                    conflict.startLine > 0 ? content.lastIndexOf('\n', conflict.startLine) : 0
+                  );
+                  const conflictBlockEnd =
+                    content.indexOf('>>>>>>>', conflictBlockStart) +
+                    content
+                      .substring(content.indexOf('>>>>>>>', conflictBlockStart))
+                      .indexOf('\n') +
+                    1;
+
                   if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
-                    cleanedContent = content.substring(0, conflictBlockStart) + resolved + '\n' + content.substring(conflictBlockEnd);
+                    cleanedContent =
+                      content.substring(0, conflictBlockStart) +
+                      resolved +
+                      '\n' +
+                      content.substring(conflictBlockEnd);
                   } else {
                     cleanedContent = cleanedContent.replace(
                       `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
                       resolved + '\n'
                     );
                   }
-                  
+
                   fileResolved++;
                   fileAiUsed = true;
                 } catch (e) {
@@ -234,7 +262,9 @@ RESOLVED CODE (output only):
 
               if (fileResolved > 0) {
                 await fs.writeFile(fullPath, cleanedContent, 'utf8');
-                console.log(chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`));
+                console.log(
+                  chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`)
+                );
                 totalResolved += fileResolved;
                 if (fileAiUsed) aiUsed = true;
               }
@@ -250,7 +280,7 @@ RESOLVED CODE (output only):
       cleaned: totalResolved > 0,
       filesFixed: totalResolved,
       diff: cleanedDiff,
-      aiUsed
+      aiUsed,
     };
   }
 
@@ -309,7 +339,7 @@ RESOLVED CODE (output only):
         currentConflict = {
           startLine: lines.indexOf(line),
           currentVersion: [],
-          incomingVersion: []
+          incomingVersion: [],
         };
         collectingCurrent = true;
         collectingIncoming = false;

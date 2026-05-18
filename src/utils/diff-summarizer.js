@@ -125,9 +125,9 @@ class DiffSummarizer {
     }
 
     const fileCount = summaries.length;
-    const changeTypes = [...new Set(summaries.map((s) => s.changeType))];
-    const allEntities = summaries.flatMap((s) => s.entities.all);
-    const allKeyChanges = summaries.flatMap((s) => s.keyChanges);
+    const changeTypes = [...new Set(summaries.map(s => s.changeType))];
+    const allEntities = summaries.flatMap(s => s.entities.all);
+    const allKeyChanges = summaries.flatMap(s => s.keyChanges);
 
     const combined = summaries
       .map((s, i) => {

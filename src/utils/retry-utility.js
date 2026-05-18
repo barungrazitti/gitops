@@ -11,11 +11,17 @@ class RetryUtility {
       factor: options.factor || 2, // Exponential factor
       jitter: options.jitter || true, // Add randomness to delay
       retryableErrors: options.retryableErrors || [
-        'ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND',
-        'Network Error', 'Request Timeout', 'Gateway Timeout',
-        'Service Unavailable', 'Too Many Requests'
+        'ECONNRESET',
+        'ETIMEDOUT',
+        'ECONNREFUSED',
+        'ENOTFOUND',
+        'Network Error',
+        'Request Timeout',
+        'Gateway Timeout',
+        'Service Unavailable',
+        'Too Many Requests',
       ],
-      ...options
+      ...options,
     };
   }
 
@@ -25,33 +31,33 @@ class RetryUtility {
   async execute(fn, options = {}) {
     const opts = { ...this.options, ...options };
     let lastError;
-    
+
     for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
       try {
         return await fn(attempt);
       } catch (error) {
         lastError = error;
-        
+
         // If this was the last attempt, don't retry
         if (attempt === opts.maxRetries) {
           break;
         }
-        
+
         // Check if error is retryable
         if (!this.isRetryableError(error, opts.retryableErrors)) {
           break;
         }
-        
+
         // Calculate delay with exponential backoff
         const delay = this.calculateDelay(attempt, opts);
-        
+
         console.warn(`Attempt ${attempt + 1} failed: ${error.message}. Retrying in ${delay}ms...`);
-        
+
         // Wait for the calculated delay
         await this.sleep(delay);
       }
     }
-    
+
     throw lastError;
   }
 
@@ -59,16 +65,16 @@ class RetryUtility {
    * Calculate delay with exponential backoff
    */
   calculateDelay(attempt, options) {
-    let delay = options.baseDelay * options.factor**attempt;
-    
+    let delay = options.baseDelay * options.factor ** attempt;
+
     // Cap the delay at maxDelay
     delay = Math.min(delay, options.maxDelay);
-    
+
     // Add jitter to prevent thundering herd
     if (options.jitter) {
-      delay *= (0.5 + Math.random() * 0.5);
+      delay *= 0.5 + Math.random() * 0.5;
     }
-    
+
     return Math.floor(delay);
   }
 
@@ -78,14 +84,14 @@ class RetryUtility {
   isRetryableError(error, retryableErrors = null) {
     const errors = retryableErrors || this.options.retryableErrors;
     const errorMessage = error.message || error.toString();
-    
+
     // Check against known retryable error patterns
     for (const retryable of errors) {
       if (errorMessage.includes(retryable)) {
         return true;
       }
     }
-    
+
     // Check for network-related errors
     if (error.code) {
       const networkErrors = ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'ENOTFOUND', 'ENETUNREACH'];
@@ -93,7 +99,7 @@ class RetryUtility {
         return true;
       }
     }
-    
+
     // Check for HTTP status codes if available
     if (error.status) {
       // 5xx server errors and 429 rate limiting
@@ -101,7 +107,7 @@ class RetryUtility {
         return true;
       }
     }
-    
+
     return false;
   }
 
@@ -118,7 +124,7 @@ class RetryUtility {
   async executeAll(tasks, options = {}) {
     const results = [];
     const errors = [];
-    
+
     for (const [index, task] of tasks.entries()) {
       try {
         const result = await this.execute(task, options);
@@ -128,7 +134,7 @@ class RetryUtility {
         results[index] = { success: false, error };
       }
     }
-    
+
     return results;
   }
 
@@ -139,40 +145,40 @@ class RetryUtility {
     const opts = { ...this.options, ...options };
     let lastResult;
     let lastError;
-    
+
     for (let attempt = 0; attempt <= opts.maxRetries; attempt++) {
       try {
         const result = await fn(attempt);
         lastResult = result;
-        
+
         // Check if we should retry based on custom condition
         if (!shouldRetry(result, attempt)) {
           return result;
         }
-        
+
         if (attempt < opts.maxRetries) {
           const delay = this.calculateDelay(attempt, opts);
           await this.sleep(delay);
         }
       } catch (error) {
         lastError = error;
-        
+
         // Check if error is retryable
         if (!this.isRetryableError(error, opts.retryableErrors)) {
           break;
         }
-        
+
         if (attempt < opts.maxRetries) {
           const delay = this.calculateDelay(attempt, opts);
           await this.sleep(delay);
         }
       }
     }
-    
+
     if (lastError) {
       throw lastError;
     }
-    
+
     return lastResult;
   }
 }

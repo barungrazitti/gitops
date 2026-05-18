@@ -10,14 +10,16 @@ class Groq {
   get chat() {
     return {
       completions: {
-        create: async (_options) => ({
-          choices: [{
-            message: {
-              content: 'Mock commit message from Groq'
-            }
-          }]
-        })
-      }
+        create: async _options => ({
+          choices: [
+            {
+              message: {
+                content: 'Mock commit message from Groq',
+              },
+            },
+          ],
+        }),
+      },
     };
   }
 }

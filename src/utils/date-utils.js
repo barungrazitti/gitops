@@ -3,9 +3,9 @@ function isValidDate(date) {
   return date instanceof Date && !isNaN(date.getTime());
 }
 
-function formatDate(date, _format = "YYYY-MM-DD") {
-  if (!isValidDate(date)) return "";
-  return date.toISOString().split("T")[0];
+function formatDate(date, _format = 'YYYY-MM-DD') {
+  if (!isValidDate(date)) return '';
+  return date.toISOString().split('T')[0];
 }
 
 function addDays(date, days) {
@@ -17,5 +17,5 @@ function addDays(date, days) {
 module.exports = {
   isValidDate,
   formatDate,
-  addDays
+  addDays,
 };

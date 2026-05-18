@@ -1,6 +1,6 @@
 /**
  * Jest Setup File
- * 
+ *
  * This file runs before each test file and sets up the testing environment.
  */
 
@@ -16,7 +16,7 @@ const originalConsoleWarn = console.warn;
 global.originalConsole = {
   log: originalConsoleLog,
   error: originalConsoleError,
-  warn: originalConsoleWarn
+  warn: originalConsoleWarn,
 };
 
 // Mock console methods during tests (can be overridden in individual tests)
@@ -41,7 +41,10 @@ afterEach(() => {
 // Global test utilities
 global.testUtils = {
   // Helper to create mock git diff
-  createMockDiff: (files = ['test.js']) => files.map(file => `
+  createMockDiff: (files = ['test.js']) =>
+    files
+      .map(
+        file => `
 diff --git a/${file} b/${file}
 new file mode 100644
 index 0000000..1234567
@@ -51,20 +54,22 @@ index 0000000..1234567
 +function test() {
 +  return 'Hello World';
 +}
-    `).join('\n'),
-  
+    `
+      )
+      .join('\n'),
+
   // Helper to create mock config
   createMockConfig: (overrides = {}) => ({
-      provider: 'openai',
-      model: 'gpt-3.5-turbo',
-      language: 'en',
-      conventional: true,
-      cache: true,
-      maxTokens: 150,
-      temperature: 0.7,
-      ...overrides
-    }),
-  
+    provider: 'openai',
+    model: 'gpt-3.5-turbo',
+    language: 'en',
+    conventional: true,
+    cache: true,
+    maxTokens: 150,
+    temperature: 0.7,
+    ...overrides,
+  }),
+
   // Helper to wait for async operations
-  wait: (ms = 100) => new Promise(resolve => setTimeout(resolve, ms))
+  wait: (ms = 100) => new Promise(resolve => setTimeout(resolve, ms)),
 };

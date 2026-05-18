@@ -45,9 +45,7 @@ describe('MetricsScorer', () => {
     });
 
     test('invalid type returns isConventional false', () => {
-      const result = scorer.checkConventionalFormat(
-        'invalid(scope): description'
-      );
+      const result = scorer.checkConventionalFormat('invalid(scope): description');
       expect(result.isConventional).toBe(false);
       expect(result.issues[0]).toContain('Invalid type "invalid"');
     });
@@ -76,25 +74,25 @@ describe('MetricsScorer', () => {
       const longMessage = 'A'.repeat(73);
       const result = scorer.checkLengthCompliance(longMessage);
       expect(result.isCompliant).toBe(false);
-      expect(result.issues.some((i) => i.includes('72'))).toBe(true);
+      expect(result.issues.some(i => i.includes('72'))).toBe(true);
     });
 
     test('message ending with period returns isCompliant false', () => {
       const result = scorer.checkLengthCompliance('Add feature.');
       expect(result.isCompliant).toBe(false);
-      expect(result.issues.some((i) => i.includes('period'))).toBe(true);
+      expect(result.issues.some(i => i.includes('period'))).toBe(true);
     });
 
     test('lowercase start returns isCompliant false', () => {
       const result = scorer.checkLengthCompliance('add feature');
       expect(result.isCompliant).toBe(false);
-      expect(result.issues.some((i) => i.includes('capital'))).toBe(true);
+      expect(result.issues.some(i => i.includes('capital'))).toBe(true);
     });
 
     test('progressive tense returns isCompliant false', () => {
       const result = scorer.checkLengthCompliance('Adding feature');
       expect(result.isCompliant).toBe(false);
-      expect(result.issues.some((i) => i.includes('ing'))).toBe(true);
+      expect(result.issues.some(i => i.includes('ing'))).toBe(true);
     });
   });
 

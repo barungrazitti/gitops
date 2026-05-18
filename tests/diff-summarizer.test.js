@@ -56,8 +56,7 @@ index 1234567..89abcdef 100644
     test('extracts entities from chunk content', () => {
       const chunk = {
         fileName: 'test.js',
-        content:
-          '+ function calculateTotal() {}\n+ class UserManager {}\n+ const userCount = 0',
+        content: '+ function calculateTotal() {}\n+ class UserManager {}\n+ const userCount = 0',
       };
 
       const summary = summarizer.summarizeChunk(chunk, 0, 1);
@@ -70,8 +69,7 @@ index 1234567..89abcdef 100644
     test('limits keyChanges to top 3', () => {
       const chunk = {
         fileName: 'test.js',
-        content:
-          '+ const a = 1\n+ const b = 2\n+ const c = 3\n+ const d = 4\n+ const e = 5',
+        content: '+ const a = 1\n+ const b = 2\n+ const c = 3\n+ const d = 4\n+ const e = 5',
       };
 
       const summary = summarizer.summarizeChunk(chunk, 0, 1);

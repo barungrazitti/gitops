@@ -10,9 +10,9 @@ jest.mock('fs-extra', () => {
     existsSync: jest.fn().mockReturnValue(false),
     readdirSync: jest.fn().mockReturnValue([]),
     statSync: jest.fn().mockImplementation(() => ({
-      isDirectory: () => false
+      isDirectory: () => false,
     })),
-    readFileSync: jest.fn().mockReturnValue('')
+    readFileSync: jest.fn().mockReturnValue(''),
   };
 });
 
@@ -39,7 +39,7 @@ describe('DependencyMapper', () => {
       expect(result[0]).toMatchObject({
         module: './utils',
         type: 'commonjs',
-        resolvedPath: null
+        resolvedPath: null,
       });
     });
 
@@ -60,7 +60,7 @@ describe('DependencyMapper', () => {
       expect(result[0]).toMatchObject({
         module: '../lib/bar',
         type: 'esm',
-        resolvedPath: null
+        resolvedPath: null,
       });
     });
 
@@ -101,14 +101,14 @@ describe('DependencyMapper', () => {
     });
 
     it('should skip dynamic requires', () => {
-      const content = "const mod = require(dynamicPath);";
+      const content = 'const mod = require(dynamicPath);';
       const result = mapper.parseImports(content);
 
       expect(result).toHaveLength(0);
     });
 
     it('should skip template literal requires', () => {
-      const content = "const mod = require(`./modules/${name}`);";
+      const content = 'const mod = require(`./modules/${name}`);';
       const result = mapper.parseImports(content);
 
       expect(result).toHaveLength(0);
@@ -136,23 +136,23 @@ describe('DependencyMapper', () => {
 
   describe('parseExports()', () => {
     it('should detect named CommonJS exports', () => {
-      const content = "exports.doSomething = function() {};";
+      const content = 'exports.doSomething = function() {};';
       const result = mapper.parseExports(content);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
         name: 'doSomething',
-        type: 'named'
+        type: 'named',
       });
     });
 
     it('should detect module.exports assignment', () => {
-      const content = "module.exports = MyClass;";
+      const content = 'module.exports = MyClass;';
       const result = mapper.parseExports(content);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
-        type: 'default'
+        type: 'default',
       });
     });
 
@@ -168,12 +168,12 @@ describe('DependencyMapper', () => {
     });
 
     it('should detect ESM default export', () => {
-      const content = "export default class App {}";
+      const content = 'export default class App {}';
       const result = mapper.parseExports(content);
 
       expect(result).toHaveLength(1);
       expect(result[0]).toMatchObject({
-        type: 'default'
+        type: 'default',
       });
     });
 
@@ -186,7 +186,7 @@ describe('DependencyMapper', () => {
     });
 
     it('should return empty for no exports', () => {
-      const content = "const x = 42;";
+      const content = 'const x = 42;';
       const result = mapper.parseExports(content);
       expect(result).toHaveLength(0);
     });
@@ -201,7 +201,7 @@ describe('DependencyMapper', () => {
     it('should build dependency graph from files', () => {
       const filesWithContents = new Map([
         ['src/auth.js', "const utils = require('./utils');\nexports.login = function() {};"],
-        ['src/utils.js', "exports.helper = function() {};"]
+        ['src/utils.js', 'exports.helper = function() {};'],
       ]);
 
       const result = mapper.mapDependencies(filesWithContents);
@@ -214,9 +214,7 @@ describe('DependencyMapper', () => {
     });
 
     it('should return empty arrays for files with no imports/exports', () => {
-      const filesWithContents = new Map([
-        ['src/config.js', "const x = 42;"]
-      ]);
+      const filesWithContents = new Map([['src/config.js', 'const x = 42;']]);
 
       const result = mapper.mapDependencies(filesWithContents);
 
@@ -227,7 +225,7 @@ describe('DependencyMapper', () => {
     it('should handle circular dependencies', () => {
       const filesWithContents = new Map([
         ['src/a.js', "const b = require('./b');\nexports.a = 1;"],
-        ['src/b.js', "const a = require('./a');\nexports.b = 2;"]
+        ['src/b.js', "const a = require('./a');\nexports.b = 2;"],
       ]);
 
       const result = mapper.mapDependencies(filesWithContents);
@@ -241,26 +239,26 @@ describe('DependencyMapper', () => {
     it('should find files that import the changed file', () => {
       const repoFiles = new Map([
         ['src/a.js', "const b = require('./b');"],
-        ['src/b.js', "exports.b = 1;"],
-        ['src/c.js', "const b = require('./b');"]
+        ['src/b.js', 'exports.b = 1;'],
+        ['src/c.js', "const b = require('./b');"],
       ]);
 
-      fs.readFileSync.mockImplementation((filePath) => {
+      fs.readFileSync.mockImplementation(filePath => {
         const relPath = filePath.replace('/test/repo/', '');
         return repoFiles.get(relPath) || '';
       });
-      fs.existsSync.mockImplementation((p) => {
+      fs.existsSync.mockImplementation(p => {
         const relPath = p.replace('/test/repo/', '');
         return repoFiles.has(relPath);
       });
-      fs.readdirSync.mockImplementation((dir) => {
+      fs.readdirSync.mockImplementation(dir => {
         if (dir.endsWith('src')) {
           return ['a.js', 'b.js', 'c.js'];
         }
         return [];
       });
-      fs.statSync.mockImplementation((filePath) => ({
-        isDirectory: () => !path.extname(filePath)
+      fs.statSync.mockImplementation(filePath => ({
+        isDirectory: () => !path.extname(filePath),
       }));
 
       const dependents = mapper.findDependents('src/b.js');

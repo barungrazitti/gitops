@@ -82,18 +82,12 @@ class BaseProvider {
             'gz',
           ];
 
-          if (
-            assetExtensions.includes(ext) ||
-            /^Binary files/.test(lines[i + 1] || '')
-          ) {
+          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
             assetFiles.push(filePath);
             processedLines.push(`# Asset file added: ${filePath}`);
 
             // Skip ahead to next diff --git (don't include asset content)
-            while (
-              i + 1 < lines.length &&
-              !lines[i + 1].startsWith('diff --git')
-            ) {
+            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
               i++;
             }
             continue;
@@ -131,14 +125,14 @@ class BaseProvider {
 
     // Combine lines to preserve full context
     processedLines.push(...importantLines);
-    processedLines.push(...contextLines.map((line) => ` ${line}`));
+    processedLines.push(...contextLines.map(line => ` ${line}`));
 
     // Only limit if extremely large (preserve much more content)
     const maxLines = 1000; // Increased from 250 to 1000
     if (processedLines.length > maxLines) {
       // Prioritize keeping headers and changes, limit context
       const headers = processedLines.filter(
-        (line) =>
+        line =>
           line.startsWith('diff --git') ||
           line.startsWith('index ') ||
           line.startsWith('---') ||
@@ -146,12 +140,10 @@ class BaseProvider {
           line.startsWith('@@')
       );
 
-      const changes = processedLines.filter(
-        (line) => line.startsWith('+') || line.startsWith('-')
-      );
+      const changes = processedLines.filter(line => line.startsWith('+') || line.startsWith('-'));
 
       const context = processedLines.filter(
-        (line) =>
+        line =>
           !line.startsWith('diff --git') &&
           !line.startsWith('index ') &&
           !line.startsWith('---') &&
@@ -241,7 +233,7 @@ class BaseProvider {
 
     // Group by type
     const byType = {};
-    assetFiles.forEach((file) => {
+    assetFiles.forEach(file => {
       const ext = file.split('.').pop().toLowerCase();
       const type = this.getAssetType(ext);
       byType[type] = (byType[type] || 0) + 1;
@@ -261,16 +253,7 @@ class BaseProvider {
    * Get asset type from extension
    */
   getAssetType(ext) {
-    const imageTypes = [
-      'svg',
-      'png',
-      'jpg',
-      'jpeg',
-      'gif',
-      'webp',
-      'ico',
-      'bmp',
-    ];
+    const imageTypes = ['svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp'];
     const fontTypes = ['woff', 'woff2', 'ttf', 'eot', 'otf'];
     const mediaTypes = ['mp4', 'mp3', 'wav', 'ogg', 'webm', 'avi', 'mov'];
 
@@ -315,10 +298,8 @@ class BaseProvider {
     };
 
     const lines = diff.split('\n');
-    const addedLines = lines.filter((line) => line.startsWith('+')).join('\n');
-    const removedLines = lines
-      .filter((line) => line.startsWith('-'))
-      .join('\n');
+    const addedLines = lines.filter(line => line.startsWith('+')).join('\n');
+    const removedLines = lines.filter(line => line.startsWith('-')).join('\n');
 
     // Enhanced semantic change detection
     const semanticPatterns = {
@@ -329,8 +310,7 @@ class BaseProvider {
         /^\+.*(?:function\s+(\w+)\s*\([^)]*\)\s*\{|const\s+(\w+)\s*=\s*(?:React\.)?(?:forwardRef\s*\()?\([^)]*\)\s*=>\s*{)/gm,
       apiChanges:
         /^\+.*(?:app\.(get|post|put|delete|patch)|router\.(get|post|put|delete|patch))\s*\(\s*['"]([^'"]+)['"]/gm,
-      databaseChanges:
-        /^\+.*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)\s+(TABLE|INDEX|DATABASE)/gm,
+      databaseChanges: /^\+.*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)\s+(TABLE|INDEX|DATABASE)/gm,
       configChanges: /^\+.*(?:process\.env|config\.|\.env|ENV\[)/gm,
       wordpress_hooks:
         /^\+.*add_action\s*\(\s*['"]([^'"]+)['"]|^\+.*add_filter\s*\(\s*['"]([^'"]+)['"]|^\+.*add_shortcode\s*\(\s*['"]([^'"]+)['"]/gm,
@@ -350,17 +330,11 @@ class BaseProvider {
         } else if (changeType === 'apiChanges') {
           const method = match[1];
           const endpoint = match[2];
-          analysis.semanticChanges[changeType].push(
-            `${method.toUpperCase()} ${endpoint}`
-          );
+          analysis.semanticChanges[changeType].push(`${method.toUpperCase()} ${endpoint}`);
         } else if (changeType === 'configChanges') {
-          analysis.semanticChanges[changeType].push(
-            match[0].substring(1).trim()
-          );
+          analysis.semanticChanges[changeType].push(match[0].substring(1).trim());
         } else {
-          analysis.semanticChanges[changeType].push(
-            match[0].substring(1).trim()
-          );
+          analysis.semanticChanges[changeType].push(match[0].substring(1).trim());
         }
       }
     }
@@ -368,15 +342,11 @@ class BaseProvider {
     // Enhanced area patterns with more comprehensive WordPress detection
     const patterns = {
       authentication: /auth|login|user|session|jwt|passport|password|token/i,
-      'api endpoints':
-        /api|endpoint|route|controller|handler|service|express|router/i,
-      database:
-        /database|db|model|schema|migration|sql|query|sequelize|mongoose|prisma/i,
-      'ui components':
-        /component|view|template|render|jsx|tsx|html|react|vue|angular/i,
+      'api endpoints': /api|endpoint|route|controller|handler|service|express|router/i,
+      database: /database|db|model|schema|migration|sql|query|sequelize|mongoose|prisma/i,
+      'ui components': /component|view|template|render|jsx|tsx|html|react|vue|angular/i,
       configuration: /config|env|setting|constant|environment|dotenv/i,
-      testing:
-        /test|spec|mock|fixture|describe|it\(|expect|jest|mocha|cypress/i,
+      testing: /test|spec|mock|fixture|describe|it\(|expect|jest|mocha|cypress/i,
       dependencies: /package|npm|yarn|require|import|dependency|node_modules/i,
       'error handling': /error|exception|try|catch|throw|validation|sanitize/i,
       performance: /performance|optimize|cache|lazy|memo|async|await|promise/i,
@@ -427,7 +397,7 @@ class BaseProvider {
     ];
 
     for (const { patterns, purpose } of purposeDetection) {
-      if (patterns.some((p) => p.test(diff))) {
+      if (patterns.some(p => p.test(diff))) {
         analysis.likelyPurpose = purpose;
         break;
       }
@@ -458,12 +428,12 @@ class BaseProvider {
       /function|class|const|let|var/.test(addedLines) &&
       !/function|class|const|let|var/.test(removedLines)
     ) {
-      if (!analysis.keyChanges.some((k) => k.includes('new functions'))) {
+      if (!analysis.keyChanges.some(k => k.includes('new functions'))) {
         analysis.keyChanges.push('new functions/classes added');
       }
     }
     if (/export|module\.exports/.test(addedLines)) {
-      if (!analysis.keyChanges.some((k) => k.includes('export'))) {
+      if (!analysis.keyChanges.some(k => k.includes('export'))) {
         analysis.keyChanges.push('new exports added');
       }
     }
@@ -472,9 +442,7 @@ class BaseProvider {
       analysis.affectedAreas.length > 0,
       analysis.likelyPurpose !== null,
       analysis.keyChanges.length > 0,
-      Object.values(analysis.semanticChanges).some(
-        (changes) => changes.length > 0
-      ),
+      Object.values(analysis.semanticChanges).some(changes => changes.length > 0),
     ].some(Boolean);
 
     return analysis;
@@ -505,22 +473,15 @@ class BaseProvider {
     if (error.response) {
       // HTTP error response
       const { status } = error.response;
-      const message =
-        error.response.data?.error?.message || error.response.statusText;
+      const message = error.response.data?.error?.message || error.response.statusText;
 
       switch (status) {
         case 401:
-          throw new Error(
-            `Authentication failed for ${providerName}. Please check your API key.`
-          );
+          throw new Error(`Authentication failed for ${providerName}. Please check your API key.`);
         case 403:
-          throw new Error(
-            `Access forbidden for ${providerName}. Please check your permissions.`
-          );
+          throw new Error(`Access forbidden for ${providerName}. Please check your permissions.`);
         case 429:
-          throw new Error(
-            `Rate limit exceeded for ${providerName}. Please try again later.`
-          );
+          throw new Error(`Rate limit exceeded for ${providerName}. Please try again later.`);
         case 500:
         case 502:
         case 503:
@@ -532,13 +493,9 @@ class BaseProvider {
           throw new Error(`${providerName} API error (${status}): ${message}`);
       }
     } else if (error.code === 'ECONNREFUSED') {
-      throw new Error(
-        `Cannot connect to ${providerName}. Please check your internet connection.`
-      );
+      throw new Error(`Cannot connect to ${providerName}. Please check your internet connection.`);
     } else if (error.code === 'ETIMEDOUT') {
-      throw new Error(
-        `Request to ${providerName} timed out. Please try again.`
-      );
+      throw new Error(`Request to ${providerName} timed out. Please try again.`);
     } else {
       // Handle undefined error message safely
       const errorMessage = error?.message || 'Unknown error occurred';
@@ -558,11 +515,7 @@ class BaseProvider {
       content = response;
     } else if (response && typeof response === 'object') {
       // Handle Groq response format (with choices)
-      if (
-        response.choices &&
-        Array.isArray(response.choices) &&
-        response.choices.length > 0
-      ) {
+      if (response.choices && Array.isArray(response.choices) && response.choices.length > 0) {
         content = response.choices[0]?.message?.content;
       } else {
         // If it's an object but not expected Groq format
@@ -580,7 +533,7 @@ class BaseProvider {
     const messages = content
       .split('\n')
       .map(
-        (line) =>
+        line =>
           line
             .trim()
             .replace(/^\d+\.?\s*/, '') // Strip numbering
@@ -588,7 +541,7 @@ class BaseProvider {
             .replace(/^\* \s*/, '') // Strip asterisks
             .replace(/^["']|["']$/g, '') // Strip surrounding quotes
       )
-      .filter((line) => line.length > 0)
+      .filter(line => line.length > 0)
       .slice(0, 1); // Only take first message (best one)
 
     if (messages.length === 0) {
@@ -624,10 +577,8 @@ class BaseProvider {
         const messageScores = [];
 
         for (const message of messages) {
-          const validation =
-            messageFormatter.getCommitMessageValidation(message);
-          const relevanceScore =
-            messageFormatter.calculateRelevanceScore(message);
+          const validation = messageFormatter.getCommitMessageValidation(message);
+          const relevanceScore = messageFormatter.calculateRelevanceScore(message);
 
           messageScores.push({
             message,
@@ -687,21 +638,18 @@ class BaseProvider {
           provider: this.name,
           attempt,
           invalidMessages,
-          allExplanatory: invalidMessages.every((m) => m.isExplanatory),
-          allGeneric: invalidMessages.every((m) => m.isGeneric),
+          allExplanatory: invalidMessages.every(m => m.isExplanatory),
+          allGeneric: invalidMessages.every(m => m.isGeneric),
         };
 
         // Log validation failure
         if (this.activityLogger) {
-          await this.activityLogger.warn(
-            'commit_message_validation_failed',
-            errorDetails
-          );
+          await this.activityLogger.warn('commit_message_validation_failed', errorDetails);
         }
 
         // Create error for retry logic
         const error = new Error(
-          `All generated commit messages are invalid: ${invalidMessages.map((m) => m.issues.join('; ')).join(' | ')}`
+          `All generated commit messages are invalid: ${invalidMessages.map(m => m.issues.join('; ')).join(' | ')}`
         );
         error.validationDetails = errorDetails;
         throw error;
@@ -736,7 +684,7 @@ class BaseProvider {
 
         // Wait before retry with exponential backoff
         const delay = Math.min(1000 * 2 ** (attempt - 1), 5000);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
@@ -848,13 +796,7 @@ Use: "config: update database connection settings for production"
 
         // Do not retry on client-side errors (e.g., 401, 403), but retry on rate limits (429, 413)
         const status = error.response?.status;
-        if (
-          status &&
-          status >= 400 &&
-          status < 500 &&
-          status !== 413 &&
-          status !== 429
-        ) {
+        if (status && status >= 400 && status < 500 && status !== 413 && status !== 429) {
           throw error;
         }
 
@@ -863,9 +805,7 @@ Use: "config: update database connection settings for production"
 
         if (attempt < maxRetries) {
           // Use exponential backoff
-          await new Promise((resolve) =>
-            setTimeout(resolve, delay * 2 ** (attempt - 1))
-          );
+          await new Promise(resolve => setTimeout(resolve, delay * 2 ** (attempt - 1)));
         }
       }
     }
@@ -961,18 +901,12 @@ Use: "config: update database connection settings for production"
             'gz',
           ];
 
-          if (
-            assetExtensions.includes(ext) ||
-            /^Binary files/.test(lines[i + 1] || '')
-          ) {
+          if (assetExtensions.includes(ext) || /^Binary files/.test(lines[i + 1] || '')) {
             assetFiles.push(filePath);
             filteredLines.push(`# Asset file added: ${filePath}`);
 
             // Skip ahead to next diff --git (don't include asset content)
-            while (
-              i + 1 < lines.length &&
-              !lines[i + 1].startsWith('diff --git')
-            ) {
+            while (i + 1 < lines.length && !lines[i + 1].startsWith('diff --git')) {
               i++;
             }
             continue;
@@ -1058,7 +992,7 @@ Use: "config: update database connection settings for production"
     const changes = [];
     let currentFile = null;
 
-    lines.forEach((line) => {
+    lines.forEach(line => {
       // Look for file headers
       const fileMatch = line.match(/diff --git a\/(.+) b\/(.+)/);
       if (fileMatch) {
@@ -1111,7 +1045,7 @@ Use: "config: update database connection settings for production"
   extractKeyChanges(changes) {
     const keyChanges = [];
 
-    changes.forEach((change) => {
+    changes.forEach(change => {
       if (change.additions > 0 && change.deletions === 0) {
         keyChanges.push(`new file: ${change.file}`);
       } else if (change.additions > 0 && change.deletions > 0) {
@@ -1160,13 +1094,9 @@ Use: "config: update database connection settings for production"
         }
 
         // Match API changes
-        const apiMatch = content.match(
-          /app\.(get|post|put|delete|patch)\(['"`](.+?)['"`]/
-        );
+        const apiMatch = content.match(/app\.(get|post|put|delete|patch)\(['"`](.+?)['"`]/);
         if (apiMatch) {
-          semanticChanges.apiChanges.push(
-            `${apiMatch[1].toUpperCase()} ${apiMatch[2]}`
-          );
+          semanticChanges.apiChanges.push(`${apiMatch[1].toUpperCase()} ${apiMatch[2]}`);
         }
 
         // Match config changes
@@ -1194,8 +1124,7 @@ Use: "config: update database connection settings for production"
             /(?:add_action|add_filter|add_shortcode)\s*\(\s*['"`]([^'"`]+)['"`]/
           );
           if (wpHookMatch) {
-            semanticChanges.wordpressHooks =
-              semanticChanges.wordpressHooks || [];
+            semanticChanges.wordpressHooks = semanticChanges.wordpressHooks || [];
             semanticChanges.wordpressHooks.push(wpHookMatch[1]);
           }
         }
@@ -1205,8 +1134,7 @@ Use: "config: update database connection settings for production"
           content.includes('wp_localize_script') ||
           content.includes('wp_localize')
         ) {
-          semanticChanges.wordpressChanges =
-            semanticChanges.wordpressChanges || [];
+          semanticChanges.wordpressChanges = semanticChanges.wordpressChanges || [];
           semanticChanges.wordpressChanges.push(content.trim());
         }
 
@@ -1216,8 +1144,7 @@ Use: "config: update database connection settings for production"
           content.includes('get_footer') ||
           content.includes('get_sidebar')
         ) {
-          semanticChanges.wordpressTemplateChanges =
-            semanticChanges.wordpressTemplateChanges || [];
+          semanticChanges.wordpressTemplateChanges = semanticChanges.wordpressTemplateChanges || [];
           semanticChanges.wordpressTemplateChanges.push(content.trim());
         }
       }
@@ -1230,30 +1157,24 @@ Use: "config: update database connection settings for production"
    * Infer likely purpose of changes
    */
   inferLikelyPurpose(changes) {
-    if (changes.some((change) => change.file && change.file.includes('test'))) {
+    if (changes.some(change => change.file && change.file.includes('test'))) {
       return 'test-related changes';
     }
-    if (
-      changes.some(
-        (change) => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file)
-      )
-    ) {
+    if (changes.some(change => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file))) {
       return 'javascript/typescript changes';
     }
-    if (changes.some((change) => change.file && /\.(py)$/.test(change.file))) {
+    if (changes.some(change => change.file && /\.(py)$/.test(change.file))) {
       return 'python changes';
     }
-    if (changes.some((change) => change.file && /\.(php)$/.test(change.file))) {
+    if (changes.some(change => change.file && /\.(php)$/.test(change.file))) {
       return 'php changes';
     }
     if (
       changes.some(
-        (change) =>
+        change =>
           change.changes &&
           change.changes.some(
-            (c) =>
-              c.content &&
-              /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
+            c => c.content && /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
           )
       )
     ) {
@@ -1261,12 +1182,10 @@ Use: "config: update database connection settings for production"
     }
     if (
       changes.some(
-        (change) =>
+        change =>
           change.changes &&
           change.changes.some(
-            (c) =>
-              c.content &&
-              /\b(feature|add|implement|create|new)\b/i.test(c.content)
+            c => c.content && /\b(feature|add|implement|create|new)\b/i.test(c.content)
           )
       )
     ) {

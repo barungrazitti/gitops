@@ -78,9 +78,9 @@ class EntityExtractor {
     result.variables = this.extractVariables(diff);
 
     result.all = [
-      ...result.functions.map((f) => ({ name: f, type: 'function' })),
-      ...result.classes.map((c) => ({ name: c, type: 'class' })),
-      ...result.variables.map((v) => ({ name: v, type: 'variable' })),
+      ...result.functions.map(f => ({ name: f, type: 'function' })),
+      ...result.classes.map(c => ({ name: c, type: 'class' })),
+      ...result.variables.map(v => ({ name: v, type: 'variable' })),
     ];
 
     return result;

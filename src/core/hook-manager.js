@@ -58,12 +58,7 @@ class HookManager {
   async uninstall() {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(
-        repoRoot,
-        '.git',
-        'hooks',
-        'prepare-commit-msg'
-      );
+      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
 
       if (!(await fs.pathExists(hookPath))) {
         throw new Error('Git hook is not installed');
@@ -82,9 +77,7 @@ class HookManager {
       // Look for backup files and offer to restore
       const hooksDir = path.dirname(hookPath);
       const backupFiles = await fs.readdir(hooksDir);
-      const backups = backupFiles.filter((file) =>
-        file.startsWith('prepare-commit-msg.backup.')
-      );
+      const backups = backupFiles.filter(file => file.startsWith('prepare-commit-msg.backup.'));
 
       if (backups.length > 0) {
         // Get the most recent backup
@@ -106,43 +99,38 @@ class HookManager {
     }
   }
 
-   /**
-    * Check if hook is installed
-    */
-   async isInstalled() {
-     try {
-       const repoRoot = await this.gitManager.getRepositoryRoot();
-       const hookPath = path.join(
-         repoRoot,
-         '.git',
-         'hooks',
-         'prepare-commit-msg'
-       );
+  /**
+   * Check if hook is installed
+   */
+  async isInstalled() {
+    try {
+      const repoRoot = await this.gitManager.getRepositoryRoot();
+      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
 
-       if (!(await fs.pathExists(hookPath))) {
-         return false;
-       }
+      if (!(await fs.pathExists(hookPath))) {
+        return false;
+      }
 
-       const content = await fs.readFile(hookPath, 'utf8');
-       return content.includes('ai-commit-generator');
-     } catch (error) {
-       return false;
-     }
-   }
+      const content = await fs.readFile(hookPath, 'utf8');
+      return content.includes('ai-commit-generator');
+    } catch (error) {
+      return false;
+    }
+  }
 
-   /**
-    * Get the hook file path
-    */
-   async getHookPath() {
-     const repoRoot = await this.gitManager.getRepositoryRoot();
-     return path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
-   }
+  /**
+   * Get the hook file path
+   */
+  async getHookPath() {
+    const repoRoot = await this.gitManager.getRepositoryRoot();
+    return path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
+  }
 
   /**
    * Generate the hook script
    */
-   generateHookScript() {
-     return `#!/bin/bash
+  generateHookScript() {
+    return `#!/bin/bash
 #
 # AI Commit Generator Hook
 # This hook automatically generates commit messages using AI
@@ -283,17 +271,10 @@ exit 0
   async updateHookConfig(options) {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(
-        repoRoot,
-        '.git',
-        'hooks',
-        'prepare-commit-msg'
-      );
+      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
 
       if (!(await this.isInstalled())) {
-        throw new Error(
-          'Hook is not installed. Install it first with --install'
-        );
+        throw new Error('Hook is not installed. Install it first with --install');
       }
 
       // Generate new hook script with options
@@ -316,12 +297,7 @@ exit 0
   async getStatus() {
     try {
       const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(
-        repoRoot,
-        '.git',
-        'hooks',
-        'prepare-commit-msg'
-      );
+      const hookPath = path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
 
       const status = {
         installed: await this.isInstalled(),
@@ -364,8 +340,7 @@ exit 0
     for (const [key, pattern] of Object.entries(patterns)) {
       const match = content.match(pattern);
       if (match) {
-        config[key] =
-          match[1] === 'true' ? true : match[1] === 'false' ? false : match[1];
+        config[key] = match[1] === 'true' ? true : match[1] === 'false' ? false : match[1];
       }
     }
 

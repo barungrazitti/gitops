@@ -34,27 +34,25 @@ program
       const autoGit = new AutoGit();
 
       if (options.dryRun) {
-        console.log(
-          chalk.cyan('🔍 Dry run mode - showing what would be done:\n')
-        );
-        
+        console.log(chalk.cyan('🔍 Dry run mode - showing what would be done:\n'));
+
         const steps = [];
         steps.push('1. Check git repository');
         steps.push('2. Stage all changes');
         steps.push('3. Generate AI commit message (or use provided)');
         steps.push('4. Commit changes');
-        
+
         if (!options.skipPull) {
           steps.push('5. Pull latest changes');
         }
-        
+
         steps.push('6. Auto-resolve conflicts if possible');
-        
+
         if (options.push !== false) {
           steps.push('7. Push changes');
         }
 
-        steps.forEach((step) => console.log(step));
+        steps.forEach(step => console.log(step));
         return;
       }
 
@@ -92,7 +90,7 @@ program
   .option('--get <key>', 'Get a configuration value')
   .option('--list', 'List all configuration values')
   .option('--reset', 'Reset configuration to defaults')
-  .action(async (options) => {
+  .action(async options => {
     try {
       const generator = new AICommitGenerator();
       await generator.config(options);
@@ -111,7 +109,7 @@ program
   .option('--format <format>', 'Export format (json|csv)', 'json')
   .option('--days <days>', 'Number of days to analyze', '30')
   .option('--reset', 'Reset all statistics')
-  .action(async (options) => {
+  .action(async options => {
     try {
       const generator = new AICommitGenerator();
       await generator.stats(options);

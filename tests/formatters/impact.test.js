@@ -20,7 +20,7 @@ describe('ImpactFormatter', () => {
     it('should detect breaking change from message', () => {
       const context = {};
       const result = formatter.format(context, 'Breaking change: remove deprecated API');
-      
+
       expect(result).toContain('Impact:');
       expect(result).toMatch(/⚠|🚨/);
     });
@@ -28,11 +28,11 @@ describe('ImpactFormatter', () => {
     it('should detect breaking change from context', () => {
       const context = {
         conventions: {
-          breakingChange: true
-        }
+          breakingChange: true,
+        },
       };
       const result = formatter.format(context, 'Update API');
-      
+
       expect(result).toContain('Impact:');
     });
 
@@ -41,12 +41,12 @@ describe('ImpactFormatter', () => {
         dependencies: {
           affected: ['module-a', 'module-b', 'module-c'],
           imports: { changed: ['module-a'] },
-          exports: { changed: ['module-b'] }
-        }
+          exports: { changed: ['module-b'] },
+        },
       };
 
       const result = formatter.format(context, 'Update module');
-      
+
       expect(result).toContain('Dependencies:');
       expect(result).toContain('3 module(s) affected');
       expect(result).toContain('Imports changed:');
@@ -57,12 +57,12 @@ describe('ImpactFormatter', () => {
       const context = {
         dependencies: {
           affected: [],
-          downstream: ['client-a', 'client-b', 'client-c']
-        }
+          downstream: ['client-a', 'client-b', 'client-c'],
+        },
       };
 
       const result = formatter.format(context, 'Update API');
-      
+
       expect(result).toContain('Downstream:');
       expect(result).toContain('may require updates');
     });
@@ -73,13 +73,13 @@ describe('ImpactFormatter', () => {
           performanceImpact: {
             type: 'improvement',
             metric: 'load time',
-            estimatedChange: '+25%'
-          }
-        }
+            estimatedChange: '+25%',
+          },
+        },
       };
 
       const result = formatter.format(context, 'Optimize loading');
-      
+
       expect(result).toContain('Performance:');
       expect(result).toContain('📈');
       expect(result).toContain('load time');
@@ -91,13 +91,13 @@ describe('ImpactFormatter', () => {
           performanceImpact: {
             type: 'degradation',
             metric: 'memory usage',
-            estimatedChange: '-10%'
-          }
-        }
+            estimatedChange: '-10%',
+          },
+        },
       };
 
       const result = formatter.format(context, 'Add caching');
-      
+
       expect(result).toContain('Performance:');
       expect(result).toContain('📉');
     });
@@ -105,16 +105,12 @@ describe('ImpactFormatter', () => {
     it('should format required actions', () => {
       const context = {
         dependencies: {
-          requiredActions: [
-            'Update configuration',
-            'Run migration script',
-            'Clear cache'
-          ]
-        }
+          requiredActions: ['Update configuration', 'Run migration script', 'Clear cache'],
+        },
       };
 
       const result = formatter.format(context, 'Breaking update');
-      
+
       expect(result).toContain('Required actions:');
       expect(result).toContain('Update configuration');
       expect(result).toContain('Run migration script');
@@ -123,12 +119,12 @@ describe('ImpactFormatter', () => {
     it('should limit required actions to 5', () => {
       const context = {
         dependencies: {
-          requiredActions: Array(10).fill('Action')
-        }
+          requiredActions: Array(10).fill('Action'),
+        },
       };
 
       const result = formatter.format(context, 'Big update');
-      
+
       expect(result).toContain('...and 5 more');
     });
 
@@ -136,11 +132,11 @@ describe('ImpactFormatter', () => {
       const context = {
         dependencies: {
           affected: Array(15).fill('module'),
-          downstream: Array(10).fill('client')
-        }
+          downstream: Array(10).fill('client'),
+        },
       };
       const result = formatter.format(context, 'Critical breaking change');
-      
+
       expect(result).toContain('🚨');
       expect(result).toContain('Critical impact');
     });
@@ -148,11 +144,11 @@ describe('ImpactFormatter', () => {
     it('should assess minor impact level', () => {
       const context = {
         dependencies: {
-          affected: ['single-module']
-        }
+          affected: ['single-module'],
+        },
       };
       const result = formatter.format(context, 'Minor tweak');
-      
+
       // Minor changes may not trigger breaking change detection
       expect(result).toMatch(/Dependencies:|No breaking changes/);
     });
@@ -190,8 +186,8 @@ describe('ImpactFormatter', () => {
       const context = {
         dependencies: {
           affected: Array(20).fill('module'),
-          downstream: Array(10).fill('client')
-        }
+          downstream: Array(10).fill('client'),
+        },
       };
       const result = formatter._assessBreakingLevel('Critical emergency fix', context);
       expect(result).toBe('critical');
@@ -200,8 +196,8 @@ describe('ImpactFormatter', () => {
     it('should assess major for significant changes', () => {
       const context = {
         dependencies: {
-          affected: Array(8).fill('module')
-        }
+          affected: Array(8).fill('module'),
+        },
       };
       const result = formatter._assessBreakingLevel('Major update', context);
       expect(result).toBe('major');
@@ -210,8 +206,8 @@ describe('ImpactFormatter', () => {
     it('should assess none for small changes', () => {
       const context = {
         dependencies: {
-          affected: ['single']
-        }
+          affected: ['single'],
+        },
       };
       const result = formatter._assessBreakingLevel('Minor tweak', context);
       expect(result).toBe('none');
@@ -220,8 +216,8 @@ describe('ImpactFormatter', () => {
     it('should assess none for no impact', () => {
       const context = {
         dependencies: {
-          affected: []
-        }
+          affected: [],
+        },
       };
       const result = formatter._assessBreakingLevel('Docs update', context);
       expect(result).toBe('minor');

@@ -25,14 +25,12 @@ class MetricsScorer {
     }
 
     const messageLower = message.toLowerCase();
-    const words = messageLower.split(/\s+/).filter((w) => w.length > 2);
+    const words = messageLower.split(/\s+/).filter(w => w.length > 2);
     const entities = this.entityExtractor.extractEntities(diff);
 
-    const allEntityNames = [
-      ...entities.functions,
-      ...entities.classes,
-      ...entities.variables,
-    ].map((n) => n.toLowerCase());
+    const allEntityNames = [...entities.functions, ...entities.classes, ...entities.variables].map(
+      n => n.toLowerCase()
+    );
 
     if (allEntityNames.length === 0) {
       return 50;
@@ -64,18 +62,14 @@ class MetricsScorer {
     const match = firstLine.match(CONVENTIONAL_PATTERN);
 
     if (!match) {
-      issues.push(
-        'Does not follow conventional format (type(scope): description)'
-      );
+      issues.push('Does not follow conventional format (type(scope): description)');
       return { isConventional: false, issues };
     }
 
     const [full, type, scope, description] = match;
 
     if (!ALLOWED_TYPES.includes(type)) {
-      issues.push(
-        `Invalid type "${type}". Allowed: ${ALLOWED_TYPES.join(', ')}`
-      );
+      issues.push(`Invalid type "${type}". Allowed: ${ALLOWED_TYPES.join(', ')}`);
     }
 
     if (description && description.length === 0) {
@@ -116,9 +110,7 @@ class MetricsScorer {
     }
 
     if (/\b\w+ing\b/.test(firstLine)) {
-      issues.push(
-        'Should use imperative mood, not progressive tense (avoid "ing" words)'
-      );
+      issues.push('Should use imperative mood, not progressive tense (avoid "ing" words)');
     }
 
     return { isCompliant: issues.length === 0, issues };

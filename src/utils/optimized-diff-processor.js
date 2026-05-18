@@ -30,15 +30,17 @@ class OptimizedDiffProcessor {
    */
   processDiff(diff, options = {}) {
     const { maxChunkSize = this.config.maxTokensPerChunk, preserveContext = true } = options;
-    
+
     if (!diff || diff.length < this.config.minChunkSize) {
       // For small diffs, return as-is with basic sanitization
-      return [{
-        content: diff,
-        size: diff ? diff.length : 0,
-        estimatedTokens: diff ? this.estimateTokens(diff) : 0,
-        isSingleChunk: true
-      }];
+      return [
+        {
+          content: diff,
+          size: diff ? diff.length : 0,
+          estimatedTokens: diff ? this.estimateTokens(diff) : 0,
+          isSingleChunk: true,
+        },
+      ];
     }
 
     // Use streaming approach for large diffs to minimize memory usage
@@ -52,23 +54,24 @@ class OptimizedDiffProcessor {
     const lines = diff.split('\n');
     const chunks = [];
     const currentChunk = [];
-    
+
     // Define semantic boundaries that should not be split
-    const isSemanticBoundary = (line) => line.startsWith('diff --git') ||
-             line.startsWith('index ') ||
-             line.startsWith('--- ') ||
-             line.startsWith('+++ ') ||
-             (line.startsWith('@@ ') && currentChunk.length > 10) || // Hunks
-             this.isFunctionDeclaration(line) ||
-             this.isClassDeclaration(line) ||
-             this.isImportStatement(line);
+    const isSemanticBoundary = line =>
+      line.startsWith('diff --git') ||
+      line.startsWith('index ') ||
+      line.startsWith('--- ') ||
+      line.startsWith('+++ ') ||
+      (line.startsWith('@@ ') && currentChunk.length > 10) || // Hunks
+      this.isFunctionDeclaration(line) ||
+      this.isClassDeclaration(line) ||
+      this.isImportStatement(line);
 
     // Look ahead to find good chunk boundaries
     const findNextBoundary = (startIndex, maxSize) => {
       let size = 0;
       for (let i = startIndex; i < lines.length; i++) {
         const lineSize = lines[i].length + 1; // +1 for newline
-        
+
         if (size + lineSize > maxSize && i > startIndex) {
           // Try to find the nearest semantic boundary before exceeding size
           for (let j = i; j > startIndex; j--) {
@@ -79,7 +82,7 @@ class OptimizedDiffProcessor {
           // If no semantic boundary found, return current position
           return i;
         }
-        
+
         size += lineSize;
       }
       return lines.length; // End of diff
@@ -88,25 +91,25 @@ class OptimizedDiffProcessor {
     let i = 0;
     while (i < lines.length) {
       const boundary = findNextBoundary(i, maxChunkSize);
-      
+
       // Extract chunk
       const chunkLines = lines.slice(i, boundary);
       const chunkContent = chunkLines.join('\n');
-      
+
       // Add context if preserving context and not at the end
       if (preserveContext && boundary < lines.length) {
         // Add context lines from the next section
         const contextEnd = Math.min(boundary + this.config.preserveContextLines, lines.length);
         const contextLines = lines.slice(boundary, contextEnd);
         const contextContent = contextLines.join('\n');
-        
+
         chunks.push({
-          content: `${chunkContent  }\n${  contextContent}`,
+          content: `${chunkContent}\n${contextContent}`,
           size: chunkContent.length + contextContent.length,
           estimatedTokens: this.estimateTokens(chunkContent + contextContent),
           startIndex: i,
           endIndex: contextEnd,
-          hasContext: true
+          hasContext: true,
         });
       } else {
         chunks.push({
@@ -115,10 +118,10 @@ class OptimizedDiffProcessor {
           estimatedTokens: this.estimateTokens(chunkContent),
           startIndex: i,
           endIndex: boundary,
-          hasContext: false
+          hasContext: false,
         });
       }
-      
+
       i = boundary;
     }
 
@@ -129,19 +132,23 @@ class OptimizedDiffProcessor {
    * Identify function declarations to preserve semantic boundaries
    */
   isFunctionDeclaration(line) {
-    return /^\s*(async\s+)?(function|const|let|var)\s+\w+\s*(=|\()/.test(line) ||
-           /^\s*\w+\s*:\s*(async\s+)?(function|\s*=>)/.test(line) ||
-           /^\s*def\s+\w+\s*\(/.test(line) ||
-           /^\s*public\s+\w+|private\s+\w+|protected\s+\w+/.test(line);
+    return (
+      /^\s*(async\s+)?(function|const|let|var)\s+\w+\s*(=|\()/.test(line) ||
+      /^\s*\w+\s*:\s*(async\s+)?(function|\s*=>)/.test(line) ||
+      /^\s*def\s+\w+\s*\(/.test(line) ||
+      /^\s*public\s+\w+|private\s+\w+|protected\s+\w+/.test(line)
+    );
   }
 
   /**
    * Identify class declarations to preserve semantic boundaries
    */
   isClassDeclaration(line) {
-    return /^\s*(export\s+)?class\s+\w+/.test(line) ||
-           /^\s*interface\s+\w+/.test(line) ||
-           /^\s*type\s+\w+/.test(line);
+    return (
+      /^\s*(export\s+)?class\s+\w+/.test(line) ||
+      /^\s*interface\s+\w+/.test(line) ||
+      /^\s*type\s+\w+/.test(line)
+    );
   }
 
   /**
@@ -162,7 +169,7 @@ class OptimizedDiffProcessor {
       addedLines: (diff.match(/^\+/gm) || []).length,
       removedLines: (diff.match(/^-/gm) || []).length,
       modifiedFiles: [],
-      hasLargeFiles: false
+      hasLargeFiles: false,
     };
 
     // Extract file information
@@ -172,10 +179,11 @@ class OptimizedDiffProcessor {
       if (fileMatch) {
         const filePath = fileMatch[2];
         stats.modifiedFiles.push(filePath);
-        
+
         // Check if file is large
         const fileContent = this.extractFileContent(diff, filePath);
-        if (fileContent && fileContent.length > 50000) { // 50KB
+        if (fileContent && fileContent.length > 50000) {
+          // 50KB
           stats.hasLargeFiles = true;
         }
       }
@@ -191,7 +199,10 @@ class OptimizedDiffProcessor {
    * Extract content for a specific file from the diff
    */
   extractFileContent(diff, filePath) {
-    const regex = new RegExp(`diff --git a\/.*? b\/${this.escapeRegExp(filePath)}\\n([\\s\\S]*?)(?=\\ndiff --git|$)`, 'g');
+    const regex = new RegExp(
+      `diff --git a\/.*? b\/${this.escapeRegExp(filePath)}\\n([\\s\\S]*?)(?=\\ndiff --git|$)`,
+      'g'
+    );
     const matches = diff.match(regex);
     return matches ? matches[0] : null;
   }
@@ -209,13 +220,14 @@ class OptimizedDiffProcessor {
   determineProcessingStrategy(stats) {
     if (stats.totalSize < 5000) {
       return 'single-chunk'; // Small diff, process as one chunk
-    } if (stats.fileCount === 1 && !stats.hasLargeFiles) {
+    }
+    if (stats.fileCount === 1 && !stats.hasLargeFiles) {
       return 'adaptive-chunking'; // Single file, adaptive chunking
-    } if (stats.hasLargeFiles) {
+    }
+    if (stats.hasLargeFiles) {
       return 'aggressive-chunking'; // Has large files, aggressive chunking
-    } 
-      return 'balanced-chunking'; // Balanced approach
-    
+    }
+    return 'balanced-chunking'; // Balanced approach
   }
 
   /**
@@ -223,7 +235,7 @@ class OptimizedDiffProcessor {
    */
   processDiffWithStrategy(diff) {
     const analysis = this.analyzeDiff(diff);
-    
+
     switch (analysis.processingStrategy) {
       case 'single-chunk':
         return this.processAsSingleChunk(diff);
@@ -241,13 +253,15 @@ class OptimizedDiffProcessor {
    * Process as single chunk (for small diffs)
    */
   processAsSingleChunk(diff) {
-    return [{
-      content: diff,
-      size: diff.length,
-      estimatedTokens: this.estimateTokens(diff),
-      strategy: 'single-chunk',
-      fileBoundaries: this.getFileBoundaries(diff)
-    }];
+    return [
+      {
+        content: diff,
+        size: diff.length,
+        estimatedTokens: this.estimateTokens(diff),
+        strategy: 'single-chunk',
+        fileBoundaries: this.getFileBoundaries(diff),
+      },
+    ];
   }
 
   /**
@@ -265,14 +279,18 @@ class OptimizedDiffProcessor {
       const line = lines[i];
       const lineSize = line.length + 1;
 
-      if (currentSize + lineSize > maxChunkSize && currentChunk.length > 0 && this.isLogicalBoundary(line)) {
+      if (
+        currentSize + lineSize > maxChunkSize &&
+        currentChunk.length > 0 &&
+        this.isLogicalBoundary(line)
+      ) {
         // Create chunk at logical boundary
         chunks.push({
           content: currentChunk.join('\n'),
           size: currentChunk.reduce((sum, l) => sum + l.length + 1, 0),
           estimatedTokens: this.estimateTokens(currentChunk.join('\n')),
           strategy: 'adaptive-chunking',
-          logicalBoundary: true
+          logicalBoundary: true,
         });
 
         currentChunk = [line];
@@ -290,7 +308,7 @@ class OptimizedDiffProcessor {
         size: currentChunk.reduce((sum, l) => sum + l.length + 1, 0),
         estimatedTokens: this.estimateTokens(currentChunk.join('\n')),
         strategy: 'adaptive-chunking',
-        logicalBoundary: true
+        logicalBoundary: true,
       });
     }
 
@@ -301,10 +319,12 @@ class OptimizedDiffProcessor {
    * Check if line is at a logical boundary
    */
   isLogicalBoundary(line) {
-    return this.isFunctionDeclaration(line) ||
-           this.isClassDeclaration(line) ||
-           line.startsWith('diff --git') ||
-           line.startsWith('@@ '); // Hunks
+    return (
+      this.isFunctionDeclaration(line) ||
+      this.isClassDeclaration(line) ||
+      line.startsWith('diff --git') ||
+      line.startsWith('@@ ')
+    ); // Hunks
   }
 
   /**
@@ -335,7 +355,7 @@ class OptimizedDiffProcessor {
       boundaries.push({
         index: match.index,
         fileA: match[1],
-        fileB: match[2]
+        fileB: match[2],
       });
     }
 

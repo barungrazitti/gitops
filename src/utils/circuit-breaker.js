@@ -5,10 +5,10 @@
 class CircuitBreaker {
   constructor(options = {}) {
     this.options = {
-      threshold: options.threshold || 5,       // Number of failures before opening circuit
-      timeout: options.timeout || 60000,       // Time in ms to keep circuit open (1 minute)
+      threshold: options.threshold || 5, // Number of failures before opening circuit
+      timeout: options.timeout || 60000, // Time in ms to keep circuit open (1 minute)
       resetTimeout: options.resetTimeout || 30000, // Time in ms before half-open state (30 seconds)
-      ...options
+      ...options,
     };
 
     this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
@@ -73,7 +73,7 @@ class CircuitBreaker {
       isOpen: this.state === 'OPEN',
       isClosed: this.state === 'CLOSED',
       isHalfOpen: this.state === 'HALF_OPEN',
-      timeUntilReset: this.state === 'OPEN' ? this.nextAttemptTime - Date.now() : 0
+      timeUntilReset: this.state === 'OPEN' ? this.nextAttemptTime - Date.now() : 0,
     };
   }
 

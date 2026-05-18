@@ -8,13 +8,13 @@ const path = require('path');
 jest.mock('../../src/utils/project-type-detector', () => ({
   detectMonorepo: jest.fn(),
   detectProjectType: jest.fn(),
-  detectWordPress: jest.fn()
+  detectWordPress: jest.fn(),
 }));
 
 // Mock conf to avoid config file dependency
 jest.mock('conf', () => {
   return jest.fn().mockImplementation(() => ({
-    get: jest.fn().mockReturnValue({})
+    get: jest.fn().mockReturnValue({}),
   }));
 });
 
@@ -48,7 +48,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'auth',
         scope: 'packages/auth',
-        boundary: expect.stringMatching(/directory|package/)
+        boundary: expect.stringMatching(/directory|package/),
       });
     });
 
@@ -63,7 +63,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'user-service',
         scope: 'services/user-service',
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -78,7 +78,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'web',
         scope: 'apps/web',
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -93,7 +93,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'payment',
         scope: 'modules/payment',
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -108,7 +108,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'shared',
         scope: 'libs/shared',
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -123,7 +123,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'Button',
         scope: 'components/Button',
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -138,7 +138,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'auth',
         scope: expect.stringContaining('auth'),
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -164,7 +164,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'auth',
         scope: expect.stringContaining('auth'),
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
 
@@ -179,7 +179,7 @@ describe('ComponentDetector', () => {
       expect(result[0]).toMatchObject({
         component: 'api',
         scope: expect.stringContaining('api'),
-        boundary: 'directory'
+        boundary: 'directory',
       });
     });
   });
@@ -194,7 +194,7 @@ describe('ComponentDetector', () => {
       const results = await detector.detectBatch([
         'src/auth/login.js',
         'src/auth/logout.js',
-        'src/api/routes.js'
+        'src/api/routes.js',
       ]);
 
       expect(results).toHaveLength(3);
@@ -214,7 +214,7 @@ describe('ComponentDetector', () => {
       const summary = await detector.getComponentsSummary([
         'src/auth/login.js',
         'src/auth/logout.js',
-        'src/api/routes.js'
+        'src/api/routes.js',
       ]);
 
       expect(summary).toHaveProperty('components');

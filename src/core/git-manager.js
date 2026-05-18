@@ -57,7 +57,7 @@ class GitManager {
   async getCommitHistory(limit = 50) {
     try {
       const log = await this.git.log({ maxCount: limit });
-      return log.all.map((commit) => ({
+      return log.all.map(commit => ({
         hash: commit.hash,
         message: commit.message,
         author: commit.author_name,
@@ -159,7 +159,7 @@ class GitManager {
       return {
         branch,
         root,
-        remotes: remotes.map((remote) => ({
+        remotes: remotes.map(remote => ({
           name: remote.name,
           url: remote.refs.fetch,
         })),
@@ -184,8 +184,8 @@ class GitManager {
         formats: new Map(),
       };
 
-      commits.forEach((commit) => {
-        const {message} = commit;
+      commits.forEach(commit => {
+        const { message } = commit;
         patterns.lengths.push(message.length);
 
         // Check for conventional commit format
@@ -195,20 +195,11 @@ class GitManager {
           patterns.types.set(type, (patterns.types.get(type) || 0) + 1);
           if (scope) {
             const cleanScope = scope.slice(1, -1); // Remove parentheses
-            patterns.scopes.set(
-              cleanScope,
-              (patterns.scopes.get(cleanScope) || 0) + 1
-            );
+            patterns.scopes.set(cleanScope, (patterns.scopes.get(cleanScope) || 0) + 1);
           }
-          patterns.formats.set(
-            'conventional',
-            (patterns.formats.get('conventional') || 0) + 1
-          );
+          patterns.formats.set('conventional', (patterns.formats.get('conventional') || 0) + 1);
         } else {
-          patterns.formats.set(
-            'freeform',
-            (patterns.formats.get('freeform') || 0) + 1
-          );
+          patterns.formats.set('freeform', (patterns.formats.get('freeform') || 0) + 1);
         }
       });
 
@@ -219,12 +210,9 @@ class GitManager {
         mostUsedScopes: Array.from(patterns.scopes.entries())
           .sort((a, b) => b[1] - a[1])
           .slice(0, 5),
-        averageLength:
-          patterns.lengths.reduce((a, b) => a + b, 0) / patterns.lengths.length,
+        averageLength: patterns.lengths.reduce((a, b) => a + b, 0) / patterns.lengths.length,
         preferredFormat:
-          Array.from(patterns.formats.entries()).sort(
-            (a, b) => b[1] - a[1]
-          )[0]?.[0] || 'freeform',
+          Array.from(patterns.formats.entries()).sort((a, b) => b[1] - a[1])[0]?.[0] || 'freeform',
       };
     } catch (error) {
       throw new Error(`Failed to analyze commit patterns: ${error.message}`);
@@ -237,10 +225,7 @@ class GitManager {
   async createValidationBranch(_baseBranch = null) {
     try {
       await this.getCurrentBranch();
-      const timestamp = new Date()
-        .toISOString()
-        .replace(/[:.]/g, '-')
-        .slice(0, 19);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       const validationBranch = `validation-${timestamp}`;
 
       // Create and checkout validation branch
@@ -290,7 +275,7 @@ class GitManager {
         // Stage the fixed changes
         await this.git.add('.');
 
-        const fixedMessage = `${originalMessage}\n\n[auto-corrected] Applied ${fixes.summary.totalFixes} fixes:\n${fixes.applied.map((f) => `- ${f.description || f.type}`).join('\n')}`;
+        const fixedMessage = `${originalMessage}\n\n[auto-corrected] Applied ${fixes.summary.totalFixes} fixes:\n${fixes.applied.map(f => `- ${f.description || f.type}`).join('\n')}`;
 
         const fixedCommit = await this.commit(fixedMessage);
         commits.push({
@@ -334,7 +319,9 @@ class GitManager {
   async stashChanges(message = 'Auto-stash before validation') {
     try {
       const sanitizedMessage = InputSanitizer.sanitizeString(message);
-      const result = await this.git.stash(InputSanitizer.sanitizeGitArgs(['push', '-m', sanitizedMessage]));
+      const result = await this.git.stash(
+        InputSanitizer.sanitizeGitArgs(['push', '-m', sanitizedMessage])
+      );
       return result;
     } catch (error) {
       throw new Error(`Failed to stash changes: ${error.message}`);
@@ -371,11 +358,7 @@ class GitManager {
   async getUnstagedFiles() {
     try {
       const status = await this.git.status();
-      return status.modified.concat(
-        status.not_added,
-        status.deleted,
-        status.created
-      );
+      return status.modified.concat(status.not_added, status.deleted, status.created);
     } catch (error) {
       throw new Error(`Failed to get unstaged files: ${error.message}`);
     }
@@ -403,7 +386,7 @@ class GitManager {
         ...status.modified,
         ...status.not_added,
         ...status.deleted,
-        ...status.created
+        ...status.created,
       ];
       return [...new Set(allChanged)]; // Remove duplicates
     } catch (error) {

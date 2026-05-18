@@ -14,7 +14,7 @@ class ProviderPerformanceManager {
       successfulRequests: 0,
       failedRequests: 0,
       avgResponseTime: 0,
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
     };
 
     // Initialize retry utility with default options
@@ -22,7 +22,7 @@ class ProviderPerformanceManager {
       maxRetries: options.maxRetries || 2,
       baseDelay: options.baseDelay || 1000,
       maxDelay: options.maxDelay || 10000,
-      ...options.retryOptions
+      ...options.retryOptions,
     });
   }
 
@@ -44,7 +44,7 @@ class ProviderPerformanceManager {
         successRate: 0,
         isHealthy: true,
         responseTimes: [], // Keep last N response times for moving average
-        maxResponseTimes: 10 // Keep only last 10 response times
+        maxResponseTimes: 10, // Keep only last 10 response times
       });
     }
   }
@@ -55,20 +55,20 @@ class ProviderPerformanceManager {
   recordRequest(providerName, startTime) {
     this.initProvider(providerName);
     this.metrics.totalRequests++;
-    
+
     const stats = this.providerStats.get(providerName);
     stats.totalRequests++;
     stats.lastRequestTime = Date.now();
-    
+
     // Add to request queue for tracking
     const requestId = `req_${Date.now()}_${Math.random()}`;
     this.requestQueue.push({
       id: requestId,
       provider: providerName,
       startTime,
-      completed: false
+      completed: false,
     });
-    
+
     return requestId;
   }
 
@@ -77,30 +77,33 @@ class ProviderPerformanceManager {
    */
   recordSuccess(requestId, providerName, responseTime, _result) {
     this.initProvider(providerName);
-    
+
     const stats = this.providerStats.get(providerName);
     stats.successfulRequests++;
     stats.lastSuccessTime = Date.now();
     stats.consecutiveFailures = 0;
     stats.isHealthy = true;
-    
+
     // Update response time tracking
     stats.responseTimes.push(responseTime);
     if (stats.responseTimes.length > stats.maxResponseTimes) {
       stats.responseTimes.shift();
     }
-    
+
     // Calculate moving average
     if (stats.responseTimes.length > 0) {
-      stats.avgResponseTime = stats.responseTimes.reduce((a, b) => a + b, 0) / stats.responseTimes.length;
+      stats.avgResponseTime =
+        stats.responseTimes.reduce((a, b) => a + b, 0) / stats.responseTimes.length;
     }
-    
+
     // Update success rate
     stats.successRate = (stats.successfulRequests / stats.totalRequests) * 100;
-    
+
     this.metrics.successfulRequests++;
-    this.metrics.avgResponseTime = ((this.metrics.avgResponseTime * (this.metrics.successfulRequests - 1)) + responseTime) / this.metrics.successfulRequests;
-    
+    this.metrics.avgResponseTime =
+      (this.metrics.avgResponseTime * (this.metrics.successfulRequests - 1) + responseTime) /
+      this.metrics.successfulRequests;
+
     // Mark request as completed
     const requestIndex = this.requestQueue.findIndex(req => req.id === requestId);
     if (requestIndex !== -1) {
@@ -113,18 +116,18 @@ class ProviderPerformanceManager {
    */
   recordFailure(requestId, providerName, error) {
     this.initProvider(providerName);
-    
+
     const stats = this.providerStats.get(providerName);
     stats.failedRequests++;
     stats.consecutiveFailures++;
     stats.lastError = error.message || error.toString();
     stats.isHealthy = stats.consecutiveFailures < 3; // Mark unhealthy after 3 consecutive failures
-    
+
     // Update success rate
     stats.successRate = (stats.successfulRequests / stats.totalRequests) * 100;
-    
+
     this.metrics.failedRequests++;
-    
+
     // Mark request as completed
     const requestIndex = this.requestQueue.findIndex(req => req.id === requestId);
     if (requestIndex !== -1) {
@@ -170,10 +173,8 @@ class ProviderPerformanceManager {
       // If no healthy providers, return the one with least consecutive failures
       const allProviders = Array.from(this.providerStats.entries());
       if (allProviders.length === 0) return null;
-      
-      return allProviders.sort((a, b) => 
-        a[1].consecutiveFailures - b[1].consecutiveFailures
-      )[0][0];
+
+      return allProviders.sort((a, b) => a[1].consecutiveFailures - b[1].consecutiveFailures)[0][0];
     }
 
     // Choose provider with highest success rate and lowest avg response time
@@ -182,14 +183,14 @@ class ProviderPerformanceManager {
       if (current.stats.successRate > best.stats.successRate) {
         return current;
       }
-      
+
       // If success rates are similar, prefer lower response time
       if (Math.abs(current.stats.successRate - best.stats.successRate) < 5) {
         if (current.stats.avgResponseTime < best.stats.avgResponseTime) {
           return current;
         }
       }
-      
+
       return best;
     });
 
@@ -220,7 +221,7 @@ class ProviderPerformanceManager {
       successfulRequests: 0,
       failedRequests: 0,
       avgResponseTime: 0,
-      lastUpdated: Date.now()
+      lastUpdated: Date.now(),
     };
   }
 
@@ -229,8 +230,8 @@ class ProviderPerformanceManager {
    */
   cleanupRequestQueue() {
     const now = Date.now();
-    this.requestQueue = this.requestQueue.filter(req => 
-      !req.completed || (now - req.startTime) < 300000 // Keep for 5 minutes after completion
+    this.requestQueue = this.requestQueue.filter(
+      req => !req.completed || now - req.startTime < 300000 // Keep for 5 minutes after completion
     );
   }
 
@@ -247,7 +248,7 @@ class ProviderPerformanceManager {
 
     try {
       // Execute with retry logic
-      const result = await this.retryUtility.execute(async (attempt) => {
+      const result = await this.retryUtility.execute(async attempt => {
         if (attempt > 0) {
           console.log(`Retry attempt ${attempt} for ${providerName}`);
         }
@@ -277,7 +278,7 @@ class ProviderPerformanceManager {
         successRate: stats.successRate.toFixed(2),
         avgResponseTime: stats.avgResponseTime.toFixed(2),
         consecutiveFailures: stats.consecutiveFailures,
-        totalRequests: stats.totalRequests
+        totalRequests: stats.totalRequests,
       };
     }
     return summary;

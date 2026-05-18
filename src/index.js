@@ -96,9 +96,7 @@ Do not explain the error, just provide the solution.`;
         // Clean up any extra whitespace or formatting
         let suggestion = response.trim();
         // Remove any numbering or bullet points that might be added
-        suggestion = suggestion
-          .replace(/^\d+\.?\s*/, '')
-          .replace(/^[-*]\s*/, '');
+        suggestion = suggestion.replace(/^\d+\.?\s*/, '').replace(/^[-*]\s*/, '');
         // Ensure it's a reasonable length
         if (suggestion.length > 0 && suggestion.length < 200) {
           return suggestion;
@@ -147,11 +145,7 @@ Do not explain the error, just provide the solution.`;
       let diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
-        spinner.fail(
-          chalk.red(
-            '❌ No staged changes found. Please stage your changes first.'
-          )
-        );
+        spinner.fail(chalk.red('❌ No staged changes found. Please stage your changes first.'));
         await this.activityLogger.warn('generate_failed', {
           reason: 'no_staged_changes',
         });
@@ -171,9 +165,7 @@ Do not explain the error, just provide the solution.`;
 
         if (redactionSummary.found) {
           console.log(
-            chalk.yellow(
-              `\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`
-            )
+            chalk.yellow(`\n⚠️  Found and redacted ${redactionSummary.redacted} sensitive item(s):`)
           );
 
           // Group by category for cleaner output
@@ -182,9 +174,7 @@ Do not explain the error, just provide the solution.`;
             categories.forEach(([category, count]) => {
               const categoryEmoji = category === 'pii' ? '👤' : '🔑';
               console.log(
-                chalk.gray(
-                  `   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`
-                )
+                chalk.gray(`   ${categoryEmoji} ${category.toUpperCase()}: ${count} item(s)`)
               );
             });
           }
@@ -238,8 +228,7 @@ Do not explain the error, just provide the solution.`;
           count: parseInt(mergedOptions.count) || 1,
           type: mergedOptions.type,
           language: mergedOptions.language || 'en',
-          conventional:
-            mergedOptions.conventional || config.conventionalCommits,
+          conventional: mergedOptions.conventional || config.conventionalCommits,
           preferredProvider: mergedOptions.provider || config.defaultProvider,
         });
 
@@ -249,12 +238,10 @@ Do not explain the error, just provide the solution.`;
         }
       }
 
-      spinner.succeed(
-        chalk.green('✅ Commit messages generated successfully!')
-      );
+      spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
       // Format messages
-      const formattedMessages = messages.map((msg) =>
+      const formattedMessages = messages.map(msg =>
         this.messageFormatter.format(msg, mergedOptions)
       );
 
@@ -270,19 +257,14 @@ Do not explain the error, just provide the solution.`;
         return;
       }
 
-      const selectedMessage = await this.selectMessage(
-        formattedMessages,
-        mergedOptions
-      );
+      const selectedMessage = await this.selectMessage(formattedMessages, mergedOptions);
 
       if (selectedMessage) {
         await this.gitManager.commit(selectedMessage);
         console.log(chalk.green('\n✅ Commit created successfully!'));
 
         // Update statistics
-        await this.statsManager.recordCommit(
-          mergedOptions.provider || config.defaultProvider
-        );
+        await this.statsManager.recordCommit(mergedOptions.provider || config.defaultProvider);
 
         // Log successful commit
         await this.activityLogger.logGitOperation('commit', {
@@ -298,15 +280,11 @@ Do not explain the error, just provide the solution.`;
         });
       }
     } catch (error) {
-      spinner.fail(
-        chalk.red(`❌ Failed to generate commit message: ${error.message}`)
-      );
+      spinner.fail(chalk.red(`❌ Failed to generate commit message: ${error.message}`));
       await this.activityLogger.logDetailedError(error, {
         operation: 'generate_commit',
         duration: Date.now() - startTime,
-        provider:
-          mergedOptions?.provider ||
-          (await this.configManager.get('defaultProvider')),
+        provider: mergedOptions?.provider || (await this.configManager.get('defaultProvider')),
         diffLength: diff?.length,
         cacheEnabled: mergedOptions?.cache !== false,
         conventionalCommits: mergedOptions?.conventional,
@@ -353,10 +331,7 @@ Do not explain the error, just provide the solution.`;
       return 'ai_connection_error';
     }
 
-    if (
-      message.includes('context length exceeded') ||
-      message.includes('too large')
-    ) {
+    if (message.includes('context length exceeded') || message.includes('too large')) {
       return 'ai_context_limit';
     }
 
@@ -370,8 +345,7 @@ Do not explain the error, just provide the solution.`;
     const suggestions = {
       git_no_changes:
         'No changes are staged. Use "git add <file>" to stage changes before running aic.',
-      git_not_repo:
-        'This directory is not a git repository. Run "git init" to initialize one.',
+      git_not_repo: 'This directory is not a git repository. Run "git init" to initialize one.',
       ai_auth_error:
         'AI provider authentication failed. Run "aic setup" to configure your API key.',
       ai_rate_limit:
@@ -380,8 +354,7 @@ Do not explain the error, just provide the solution.`;
         'Could not connect to AI provider. Check your internet connection or ensure Ollama is running.',
       ai_context_limit:
         'The diff is too large for the AI provider. Try staging fewer files or smaller changes.',
-      unknown:
-        'An unexpected error occurred. Check your internet connection and try again.',
+      unknown: 'An unexpected error occurred. Check your internet connection and try again.',
     };
 
     return suggestions[type] || suggestions.unknown;
@@ -431,8 +404,8 @@ Do not explain the error, just provide the solution.`;
       output: process.stdout,
     });
 
-    const question = (prompt) =>
-      new Promise((resolve) => {
+    const question = prompt =>
+      new Promise(resolve => {
         rl.question(prompt, resolve);
       });
 
@@ -452,14 +425,10 @@ Do not explain the error, just provide the solution.`;
       });
 
       console.log(chalk.gray(`${messages.length + 1}. 🔄 Regenerate messages`));
-      console.log(
-        chalk.gray(`${messages.length + 2}. ✏️  Write custom message`)
-      );
+      console.log(chalk.gray(`${messages.length + 2}. ✏️  Write custom message`));
       console.log(chalk.gray(`${messages.length + 3}. ❌ Cancel`));
 
-      const choice = await question(
-        `\nSelect option (1-${messages.length + 3}, default: 1): `
-      );
+      const choice = await question(`\nSelect option (1-${messages.length + 3}, default: 1): `);
       const choiceNum = parseInt(choice) || 1;
 
       if (choiceNum === messages.length + 3) {
@@ -475,9 +444,7 @@ Do not explain the error, just provide the solution.`;
       }
 
       if (choiceNum === messages.length + 2) {
-        const customMessage = await question(
-          'Enter your custom commit message: '
-        );
+        const customMessage = await question('Enter your custom commit message: ');
         if (!customMessage.trim()) {
           console.log(chalk.red('Message cannot be empty'));
           return null;
@@ -512,10 +479,7 @@ Do not explain the error, just provide the solution.`;
     } else if (options.get) {
       const value = await this.configManager.get(options.get);
       console.log(`${options.get}: ${value || 'not set'}`);
-    } else if (
-      options.list ||
-      (!options.set && !options.get && !options.reset)
-    ) {
+    } else if (options.list || (!options.set && !options.get && !options.reset)) {
       const config = await this.configManager.load();
       console.log(chalk.cyan('Current configuration:'));
       Object.entries(config).forEach(([key, value]) => {
@@ -540,8 +504,8 @@ Do not explain the error, just provide the solution.`;
       output: process.stdout,
     });
 
-    const question = (prompt) =>
-      new Promise((resolve) => {
+    const question = prompt =>
+      new Promise(resolve => {
         rl.question(prompt, resolve);
       });
 
@@ -596,9 +560,7 @@ Do not explain the error, just provide the solution.`;
       });
 
       console.log(chalk.green('\n✅ Setup completed successfully!'));
-      console.log(
-        chalk.cyan('You can now use "aic" to generate commit messages.')
-      );
+      console.log(chalk.cyan('You can now use "aic" to generate commit messages.'));
     } catch (error) {
       console.error(chalk.red('Setup failed:'), error.message);
     } finally {
@@ -634,17 +596,16 @@ Do not explain the error, just provide the solution.`;
     let currentTokens = 0;
 
     // Rough estimation: 1 token ≈ 4 characters
-    const estimateTokens = (text) => Math.ceil(text.length / 4);
+    const estimateTokens = text => Math.ceil(text.length / 4);
 
     // Helper to detect semantic boundaries
-    const isSemanticBoundary = (line) =>
+    const isSemanticBoundary = line =>
       line.startsWith('diff --git') ||
       line.startsWith('index ') ||
       line.startsWith('---') ||
       line.startsWith('+++') ||
       (line.startsWith('@@') && currentChunk.length > 10) || // New hunk with existing content
-      (/^(function|class|def|const|let|var)\s+\w+/.test(line) &&
-        currentChunk.length > 5);
+      (/^(function|class|def|const|let|var)\s+\w+/.test(line) && currentChunk.length > 5);
 
     // Helper to find good break point near token limit
     const findBreakPoint = (startIdx, maxTokens) => {
@@ -737,7 +698,7 @@ Do not explain the error, just provide the solution.`;
     const uniqueMessages = [...new Set(messages)];
 
     // Score messages based on quality factors
-    const scored = uniqueMessages.map((msg) => ({
+    const scored = uniqueMessages.map(msg => ({
       message: msg,
       score: this.scoreCommitMessage(msg, diff),
     }));
@@ -745,7 +706,7 @@ Do not explain the error, just provide the solution.`;
     // Sort by score and take best ones
     scored.sort((a, b) => b.score - a.score);
 
-    return scored.slice(0, count).map((item) => item.message);
+    return scored.slice(0, count).map(item => item.message);
   }
 
   /**
@@ -755,11 +716,7 @@ Do not explain the error, just provide the solution.`;
     let score = 0;
 
     // Prefer conventional commit format
-    if (
-      /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(
-        message
-      )
-    ) {
+    if (/^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(message)) {
       score += 10;
     }
 
@@ -772,10 +729,7 @@ Do not explain the error, just provide the solution.`;
     }
 
     // Prefer messages with proper capitalization
-    if (
-      message[0] === message[0].toUpperCase() &&
-      message[0] !== message[0].toLowerCase()
-    ) {
+    if (message[0] === message[0].toUpperCase() && message[0] !== message[0].toLowerCase()) {
       score += 2;
     }
 
@@ -792,7 +746,7 @@ Do not explain the error, just provide the solution.`;
       /\b(class|function|const|let|var)\s+\w+/i, // Code constructs
     ];
 
-    specificPatterns.forEach((pattern) => {
+    specificPatterns.forEach(pattern => {
       if (pattern.test(message)) {
         score += 3;
       }
@@ -806,7 +760,7 @@ Do not explain the error, just provide the solution.`;
       /^\s*(improvements?|bug fix|updates?|refactor)\s*$/i,
     ];
 
-    genericPatterns.forEach((pattern) => {
+    genericPatterns.forEach(pattern => {
       if (pattern.test(message)) {
         score -= 20;
       }
@@ -820,7 +774,7 @@ Do not explain the error, just provide the solution.`;
       /^\s*changes\s*$/i,
     ];
 
-    bannedPatterns.forEach((pattern) => {
+    bannedPatterns.forEach(pattern => {
       if (pattern.test(message)) {
         score = -100;
       }
@@ -852,10 +806,7 @@ Do not explain the error, just provide the solution.`;
     const messageKeywords = this.extractKeywordsFromMessage(message);
 
     // Calculate overlap between diff entities and message
-    const entityOverlap = this.calculateEntityOverlap(
-      entitiesFromDiff,
-      messageKeywords
-    );
+    const entityOverlap = this.calculateEntityOverlap(entitiesFromDiff, messageKeywords);
     relevanceScore += entityOverlap * 8; // Weight entity overlap heavily
 
     // Check if the commit type matches the diff type
@@ -908,11 +859,11 @@ Do not explain the error, just provide the solution.`;
 
     // Process diff line by line to distinguish added vs removed content
     const lines = diff.split('\n');
-    
+
     // Extract function/class definitions from ADDED lines
     const addedLines = lines.filter(line => line.startsWith('+') && !line.startsWith('+++'));
     const addedDiff = addedLines.join('\n');
-    
+
     // Extract function/class definitions from REMOVED lines
     const removedLines = lines.filter(line => line.startsWith('-') && !line.startsWith('---'));
     const removedDiff = removedLines.join('\n');
@@ -934,30 +885,21 @@ Do not explain the error, just provide the solution.`;
     }
 
     // Extract class definitions from added diff
-    const classMatchesAdded =
-      addedDiff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const classMatchesAdded = addedDiff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of classMatchesAdded) {
-      const className = match
-        .replace('class\s+', '')
-        .replace('class ', '')
-        .trim();
+      const className = match.replace('class\s+', '').replace('class ', '').trim();
       if (className) entities.classes.added.push(className);
     }
 
     // Extract class definitions from removed diff
-    const classMatchesRemoved =
-      removedDiff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const classMatchesRemoved = removedDiff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of classMatchesRemoved) {
-      const className = match
-        .replace('class\s+', '')
-        .replace('class ', '')
-        .trim();
+      const className = match.replace('class\s+', '').replace('class ', '').trim();
       if (className) entities.classes.removed.push(className);
     }
 
     // Extract variable declarations from added diff
-    const varMatchesAdded =
-      addedDiff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const varMatchesAdded = addedDiff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of varMatchesAdded) {
       const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
       if (varName) entities.variables.added.push(varName);
@@ -973,9 +915,7 @@ Do not explain the error, just provide the solution.`;
 
     // Extract method definitions from added diff
     const methodMatchesAdded =
-      addedDiff.match(
-        /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
-      ) || [];
+      addedDiff.match(/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g) || [];
     for (const match of methodMatchesAdded) {
       const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
       if (methodName && !entities.functions.added.includes(methodName)) {
@@ -985,9 +925,8 @@ Do not explain the error, just provide the solution.`;
 
     // Extract method definitions from removed diff
     const methodMatchesRemoved =
-      removedDiff.match(
-        /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
-      ) || [];
+      removedDiff.match(/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g) ||
+      [];
     for (const match of methodMatchesRemoved) {
       const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
       if (methodName && !entities.functions.removed.includes(methodName)) {
@@ -1032,7 +971,7 @@ Do not explain the error, just provide the solution.`;
       .toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter((word) => word.length > 2 && !this.isCommonStopWord(word));
+      .filter(word => word.length > 2 && !this.isCommonStopWord(word));
 
     return [...new Set(words)]; // Remove duplicates
   }
@@ -1136,21 +1075,17 @@ Do not explain the error, just provide the solution.`;
     for (const func of entities.functions.added) {
       const funcName = func.toLowerCase();
       if (
-        messageKeywords.some(
-          (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
-        )
+        messageKeywords.some(keyword => funcName.includes(keyword) || keyword.includes(funcName))
       ) {
         overlapCount += 2; // Added functions are more relevant
       }
     }
-    
+
     // Removed functions get less weight
     for (const func of entities.functions.removed) {
       const funcName = func.toLowerCase();
       if (
-        messageKeywords.some(
-          (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
-        )
+        messageKeywords.some(keyword => funcName.includes(keyword) || keyword.includes(funcName))
       ) {
         overlapCount += 1; // Removed functions are less relevant
       }
@@ -1160,23 +1095,17 @@ Do not explain the error, just provide the solution.`;
     for (const cls of entities.classes.added) {
       const className = cls.toLowerCase();
       if (
-        messageKeywords.some(
-          (keyword) =>
-            className.includes(keyword) || keyword.includes(className)
-        )
+        messageKeywords.some(keyword => className.includes(keyword) || keyword.includes(className))
       ) {
         overlapCount += 2; // Added classes are more relevant
       }
     }
-    
+
     // Removed classes get less weight
     for (const cls of entities.classes.removed) {
       const className = cls.toLowerCase();
       if (
-        messageKeywords.some(
-          (keyword) =>
-            className.includes(keyword) || keyword.includes(className)
-        )
+        messageKeywords.some(keyword => className.includes(keyword) || keyword.includes(className))
       ) {
         overlapCount += 1; // Removed classes are less relevant
       }
@@ -1187,21 +1116,19 @@ Do not explain the error, just provide the solution.`;
       const varNameLower = varName.toLowerCase();
       if (
         messageKeywords.some(
-          (keyword) =>
-            varNameLower.includes(keyword) || keyword.includes(varNameLower)
+          keyword => varNameLower.includes(keyword) || keyword.includes(varNameLower)
         )
       ) {
         overlapCount += 2; // Added variables are more relevant
       }
     }
-    
+
     // Removed variables get less weight
     for (const varName of entities.variables.removed) {
       const varNameLower = varName.toLowerCase();
       if (
         messageKeywords.some(
-          (keyword) =>
-            varNameLower.includes(keyword) || keyword.includes(varNameLower)
+          keyword => varNameLower.includes(keyword) || keyword.includes(varNameLower)
         )
       ) {
         overlapCount += 1; // Removed variables are less relevant
@@ -1214,11 +1141,7 @@ Do not explain the error, just provide the solution.`;
       const fileNameParts = fileName.split(/[\/\\]/); // Split by path separators
 
       for (const part of fileNameParts) {
-        if (
-          messageKeywords.some(
-            (keyword) => part.includes(keyword) || keyword.includes(part)
-          )
-        ) {
+        if (messageKeywords.some(keyword => part.includes(keyword) || keyword.includes(part))) {
           overlapCount += 1; // File names have normal weight
           break;
         }
@@ -1241,18 +1164,11 @@ Do not explain the error, just provide the solution.`;
     // Determine what type of changes are in the diff
     const diffIndicators = {
       feat: /(\+.*function|\+.*class|\+.*def|\+.*export|\+.*import)/.test(diff),
-      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(
-        diff
-      ),
+      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(diff),
       docs: /(\+.*\.(md|txt|rst)|\+.*README|\+.*documentation)/i.test(diff),
-      refactor:
-        /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
-      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(
-        diff
-      ),
-      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(
-        diff
-      ),
+      refactor: /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
+      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(diff),
+      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(diff),
     };
 
     // Check if the type matches the detected change pattern
@@ -1290,7 +1206,7 @@ Do not explain the error, just provide the solution.`;
     };
 
     if (scopeTypeMap[scope]) {
-      return fileTypes.some((type) => scopeTypeMap[scope].includes(type));
+      return fileTypes.some(type => scopeTypeMap[scope].includes(type));
     }
 
     return false;
@@ -1303,9 +1219,7 @@ Do not explain the error, just provide the solution.`;
     // If diff contains specific function/class names but message is generic
     const entities = this.extractEntitiesFromDiff(diff);
     const hasSpecificEntities =
-      entities.functions.length > 0 ||
-      entities.classes.length > 0 ||
-      entities.variables.length > 0;
+      entities.functions.length > 0 || entities.classes.length > 0 || entities.variables.length > 0;
 
     const genericTerms = [
       /\bchanges?\b/i,
@@ -1318,7 +1232,7 @@ Do not explain the error, just provide the solution.`;
       /\benhancements?\b/i,
     ];
 
-    const hasGenericTerms = genericTerms.some((regex) => regex.test(message));
+    const hasGenericTerms = genericTerms.some(regex => regex.test(message));
 
     return hasSpecificEntities && hasGenericTerms;
   }
@@ -1332,10 +1246,7 @@ Do not explain the error, just provide the solution.`;
     // Determine providers to use - preferred first, then fallback
     const allProviders = ['ollama', 'groq'];
     const providers = preferredProvider
-      ? [
-          preferredProvider,
-          ...allProviders.filter((p) => p !== preferredProvider),
-        ]
+      ? [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)]
       : allProviders;
 
     const mode = preferredProvider ? 'sequential fallback' : 'parallel';
@@ -1347,25 +1258,18 @@ Do not explain the error, just provide the solution.`;
       context: {
         ...context,
         hasSemanticContext: !!(
-          context?.files?.semantic &&
-          Object.keys(context.files.semantic).length > 0
+          context?.files?.semantic && Object.keys(context.files.semantic).length > 0
         ),
       },
     };
 
     // Step 1: Intelligent diff management with semantic context
     const diffManagement = this.manageDiffForAI(diff, enrichedOptions);
-    console.log(
-      chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`)
-    );
+    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
 
     // Step 2: Use sequential fallback mode
-    return await this.generateWithSequentialProviders(
-      diffManagement,
-      enrichedOptions,
-      providers
-    );
+    return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
   }
 
   /**
@@ -1384,23 +1288,15 @@ Do not explain the error, just provide the solution.`;
         let actualPrompt;
 
         // Handle different diff strategies
-        if (
-          diffManagement.strategy === 'full' ||
-          diffManagement.strategy === 'smart-truncated'
-        ) {
+        if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
           // Simple case: diff in one prompt (full or smart-truncated)
           const prompt = provider.buildPrompt(diffManagement.data, options);
-          messages = await provider.generateCommitMessages(
-            diffManagement.data,
-            options
-          );
+          messages = await provider.generateCommitMessages(diffManagement.data, options);
           actualPrompt = prompt;
         } else {
           // Complex case: chunked processing
           console.log(
-            chalk.blue(
-              `📦 Processing ${diffManagement.chunks} chunks with ${providerName}...`
-            )
+            chalk.blue(`📦 Processing ${diffManagement.chunks} chunks with ${providerName}...`)
           );
 
           const chunkMessages = [];
@@ -1414,11 +1310,7 @@ Do not explain the error, just provide the solution.`;
               chunkIndex: i,
               totalChunks: diffManagement.data.length,
               isLastChunk,
-              chunkContext: isLastChunk
-                ? 'final'
-                : i === 0
-                  ? 'initial'
-                  : 'middle',
+              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
               // Add chunk-specific context
               context: {
                 ...options.context,
@@ -1435,14 +1327,8 @@ Do not explain the error, just provide the solution.`;
             };
 
             // Generate with this chunk
-            const chunkPrompt = provider.buildPrompt(
-              chunk.content,
-              chunkOptions
-            );
-            const chunkResult = await provider.generateCommitMessages(
-              chunk.content,
-              chunkOptions
-            );
+            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
+            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
 
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
@@ -1494,9 +1380,7 @@ Do not explain the error, just provide the solution.`;
 
           // Log context usage for debugging
           if (options.context.hasSemanticContext) {
-            console.log(
-              chalk.blue(`🧠 Used semantic context for ${providerName}`)
-            );
+            console.log(chalk.blue(`🧠 Used semantic context for ${providerName}`));
           }
 
           return messages;
@@ -1504,16 +1388,13 @@ Do not explain the error, just provide the solution.`;
       } catch (error) {
         const responseTime = Date.now() - startTime;
 
-        console.warn(
-          chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`)
-        );
+        console.warn(chalk.yellow(`⚠️  ${providerName} provider failed: ${error.message}`));
 
         // Log failed interaction
         await this.activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' ||
-            diffManagement.strategy === 'smart-truncated'
+          diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated'
             ? diffManagement.data
             : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
@@ -1574,11 +1455,7 @@ Do not explain the error, just provide the solution.`;
       )
     );
 
-    const smartTruncated = this.smartTruncateDiff(
-      filteredDiff,
-      MAX_SAFE_SIZE,
-      context
-    );
+    const smartTruncated = this.smartTruncateDiff(filteredDiff, MAX_SAFE_SIZE, context);
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,
@@ -1615,10 +1492,10 @@ Do not explain the error, just provide the solution.`;
     ];
 
     const filteredChunks = fileChunks.filter(
-      (fc) => !IGNORED_PATTERNS.some((pattern) => fc.fileName.includes(pattern))
+      fc => !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern))
     );
 
-    const scoredChunks = filteredChunks.map((fc) => {
+    const scoredChunks = filteredChunks.map(fc => {
       const score = this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
@@ -1671,8 +1548,8 @@ Do not explain the error, just provide the solution.`;
 
     // Build summary of skipped files for context
     const trulySkipped = skippedFiles
-      .filter((f) => !additionalPreservedFiles.includes(f.fileName))
-      .map((f) => f.fileName);
+      .filter(f => !additionalPreservedFiles.includes(f.fileName))
+      .map(f => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
@@ -1682,9 +1559,7 @@ Do not explain the error, just provide the solution.`;
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join(
-        '\n'
-      ),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
       reasoning,
       preservedFiles,
       skippedFiles: trulySkipped,
@@ -1706,7 +1581,7 @@ Do not explain the error, just provide the solution.`;
       other: [],
     };
 
-    skippedFiles.forEach((file) => {
+    skippedFiles.forEach(file => {
       if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
         groups.plugin.push(file);
       } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
@@ -1727,47 +1602,37 @@ Do not explain the error, just provide the solution.`;
 
     if (groups.plugin.length) {
       const plugins = new Set(
-        groups.plugin.map((f) => {
+        groups.plugin.map(f => {
           const match = f.match(/\/plugins\/([^\/]+)/);
           return match ? match[1] : f;
         })
       );
-      summary.push(
-        `# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`
-      );
+      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
     }
 
     if (groups.theme.length) {
       const themes = new Set(
-        groups.theme.map((f) => {
+        groups.theme.map(f => {
           const match = f.match(/\/themes\/([^\/]+)/);
           return match ? match[1] : f;
         })
       );
-      summary.push(
-        `# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`
-      );
+      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
     }
 
     if (groups.assets.length > 5) {
-      summary.push(
-        `# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`
-      );
+      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
     } else if (groups.assets.length) {
-      summary.push(
-        `# Assets: ${groups.assets.map((f) => f.split('/').pop()).join(', ')}`
-      );
+      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
     }
 
     if (groups.config.length) {
-      summary.push(
-        `# Config files: ${groups.config.map((f) => f.split('/').pop()).join(', ')}`
-      );
+      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
     }
 
     if (groups.vendor.length) {
       const vendorTypes = new Set(
-        groups.vendor.map((f) => {
+        groups.vendor.map(f => {
           if (f.includes('node_modules')) return 'npm';
           if (f.includes('vendor/composer')) return 'composer';
           return 'vendor';
@@ -1815,11 +1680,7 @@ Do not explain the error, just provide the solution.`;
         let isNewFile =
           line.includes('/dev/null') ||
           (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
-        if (
-          !isNewFile &&
-          lines[i + 1] &&
-          lines[i + 1].includes('new file mode')
-        ) {
+        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
           isNewFile = true;
         }
 
@@ -1881,24 +1742,14 @@ Do not explain the error, just provide the solution.`;
       score += 20;
     }
 
-    const ignoredPatterns = [
-      'node_modules',
-      '.git',
-      'dist',
-      'build',
-      'vendor',
-      '.lock',
-    ];
-    if (ignoredPatterns.some((p) => chunk.fileName.includes(p))) {
+    const ignoredPatterns = ['node_modules', '.git', 'dist', 'build', 'vendor', '.lock'];
+    if (ignoredPatterns.some(p => chunk.fileName.includes(p))) {
       score -= 50;
     }
 
     const semanticFiles = semanticContext?.files?.semantic || {};
     for (const [filePath, info] of Object.entries(semanticFiles)) {
-      if (
-        chunk.fileName.includes(filePath) ||
-        filePath.includes(chunk.fileName)
-      ) {
+      if (chunk.fileName.includes(filePath) || filePath.includes(chunk.fileName)) {
         if (info?.functions?.length > 0 || info?.classes?.length > 0) {
           score += 40;
         }
@@ -1945,10 +1796,8 @@ Do not explain the error, just provide the solution.`;
       } else if (line.startsWith('>>>>>>>')) {
         if (currentConflict) {
           currentConflict.endLine = lines.indexOf(line);
-          currentConflict.currentVersion =
-            currentConflict.currentVersion.join('\n');
-          currentConflict.incomingVersion =
-            currentConflict.incomingVersion.join('\n');
+          currentConflict.currentVersion = currentConflict.currentVersion.join('\n');
+          currentConflict.incomingVersion = currentConflict.incomingVersion.join('\n');
           conflicts.push(currentConflict);
         }
         currentConflict = null;
@@ -1969,12 +1818,7 @@ Do not explain the error, just provide the solution.`;
   /**
    * Resolve a single conflict block using AI
    */
-  async resolveConflictWithAI(
-    filePath,
-    currentVersion,
-    incomingVersion,
-    language = 'javascript'
-  ) {
+  async resolveConflictWithAI(filePath, currentVersion, incomingVersion, language = 'javascript') {
     const prompt = `You are an expert software developer. Resolve a git merge conflict intelligently.
 
 CONTEXT:
@@ -2005,9 +1849,7 @@ RESOLVED CODE (output only):
 
     try {
       const config = await this.configManager.getAll();
-      const provider = AIProviderFactory.create(
-        config.defaultProvider || 'groq'
-      );
+      const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
 
       const messages = await provider.generateCommitMessages(
         `RESOLVE CONFLICT IN ${filePath}:\n\n${prompt}`,
@@ -2018,18 +1860,12 @@ RESOLVED CODE (output only):
         let resolved = messages[0].trim();
 
         // Clean up any markdown code blocks if present
-        resolved = resolved
-          .replace(/^```[a-zA-Z]*\n/, '')
-          .replace(/\n```$/, '');
+        resolved = resolved.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
 
         return resolved;
       }
     } catch (error) {
-      console.warn(
-        chalk.yellow(
-          `AI resolution failed, using current version: ${error.message}`
-        )
-      );
+      console.warn(chalk.yellow(`AI resolution failed, using current version: ${error.message}`));
     }
 
     // Fallback: keep current version
@@ -2040,20 +1876,15 @@ RESOLVED CODE (output only):
    * Handle conflict markers in a diff using AI-powered resolution
    */
   async handleConflictMarkers(diff, filePath) {
-    const conflictPattern =
-      /<<<<<<< HEAD\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> .+/g;
+    const conflictPattern = /<<<<<<< HEAD\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> .+/g;
     const matches = [...diff.matchAll(conflictPattern)];
 
     if (matches.length === 0) {
       return { cleanedDiff: diff, hasConflicts: false, resolved: [] };
     }
 
-    console.log(
-      chalk.yellow(`⚠️  Found ${matches.length} conflict(s) in ${filePath}`)
-    );
-    console.log(
-      chalk.blue(`🧠 Using AI to intelligently resolve conflicts...`)
-    );
+    console.log(chalk.yellow(`⚠️  Found ${matches.length} conflict(s) in ${filePath}`));
+    console.log(chalk.blue(`🧠 Using AI to intelligently resolve conflicts...`));
 
     let cleanedDiff = diff;
     const resolved = [];
@@ -2110,9 +1941,7 @@ RESOLVED CODE (output only):
 
     const successType = aiUsed ? 'AI-merged' : 'fallback';
     console.log(
-      chalk.green(
-        `✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`
-      )
+      chalk.green(`✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`)
     );
 
     return {
@@ -2133,9 +1962,7 @@ RESOLVED CODE (output only):
       return { cleaned: false, filesFixed: 0, diff };
     }
 
-    console.log(
-      chalk.yellow('\n🔧 Detected conflict markers in staged changes')
-    );
+    console.log(chalk.yellow('\n🔧 Detected conflict markers in staged changes'));
 
     // Parse diff to find which files have conflicts
     const filePattern = /diff --git a\/(.+?) b\/(.+)/g;
@@ -2151,7 +1978,7 @@ RESOLVED CODE (output only):
 
     for (const file of files) {
       // Extract file diff
-      const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const escapeRegExp = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const fileDiffPattern = new RegExp(
         `diff --git a/${escapeRegExp(file.fileA)} b/${escapeRegExp(file.fileB)}[\\s\\S]*?(?=diff --git a|$)`,
         'g'
@@ -2202,9 +2029,7 @@ RESOLVED CODE (output only):
                   // Replace the conflict block
                   const conflictBlockStart = content.indexOf(
                     '<<<<<<<',
-                    conflict.startLine > 0
-                      ? content.lastIndexOf('\n', conflict.startLine)
-                      : 0
+                    conflict.startLine > 0 ? content.lastIndexOf('\n', conflict.startLine) : 0
                   );
                   const conflictBlockEnd =
                     content.indexOf('>>>>>>>', conflictBlockStart) +
@@ -2213,10 +2038,7 @@ RESOLVED CODE (output only):
                       .indexOf('\n') +
                     1;
 
-                  if (
-                    conflictBlockStart >= 0 &&
-                    conflictBlockEnd > conflictBlockStart
-                  ) {
+                  if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
                     cleanedContent = `${content.substring(0, conflictBlockStart) + resolved}\n${content.substring(conflictBlockEnd)}`;
                   } else {
                     cleanedContent = cleanedContent.replace(
@@ -2239,9 +2061,7 @@ RESOLVED CODE (output only):
               if (fileResolved > 0) {
                 await fs.writeFile(fullPath, cleanedContent, 'utf8');
                 console.log(
-                  chalk.green(
-                    `  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`
-                  )
+                  chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`)
                 );
                 totalResolved += fileResolved;
                 if (fileAiUsed) aiUsed = true;
@@ -2313,19 +2133,14 @@ RESOLVED CODE (output only):
     }
 
     if (options.analyze) {
-      const analysis = await this.activityLogger.analyzeLogs(
-        options.days || 30
-      );
+      const analysis = await this.activityLogger.analyzeLogs(options.days || 30);
       this.displayLogAnalysis(analysis);
       return;
     }
 
     if (options.export) {
       const format = options.format || 'json';
-      const exportData = await this.activityLogger.exportLogs(
-        options.days || 30,
-        format
-      );
+      const exportData = await this.activityLogger.exportLogs(options.days || 30, format);
 
       if (format === 'json') {
         console.log(JSON.stringify(JSON.parse(exportData), null, 2));
@@ -2372,9 +2187,7 @@ RESOLVED CODE (output only):
       Object.entries(analysis.messagePatterns)
         .sort(([, a], [, b]) => b - a)
         .forEach(([type, count]) => {
-          const percentage = Math.round(
-            (count / analysis.successfulCommits) * 100
-          );
+          const percentage = Math.round((count / analysis.successfulCommits) * 100);
           console.log(`  ${type}: ${count} (${percentage}%)`);
         });
     }
@@ -2395,17 +2208,11 @@ RESOLVED CODE (output only):
         .sort(([, a], [, b]) => b - a)
         .slice(0, 3)
         .forEach(([hour, count]) => {
-          console.log(
-            `  ${hour.toString().padStart(2, '0')}:00 - ${count} interactions`
-          );
+          console.log(`  ${hour.toString().padStart(2, '0')}:00 - ${count} interactions`);
         });
     }
 
-    console.log(
-      chalk.dim(
-        '\n💡 Tip: Use --export to get detailed data for further analysis'
-      )
-    );
+    console.log(chalk.dim('\n💡 Tip: Use --export to get detailed data for further analysis'));
   }
 }
 

@@ -17,105 +17,189 @@ class WhyChangedFormatter {
     this.motivationPatterns = {
       bugfix: {
         keywords: [
-          'fix', 'bug', 'issue', 'error', 'problem', 'broken',
-          'crash', 'fail', 'exception', 'throw', 'prevent',
-          'resolve', 'correct', 'patch', 'hotfix', 'regression',
-          'handle', 'guard', 'catch', 'debug'
+          'fix',
+          'bug',
+          'issue',
+          'error',
+          'problem',
+          'broken',
+          'crash',
+          'fail',
+          'exception',
+          'throw',
+          'prevent',
+          'resolve',
+          'correct',
+          'patch',
+          'hotfix',
+          'regression',
+          'handle',
+          'guard',
+          'catch',
+          'debug',
         ],
         templates: [
           'Fixes {issue} that caused {symptom}',
           'Resolves {issue} in {component}',
           'Prevents {error} when {condition}',
-          'Handles edge case: {condition}'
-        ]
+          'Handles edge case: {condition}',
+        ],
       },
       feature: {
         keywords: [
-          'add', 'new', 'feature', 'functionality', 'capability',
-          'implement', 'create', 'introduce', 'enable', 'support',
-          'build', 'develop', 'launch', 'release'
+          'add',
+          'new',
+          'feature',
+          'functionality',
+          'capability',
+          'implement',
+          'create',
+          'introduce',
+          'enable',
+          'support',
+          'build',
+          'develop',
+          'launch',
+          'release',
         ],
         templates: [
           'Adds {feature} to {component}',
           'Implements {capability} for {purpose}',
           'Enables {functionality} to {benefit}',
-          'Introduces {feature} for {user}'
-        ]
+          'Introduces {feature} for {user}',
+        ],
       },
       refactor: {
         keywords: [
-          'refactor', 'restructure', 'reorganize', 'clean',
-          'improve', 'optimize', 'simplify', 'streamline',
-          'extract', 'consolidate', 'merge', 'split',
-          'rename', 'reorder', 'rearrange', 'modularize'
+          'refactor',
+          'restructure',
+          'reorganize',
+          'clean',
+          'improve',
+          'optimize',
+          'simplify',
+          'streamline',
+          'extract',
+          'consolidate',
+          'merge',
+          'split',
+          'rename',
+          'reorder',
+          'rearrange',
+          'modularize',
         ],
         templates: [
           'Refactors {component} for {benefit}',
           'Improves {aspect} by {approach}',
           'Simplifies {code} to {goal}',
-          'Reorganizes {structure} for {purpose}'
-        ]
+          'Reorganizes {structure} for {purpose}',
+        ],
       },
       docs: {
         keywords: [
-          'doc', 'readme', 'comment', 'documentation',
-          'guide', 'tutorial', 'example', 'explanation',
-          'describe', 'document', 'annotate'
+          'doc',
+          'readme',
+          'comment',
+          'documentation',
+          'guide',
+          'tutorial',
+          'example',
+          'explanation',
+          'describe',
+          'document',
+          'annotate',
         ],
         templates: [
           'Documents {feature} for {audience}',
           'Adds {type} to {component}',
-          'Improves {aspect} documentation'
-        ]
+          'Improves {aspect} documentation',
+        ],
       },
       perf: {
         keywords: [
-          'performance', 'optimize', 'speed', 'fast', 'slow',
-          'cache', 'lazy', 'memo', 'async', 'parallel',
-          'boost', 'accelerate', 'efficient', 'memory'
+          'performance',
+          'optimize',
+          'speed',
+          'fast',
+          'slow',
+          'cache',
+          'lazy',
+          'memo',
+          'async',
+          'parallel',
+          'boost',
+          'accelerate',
+          'efficient',
+          'memory',
         ],
         templates: [
           'Optimizes {component} for {metric}',
           'Improves {metric} by {approach}',
-          'Reduces {cost} through {technique}'
-        ]
+          'Reduces {cost} through {technique}',
+        ],
       },
       maintenance: {
         keywords: [
-          'update', 'upgrade', 'bump', 'version',
-          'dependency', 'package', 'npm', 'yarn',
-          'maintenance', 'housekeeping', 'chore'
+          'update',
+          'upgrade',
+          'bump',
+          'version',
+          'dependency',
+          'package',
+          'npm',
+          'yarn',
+          'maintenance',
+          'housekeeping',
+          'chore',
         ],
         templates: [
           'Updates {dependency} to {version}',
           'Upgrades {package} for {reason}',
-          'Maintains {component} by {action}'
-        ]
+          'Maintains {component} by {action}',
+        ],
       },
       test: {
         keywords: [
-          'test', 'spec', 'coverage', 'jest', 'mocha',
-          'cypress', 'unit', 'integration', 'e2e',
-          'mock', 'fixture', 'assert'
+          'test',
+          'spec',
+          'coverage',
+          'jest',
+          'mocha',
+          'cypress',
+          'unit',
+          'integration',
+          'e2e',
+          'mock',
+          'fixture',
+          'assert',
         ],
         templates: [
           'Adds {type} tests for {component}',
           'Improves test coverage for {feature}',
-          'Fixes {type} test for {scenario}'
-        ]
+          'Fixes {type} test for {scenario}',
+        ],
       },
       security: {
         keywords: [
-          'security', 'vulnerability', 'cve', 'sanitize',
-          'validate', 'escape', 'encrypt', 'protect',
-          'auth', 'permission', 'access', 'token'
+          'security',
+          'vulnerability',
+          'cve',
+          'sanitize',
+          'validate',
+          'escape',
+          'encrypt',
+          'protect',
+          'auth',
+          'permission',
+          'access',
+          'token',
         ],
         templates: [
           'Fixes security vulnerability: {issue}',
           'Adds {protection} to {component}',
-          'Validates {input} to prevent {attack}'
-        ]
-      }
+          'Validates {input} to prevent {attack}',
+        ],
+      },
     };
   }
 
@@ -131,7 +215,7 @@ class WhyChangedFormatter {
     }
 
     const motivation = this._detectMotivation(message, context);
-    
+
     if (!motivation || motivation.type === 'unknown') {
       return this._formatGenericWhy(message);
     }
@@ -152,7 +236,7 @@ class WhyChangedFormatter {
     // Score each motivation type
     for (const [type, config] of Object.entries(this.motivationPatterns)) {
       let score = 0;
-      
+
       // Keyword matching
       for (const keyword of config.keywords) {
         if (lowerMessage.includes(keyword)) {
@@ -188,11 +272,11 @@ class WhyChangedFormatter {
 
     const sorted = Object.entries(scores).sort((a, b) => b[1] - a[1]);
     const [type, score] = sorted[0];
-    
+
     return {
       type,
       confidence: Math.min(score / 5, 1), // Normalize to 0-1
-      alternatives: sorted.slice(1, 3).map(([t, s]) => t)
+      alternatives: sorted.slice(1, 3).map(([t, s]) => t),
     };
   }
 
@@ -257,7 +341,7 @@ class WhyChangedFormatter {
       action: this._extractAction(context),
       reason: this._extractReason(context),
       condition: this._extractCondition(context),
-      error: this._extractError(context)
+      error: this._extractError(context),
     };
 
     // Fill template
@@ -311,7 +395,7 @@ class WhyChangedFormatter {
       perf: ['perf'],
       maintenance: ['chore', 'build'],
       test: ['test'],
-      security: ['fix', 'feat']
+      security: ['fix', 'feat'],
     };
 
     const matches = mapping[motivation] || [];
@@ -329,7 +413,7 @@ class WhyChangedFormatter {
       docs: ['md', 'txt', 'rst'],
       test: ['test.js', 'spec.js', 'test.ts', 'spec.ts'],
       config: ['json', 'yaml', 'yml', 'toml', 'config'],
-      style: ['css', 'scss', 'less', 'sass']
+      style: ['css', 'scss', 'less', 'sass'],
     };
 
     const expectedTypes = mapping[motivation] || [];
@@ -342,32 +426,109 @@ class WhyChangedFormatter {
 
   // ── Extraction helpers ─────────────────────────────────────────────
 
-  _extractIssue(ctx) { return ctx?.conventions?.issue || 'the reported issue'; }
-  _extractSymptom(ctx) { return ctx?.conventions?.symptom || 'unexpected behavior'; }
-  _extractComponent(ctx) { return ctx?.components?.packages?.[0] || ctx?.files?.scope || 'the component'; }
-  _extractFeature(ctx) { return ctx?.conventions?.feature || 'new functionality'; }
-  _extractPurpose(ctx) { return ctx?.conventions?.purpose || 'improved functionality'; }
-  _extractBenefit(ctx) { return ctx?.conventions?.benefit || 'better maintainability'; }
-  _extractApproach(ctx) { return ctx?.conventions?.approach || 'code restructuring'; }
-  _extractTechnique(ctx) { return ctx?.conventions?.technique || 'optimization'; }
-  _extractMetric(ctx) { return ctx?.conventions?.metric || 'performance'; }
-  _extractCost(ctx) { return ctx?.conventions?.cost || 'resource usage'; }
-  _extractDependency(ctx) { return ctx?.files?.dependencies?.[0] || 'dependencies'; }
-  _extractVersion(ctx) { return ctx?.conventions?.version || 'latest version'; }
-  _extractProtection(ctx) { return ctx?.conventions?.protection || 'input validation'; }
-  _extractInput(ctx) { return ctx?.conventions?.input || 'user input'; }
-  _extractAttack(ctx) { return ctx?.conventions?.attack || 'injection attacks'; }
-  _extractUser(ctx) { return ctx?.conventions?.user || 'users'; }
-  _extractFunctionality(ctx) { return ctx?.conventions?.functionality || 'the feature'; }
-  _extractCode(ctx) { return ctx?.conventions?.code || 'the code'; }
-  _extractGoal(ctx) { return ctx?.conventions?.goal || 'improve clarity'; }
-  _extractStructure(ctx) { return ctx?.conventions?.structure || 'the codebase'; }
-  _extractAspect(ctx) { return ctx?.conventions?.aspect || 'code quality'; }
-  _extractAudience(ctx) { return ctx?.conventions?.audience || 'developers'; }
-  _extractAction(ctx) { return ctx?.conventions?.action || 'updating dependencies'; }
-  _extractReason(ctx) { return ctx?.conventions?.reason || 'security and stability'; }
-  _extractCondition(ctx) { return ctx?.conventions?.condition || 'certain conditions'; }
-  _extractError(ctx) { return ctx?.conventions?.error || 'errors'; }
+  _extractIssue(ctx) {
+    return ctx?.conventions?.issue || 'the reported issue';
+  }
+
+  _extractSymptom(ctx) {
+    return ctx?.conventions?.symptom || 'unexpected behavior';
+  }
+
+  _extractComponent(ctx) {
+    return ctx?.components?.packages?.[0] || ctx?.files?.scope || 'the component';
+  }
+
+  _extractFeature(ctx) {
+    return ctx?.conventions?.feature || 'new functionality';
+  }
+
+  _extractPurpose(ctx) {
+    return ctx?.conventions?.purpose || 'improved functionality';
+  }
+
+  _extractBenefit(ctx) {
+    return ctx?.conventions?.benefit || 'better maintainability';
+  }
+
+  _extractApproach(ctx) {
+    return ctx?.conventions?.approach || 'code restructuring';
+  }
+
+  _extractTechnique(ctx) {
+    return ctx?.conventions?.technique || 'optimization';
+  }
+
+  _extractMetric(ctx) {
+    return ctx?.conventions?.metric || 'performance';
+  }
+
+  _extractCost(ctx) {
+    return ctx?.conventions?.cost || 'resource usage';
+  }
+
+  _extractDependency(ctx) {
+    return ctx?.files?.dependencies?.[0] || 'dependencies';
+  }
+
+  _extractVersion(ctx) {
+    return ctx?.conventions?.version || 'latest version';
+  }
+
+  _extractProtection(ctx) {
+    return ctx?.conventions?.protection || 'input validation';
+  }
+
+  _extractInput(ctx) {
+    return ctx?.conventions?.input || 'user input';
+  }
+
+  _extractAttack(ctx) {
+    return ctx?.conventions?.attack || 'injection attacks';
+  }
+
+  _extractUser(ctx) {
+    return ctx?.conventions?.user || 'users';
+  }
+
+  _extractFunctionality(ctx) {
+    return ctx?.conventions?.functionality || 'the feature';
+  }
+
+  _extractCode(ctx) {
+    return ctx?.conventions?.code || 'the code';
+  }
+
+  _extractGoal(ctx) {
+    return ctx?.conventions?.goal || 'improve clarity';
+  }
+
+  _extractStructure(ctx) {
+    return ctx?.conventions?.structure || 'the codebase';
+  }
+
+  _extractAspect(ctx) {
+    return ctx?.conventions?.aspect || 'code quality';
+  }
+
+  _extractAudience(ctx) {
+    return ctx?.conventions?.audience || 'developers';
+  }
+
+  _extractAction(ctx) {
+    return ctx?.conventions?.action || 'updating dependencies';
+  }
+
+  _extractReason(ctx) {
+    return ctx?.conventions?.reason || 'security and stability';
+  }
+
+  _extractCondition(ctx) {
+    return ctx?.conventions?.condition || 'certain conditions';
+  }
+
+  _extractError(ctx) {
+    return ctx?.conventions?.error || 'errors';
+  }
 }
 
 module.exports = WhyChangedFormatter;

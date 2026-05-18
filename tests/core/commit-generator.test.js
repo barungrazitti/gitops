@@ -6,7 +6,7 @@
 jest.mock('../../src/core/message-validator', () => {
   return jest.fn().mockImplementation(() => ({
     validate: jest.fn(() => ({ valid: true, score: 80, issues: [], suggestions: [] })),
-    validateBatch: jest.fn((messages) => ({
+    validateBatch: jest.fn(messages => ({
       validMessages: messages.map(m => ({ message: m, score: 80, issues: [] })),
       invalidMessages: [],
       stats: {
@@ -14,15 +14,15 @@ jest.mock('../../src/core/message-validator', () => {
         validCount: messages.length || 0,
         genericCount: 0,
         withReasoning: messages.length || 0,
-        qualityRate: 1
-      }
+        qualityRate: 1,
+      },
     })),
     checkQualityThresholds: jest.fn(() => ({
       qual01Pass: true,
       qual02Pass: true,
-      failures: []
+      failures: [],
     })),
-    generateSuggestions: jest.fn(() => [])
+    generateSuggestions: jest.fn(() => []),
   }));
 });
 
@@ -36,38 +36,38 @@ describe('CommitGenerator', () => {
     mocks = {
       gitManager: {
         getStagedDiff: jest.fn(),
-        commit: jest.fn()
+        commit: jest.fn(),
       },
       configManager: {
         load: jest.fn().mockResolvedValue({ defaultProvider: 'groq' }),
-        get: jest.fn()
+        get: jest.fn(),
       },
       analysisEngine: {
-        analyzeRepository: jest.fn()
+        analyzeRepository: jest.fn(),
       },
       messageFormatter: {
-        formatWithContext: jest.fn((msg) => msg)
+        formatWithContext: jest.fn(msg => msg),
       },
       providerOrchestrator: {
-        generateWithSequentialFallback: jest.fn()
+        generateWithSequentialFallback: jest.fn(),
       },
       activityLogger: {
         info: jest.fn(),
         logGitOperation: jest.fn(),
-        logDetailedError: jest.fn()
+        logDetailedError: jest.fn(),
       },
       statsManager: {
-        recordCommit: jest.fn()
+        recordCommit: jest.fn(),
       },
       ComponentDetector: jest.fn().mockImplementation(() => ({
-        detect: jest.fn().mockResolvedValue([])
+        detect: jest.fn().mockResolvedValue([]),
       })),
       FileTypeDetector: jest.fn().mockImplementation(() => ({
-        detectBatch: jest.fn().mockResolvedValue({ files: [], summary: {} })
+        detectBatch: jest.fn().mockResolvedValue({ files: [], summary: {} }),
       })),
       DependencyMapper: jest.fn().mockImplementation(() => ({
-        mapDependencies: jest.fn().mockReturnValue({ imports: [], exports: [], affected: [] })
-      }))
+        mapDependencies: jest.fn().mockReturnValue({ imports: [], exports: [], affected: [] }),
+      })),
     };
 
     generator = new CommitGenerator(mocks);
@@ -113,20 +113,20 @@ diff --git a/package.json b/package.json`;
       const detectorResults = {
         components: [
           { component: 'auth', scope: 'src/auth', boundary: 'directory' },
-          { component: 'api', scope: 'src/api', boundary: 'directory' }
+          { component: 'api', scope: 'src/api', boundary: 'directory' },
         ],
         fileTypes: {
           summary: {
             countByType: { source: 3, test: 1 },
-            countByLanguage: { javascript: 3, typescript: 1 }
+            countByLanguage: { javascript: 3, typescript: 1 },
           },
-          files: [{ path: 'src/auth/login.js', type: 'source', language: 'javascript' }]
+          files: [{ path: 'src/auth/login.js', type: 'source', language: 'javascript' }],
         },
         dependencies: {
           imports: [{ file: 'src/auth/login.js', module: './utils', type: 'commonjs' }],
           exports: [{ file: 'src/auth/login.js', name: 'login', type: 'named' }],
-          affected: ['src/app.js', 'src/routes.js']
-        }
+          affected: ['src/app.js', 'src/routes.js'],
+        },
       };
 
       const context = generator.buildEnrichedContext(detectorResults, 'diff');
@@ -143,7 +143,7 @@ diff --git a/package.json b/package.json`;
       const detectorResults = {
         components: [],
         fileTypes: { summary: {} },
-        dependencies: { imports: [], exports: [], affected: [] }
+        dependencies: { imports: [], exports: [], affected: [] },
       };
 
       const context = generator.buildEnrichedContext(detectorResults, 'diff');
@@ -157,7 +157,7 @@ diff --git a/package.json b/package.json`;
       const detectorResults = {
         components: null,
         fileTypes: { summary: null },
-        dependencies: null
+        dependencies: null,
       };
 
       const context = generator.buildEnrichedContext(detectorResults, 'diff');
@@ -173,7 +173,7 @@ diff --git a/package.json b/package.json`;
       const detectorResults = {
         components: [],
         fileTypes: { summary: {} },
-        dependencies: { affected: [] }
+        dependencies: { affected: [] },
       };
 
       const diff = 'diff --git a/src/auth/login.js';
@@ -186,10 +186,10 @@ diff --git a/package.json b/package.json`;
       const detectorResults = {
         components: [
           { component: 'auth', scope: 'src/auth', boundary: 'directory' },
-          { component: 'auth', scope: 'src/auth', boundary: 'directory' }
+          { component: 'auth', scope: 'src/auth', boundary: 'directory' },
         ],
         fileTypes: { summary: {} },
-        dependencies: { affected: [] }
+        dependencies: { affected: [] },
       };
 
       const diff = 'diff content';
@@ -204,10 +204,10 @@ diff --git a/package.json b/package.json`;
         fileTypes: {
           summary: {
             countByType: { source: 3, test: 1 },
-            countByLanguage: { javascript: 4 }
-          }
+            countByLanguage: { javascript: 4 },
+          },
         },
-        dependencies: { affected: [] }
+        dependencies: { affected: [] },
       };
 
       const diff = 'diff content';
@@ -222,8 +222,8 @@ diff --git a/package.json b/package.json`;
         components: [],
         fileTypes: { summary: {} },
         dependencies: {
-          affected: ['src/app.js', 'src/routes.js', 'src/index.js']
-        }
+          affected: ['src/app.js', 'src/routes.js', 'src/index.js'],
+        },
       };
 
       const diff = 'diff content';
@@ -237,9 +237,7 @@ diff --git a/package.json b/package.json`;
     it('should throw error when no staged changes', async () => {
       mocks.gitManager.getStagedDiff.mockResolvedValue('');
 
-      await expect(generator.generate()).rejects.toThrow(
-        'No staged changes found'
-      );
+      await expect(generator.generate()).rejects.toThrow('No staged changes found');
     });
 
     it('should throw error when AI provider returns empty messages', async () => {

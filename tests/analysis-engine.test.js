@@ -13,13 +13,9 @@ describe('AnalysisEngine', () => {
     jest.mock('../src/core/git-manager', () => {
       return jest.fn().mockImplementation(() => ({
         getRepositoryInfo: jest.fn().mockResolvedValue({ branch: 'main' }),
-        getCommitPatterns: jest
-          .fn()
-          .mockResolvedValue({ mostUsedTypes: ['feat'] }),
+        getCommitPatterns: jest.fn().mockResolvedValue({ mostUsedTypes: ['feat'] }),
         getStagedFiles: jest.fn().mockResolvedValue(['src/index.js']),
-        getFileStats: jest
-          .fn()
-          .mockResolvedValue({ insertions: 10, deletions: 5 }),
+        getFileStats: jest.fn().mockResolvedValue({ insertions: 10, deletions: 5 }),
         getCommitHistory: jest.fn().mockResolvedValue([]),
         getRepositoryRoot: jest.fn().mockResolvedValue('/test/repo'),
       }));

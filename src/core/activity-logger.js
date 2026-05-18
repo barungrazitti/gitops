@@ -22,7 +22,7 @@ class ActivityLogger {
     this.logDir = path.join(os.homedir(), '.ai-commit-generator', 'logs');
     this.sessionId = this.generateSessionId();
     this.currentLogFile = null;
-    
+
     this.initializeLogDirectory();
   }
 
@@ -64,7 +64,7 @@ class ActivityLogger {
       retentionDate.setDate(retentionDate.getDate() - this.config.get('logRetentionDays'));
 
       const logFiles = files.filter(file => file.startsWith('activity-') && file.endsWith('.log'));
-      
+
       // Sort by creation time and keep only the most recent N files
       const fileStats = await Promise.all(
         logFiles.map(async file => {
@@ -88,7 +88,7 @@ class ActivityLogger {
       // Delete files older than retention date
       const allFilesToDelete = [
         ...filesToDelete,
-        ...fileStats.filter(f => f.created < retentionDate)
+        ...fileStats.filter(f => f.created < retentionDate),
       ];
 
       for (const { filePath, file } of allFilesToDelete) {
@@ -125,7 +125,7 @@ class ActivityLogger {
       },
     };
 
-    const logLine = `${JSON.stringify(logEntry)  }\n`;
+    const logLine = `${JSON.stringify(logEntry)}\n`;
 
     try {
       if (this.currentLogFile) {
@@ -162,7 +162,7 @@ class ActivityLogger {
   logToConsole(level, action, data) {
     const timestamp = new Date().toLocaleTimeString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}] ${action}`;
-    
+
     switch (level) {
       case 'debug':
         console.debug(prefix, data);
@@ -225,9 +225,13 @@ class ActivityLogger {
       success,
       timestamp: Date.now(),
       // Log the actual prompt for analysis (truncated if too large)
-      prompt: prompt && prompt.length > 10000 ? `${prompt.substring(0, 10000)  }...[TRUNCATED]` : prompt,
+      prompt:
+        prompt && prompt.length > 10000 ? `${prompt.substring(0, 10000)}...[TRUNCATED]` : prompt,
       // Log the actual response for quality analysis (truncated if too large)
-      response: response && response.length > 2000 ? `${response.substring(0, 2000)  }...[TRUNCATED]` : response,
+      response:
+        response && response.length > 2000
+          ? `${response.substring(0, 2000)}...[TRUNCATED]`
+          : response,
     });
   }
 
@@ -274,7 +278,7 @@ class ActivityLogger {
         nodeVersion: process.version,
         memoryUsage: process.memoryUsage(),
         pid: process.pid,
-      }
+      },
     });
   }
 
@@ -343,7 +347,9 @@ class ActivityLogger {
       hitRate,
       size: details.size,
       maxSize: details.maxSize,
-      utilization: details.maxSize ? `${(details.size / details.maxSize * 100).toFixed(2)  }%` : 'N/A',
+      utilization: details.maxSize
+        ? `${((details.size / details.maxSize) * 100).toFixed(2)}%`
+        : 'N/A',
       timestamp: Date.now(),
       ...details,
     });
@@ -374,20 +380,23 @@ class ActivityLogger {
     try {
       const files = await fs.readdir(this.logDir);
       const logFiles = files.filter(file => file.startsWith('activity-') && file.endsWith('.log'));
-      
+
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - days);
-      
+
       const recentLogs = [];
-      
+
       for (const file of logFiles) {
         const filePath = path.join(this.logDir, file);
         const stats = await fs.stat(filePath);
-        
+
         if (stats.mtime >= cutoffDate) {
           const content = await fs.readFile(filePath, 'utf8');
-          const lines = content.trim().split('\n').filter(line => line);
-          
+          const lines = content
+            .trim()
+            .split('\n')
+            .filter(line => line);
+
           for (const line of lines) {
             try {
               const entry = JSON.parse(line);
@@ -400,7 +409,7 @@ class ActivityLogger {
           }
         }
       }
-      
+
       return recentLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
     } catch (error) {
       console.warn('Failed to read recent logs:', error.message);
@@ -413,11 +422,13 @@ class ActivityLogger {
    */
   async analyzeLogs(days = 30) {
     const logs = await this.getRecentLogs(days);
-    
+
     const analysis = {
       totalSessions: new Set(logs.map(l => l.sessionId)).size,
       aiInteractions: logs.filter(l => l.action === 'ai_interaction').length,
-      successfulCommits: logs.filter(l => l.action === 'git_operation' && l.data.operation === 'commit').length,
+      successfulCommits: logs.filter(
+        l => l.action === 'git_operation' && l.data.operation === 'commit'
+      ).length,
       conflictResolutions: logs.filter(l => l.action === 'conflict_resolution').length,
       providerUsage: {},
       averageResponseTime: 0,
@@ -429,9 +440,9 @@ class ActivityLogger {
     // Analyze provider usage
     const aiLogs = logs.filter(l => l.action === 'ai_interaction');
     aiLogs.forEach(log => {
-      const {provider} = log.data;
+      const { provider } = log.data;
       analysis.providerUsage[provider] = (analysis.providerUsage[provider] || 0) + 1;
-      
+
       if (log.data.responseTime) {
         analysis.averageResponseTime += log.data.responseTime;
       }
@@ -471,7 +482,9 @@ class ActivityLogger {
    * Extract commit type from message
    */
   extractCommitType(message) {
-    const match = message.match(/^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/);
+    const match = message.match(
+      /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/
+    );
     return match ? match[1] : 'other';
   }
 
@@ -480,13 +493,14 @@ class ActivityLogger {
    */
   async exportLogs(days = 30, format = 'json') {
     const logs = await this.getRecentLogs(days);
-    
+
     if (format === 'csv') {
       return this.convertToCSV(logs);
-    } if (format === 'json') {
+    }
+    if (format === 'json') {
       return JSON.stringify(logs, null, 2);
     }
-    
+
     return logs;
   }
 
@@ -495,10 +509,19 @@ class ActivityLogger {
    */
   convertToCSV(logs) {
     if (logs.length === 0) return '';
-    
-    const headers = ['timestamp', 'sessionId', 'level', 'action', 'provider', 'operation', 'success', 'responseTime'];
+
+    const headers = [
+      'timestamp',
+      'sessionId',
+      'level',
+      'action',
+      'provider',
+      'operation',
+      'success',
+      'responseTime',
+    ];
     const csvLines = [headers.join(',')];
-    
+
     logs.forEach(log => {
       const row = [
         log.timestamp,
@@ -512,7 +535,7 @@ class ActivityLogger {
       ];
       csvLines.push(row.join(','));
     });
-    
+
     return csvLines.join('\n');
   }
 }

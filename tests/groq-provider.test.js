@@ -19,7 +19,7 @@ describe('GroqProvider', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    
+
     mockConfigManager = {
       get: jest.fn().mockReturnValue('test-api-key'),
       getProviderConfig: jest.fn().mockResolvedValue({
@@ -28,20 +28,20 @@ describe('GroqProvider', () => {
         url: 'https://api.groq.com/openai/v1',
         temperature: 0.7,
         timeout: 30000,
-      })
+      }),
     };
-    
+
     mockCircuitBreaker = {
       execute: jest.fn(),
-      getStatus: jest.fn().mockReturnValue({ state: 'CLOSED', isOpen: false })
+      getStatus: jest.fn().mockReturnValue({ state: 'CLOSED', isOpen: false }),
     };
 
     mockGroq = {
       chat: {
         completions: {
-          create: jest.fn()
-        }
-      }
+          create: jest.fn(),
+        },
+      },
     };
 
     ConfigManager.mockImplementation(() => mockConfigManager);
@@ -82,24 +82,22 @@ describe('GroqProvider', () => {
         model: 'llama-3.1-8b-instant',
       };
 
-      await expect(provider.validate(config))
-        .rejects.toThrow('Groq API key is required');
+      await expect(provider.validate(config)).rejects.toThrow('Groq API key is required');
     });
 
     it('should require API key', async () => {
       const config = { model: 'llama-3.1-8b-instant' };
 
-      await expect(provider.validate(config))
-        .rejects.toThrow('Groq API key is required');
+      await expect(provider.validate(config)).rejects.toThrow('Groq API key is required');
     });
   });
 
   describe('parseResponse', () => {
     it('should parse response successfully', () => {
       const response = {
-        choices: [{ message: { content: 'feat: add new feature' } }]
+        choices: [{ message: { content: 'feat: add new feature' } }],
       };
-      
+
       const result = provider.parseResponse(response);
 
       expect(result).toEqual(['feat: add new feature']);
@@ -107,23 +105,23 @@ describe('GroqProvider', () => {
 
     it('should handle empty response', () => {
       const response = { choices: [] };
-      
-      expect(() => provider.parseResponse(response))
-        .toThrow('No choices returned from Groq API');
+
+      expect(() => provider.parseResponse(response)).toThrow('No choices returned from Groq API');
     });
 
     it('should handle malformed response', () => {
       const response = null;
-      
-      expect(() => provider.parseResponse(response))
-        .toThrow('Invalid response format from Groq API');
+
+      expect(() => provider.parseResponse(response)).toThrow(
+        'Invalid response format from Groq API'
+      );
     });
   });
 
   describe('cleanup', () => {
     it('should cleanup resources', () => {
       provider.client = mockGroq;
-      
+
       provider.cleanup();
 
       expect(provider.client).toBeNull();

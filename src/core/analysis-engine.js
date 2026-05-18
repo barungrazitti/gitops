@@ -17,14 +17,15 @@ class AnalysisEngine {
    */
   async analyzeRepository() {
     try {
-      const [repoInfo, commitPatterns, fileContext, projectType, recentCommits] =
-        await Promise.all([
+      const [repoInfo, commitPatterns, fileContext, projectType, recentCommits] = await Promise.all(
+        [
           this.gitManager.getRepositoryInfo(),
           this.gitManager.getCommitPatterns(),
           this.analyzeFileContext(),
           this.detectProjectType(),
           this.getRecentCommits(5),
-        ]);
+        ]
+      );
 
       return {
         repository: repoInfo,
@@ -110,17 +111,16 @@ class AnalysisEngine {
       other: 0,
     };
 
-      const patterns = {
-        source: /\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt)$/i,
-        test: /\.(test|spec)\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb|go|rs)$|test.*\.(js|ts|py)$|.*test\.(js|ts|py)$/i,
-        config:
-          /\.(json|yaml|yml|toml|ini|conf|config|env)$|Dockerfile|Makefile|CMakeLists\.txt|package\.json|requirements\.txt|Gemfile|Cargo\.toml$/i,
-        docs: /\.(md|txt|rst|adoc|tex)$|README|CHANGELOG|LICENSE|CONTRIBUTING/i,
-        assets:
-          /\.(png|jpg|jpeg|gif|svg|ico|css|scss|sass|less|woff|woff2|ttf|eot)$/i,
-      };
+    const patterns = {
+      source: /\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb|go|rs|swift|kt)$/i,
+      test: /\.(test|spec)\.(js|ts|jsx|tsx|py|java|cpp|c|cs|php|rb|go|rs)$|test.*\.(js|ts|py)$|.*test\.(js|ts|py)$/i,
+      config:
+        /\.(json|yaml|yml|toml|ini|conf|config|env)$|Dockerfile|Makefile|CMakeLists\.txt|package\.json|requirements\.txt|Gemfile|Cargo\.toml$/i,
+      docs: /\.(md|txt|rst|adoc|tex)$|README|CHANGELOG|LICENSE|CONTRIBUTING/i,
+      assets: /\.(png|jpg|jpeg|gif|svg|ico|css|scss|sass|less|woff|woff2|ttf|eot)$/i,
+    };
 
-    files.forEach((file) => {
+    files.forEach(file => {
       let categorized = false;
 
       for (const [category, pattern] of Object.entries(patterns)) {
@@ -163,7 +163,8 @@ class AnalysisEngine {
       themes: /wp-content\/themes|wp-themes|themes\//i,
       core: /wp-includes|wp-admin|wp-[^/]*\.php$/i,
       posts: /posts?|article|blog|content/i,
-      pages: /pages?|template|page-[^/]*\.php|front-page\.php|home\.php|single\.php|archive\.php|category\.php|tag\.php/i,
+      pages:
+        /pages?|template|page-[^/]*\.php|front-page\.php|home\.php|single\.php|archive\.php|category\.php|tag\.php/i,
       media: /media|uploads|images?|assets?\/uploads/i,
       widgets: /widgets?|sidebar|footer|header/i,
       customizer: /customizer|customize|theme-options/i,
@@ -176,7 +177,7 @@ class AnalysisEngine {
 
     const scopeCounts = {};
 
-    files.forEach((file) => {
+    files.forEach(file => {
       for (const [scope, pattern] of Object.entries(scopePatterns)) {
         if (pattern.test(file)) {
           scopeCounts[scope] = (scopeCounts[scope] || 0) + 1;
@@ -186,17 +187,17 @@ class AnalysisEngine {
 
     // Enhanced scope prioritization with WordPress taking higher priority
     const prioritizedScopes = [
-      'wordpress',    // Top priority - WordPress-specific
-      'core',         // WordPress core
-      'themes',       // WordPress themes
-      'plugins',      // WordPress plugins
-      'woocommerce',  // WordPress e-commerce
-      'posts',        // WordPress content
-      'pages',        // WordPress pages
-      'media',        // WordPress media
-      'widgets',      // WordPress widgets
-      'customizer',   // WordPress customizer
-      'api',          // Standard scopes follow
+      'wordpress', // Top priority - WordPress-specific
+      'core', // WordPress core
+      'themes', // WordPress themes
+      'plugins', // WordPress plugins
+      'woocommerce', // WordPress e-commerce
+      'posts', // WordPress content
+      'pages', // WordPress pages
+      'media', // WordPress media
+      'widgets', // WordPress widgets
+      'customizer', // WordPress customizer
+      'api', // Standard scopes follow
       'ui',
       'auth',
       'db',
@@ -216,16 +217,16 @@ class AnalysisEngine {
       // First check if either scope is WordPress-related
       const isAWordpress = prioritizedScopes.slice(0, 8).includes(a[0]); // WordPress top priorities
       const isBWordpress = prioritizedScopes.slice(0, 8).includes(b[0]); // WordPress top priorities
-      
+
       // If one is WordPress-related and the other isn't, prioritize WordPress
       if (isAWordpress && !isBWordpress) return -1;
       if (!isAWordpress && isBWordpress) return 1;
-      
+
       // If both are WordPress-related or both are not, sort by count first
       if (b[1] !== a[1]) {
         return b[1] - a[1];
       }
-      
+
       // Then sort by priority
       const aPriority = prioritizedScopes.indexOf(a[0]);
       const bPriority = prioritizedScopes.indexOf(b[0]);
@@ -236,7 +237,7 @@ class AnalysisEngine {
 
     // If WordPress-related files are detected, prioritize them
     const wordpressRelatedScopes = ['wordpress', 'themes', 'plugins', 'core', 'woocommerce'];
-    const hasWordpressFiles = files.some(file => 
+    const hasWordpressFiles = files.some(file =>
       /wp-content|wp-includes|wp-admin|wp-config\.php|\.php$/i.test(file)
     );
 
@@ -250,7 +251,7 @@ class AnalysisEngine {
       return 'wordpress';
     }
 
-      return topScope ? topScope[0] : 'general';
+    return topScope ? topScope[0] : 'general';
   }
 
   /**
@@ -259,51 +260,79 @@ class AnalysisEngine {
   detectCommitType(files) {
     const typePatterns = {
       test: [
-        /\/tests?\//i, /\/specs?\//i, /__tests__\//i,
-        /\.test\./i, /\.spec\./i, /\/mocks?\//i, /\/fixtures?\//i,
+        /\/tests?\//i,
+        /\/specs?\//i,
+        /__tests__\//i,
+        /\.test\./i,
+        /\.spec\./i,
+        /\/mocks?\//i,
+        /\/fixtures?\//i,
       ],
       docs: [
-        /\/docs?\//i, /readme\.md/i, /changelog\.md/i, /\.md$/,
-        /\/guide|\/tutorial/i, /\/wiki\//i,
+        /\/docs?\//i,
+        /readme\.md/i,
+        /changelog\.md/i,
+        /\.md$/,
+        /\/guide|\/tutorial/i,
+        /\/wiki\//i,
       ],
       chore: [
-        /package\.json/i, /yarn\.lock/i, /pnpm-lock\.yaml/i,
-        /\.env\./i, /\/config\//i, /tsconfig/i, /webpack/i, /vite/i,
-        /\.gitignore/i, /\.editorconfig/i,
+        /package\.json/i,
+        /yarn\.lock/i,
+        /pnpm-lock\.yaml/i,
+        /\.env\./i,
+        /\/config\//i,
+        /tsconfig/i,
+        /webpack/i,
+        /vite/i,
+        /\.gitignore/i,
+        /\.editorconfig/i,
       ],
-      ci: [
-        /\.github\//i, /\.gitlab-ci\.yml/i, /jenkinsfile/i,
-        /\/workflows?\//i, /\/actions?\//i,
-      ],
-      style: [
-        /\.css$/, /\.scss$/, /\.sass$/, /\.less$/, /\.styl$/,
-        /\/styles?\//i, /\/themes?\//i,
-      ],
+      ci: [/\.github\//i, /\.gitlab-ci\.yml/i, /jenkinsfile/i, /\/workflows?\//i, /\/actions?\//i],
+      style: [/\.css$/, /\.scss$/, /\.sass$/, /\.less$/, /\.styl$/, /\/styles?\//i, /\/themes?\//i],
       fix: [
-        /\/bug|fix|correct|repair\//i, /\.(bug|fix|correct)\./i,
-        /\/error|exception|fail\//i, /error\.js/i, /exception\.js/i,
+        /\/bug|fix|correct|repair\//i,
+        /\.(bug|fix|correct)\./i,
+        /\/error|exception|fail\//i,
+        /error\.js/i,
+        /exception\.js/i,
       ],
-      refactor: [
-        /\/refactor\//i, /\/cleanup\//i, /\/restructure\//i,
-      ],
+      refactor: [/\/refactor\//i, /\/cleanup\//i, /\/restructure\//i],
       perf: [
-        /\/performance\//i, /\/optimi[sz]e\//i, /\/cache\//i,
-        /\.perf\./i, /\/lazy\//i, /memo/i,
+        /\/performance\//i,
+        /\/optimi[sz]e\//i,
+        /\/cache\//i,
+        /\.perf\./i,
+        /\/lazy\//i,
+        /memo/i,
       ],
       build: [
-        /\/build\//i, /\/scripts\//i, /Makefile/i, /Dockerfile/i,
-        /webpack\.config/i, /vite\.config/i, /rollup\.config/i,
+        /\/build\//i,
+        /\/scripts\//i,
+        /Makefile/i,
+        /Dockerfile/i,
+        /webpack\.config/i,
+        /vite\.config/i,
+        /rollup\.config/i,
       ],
       feat: [
-        /\/components?\//i, /\/pages?\//i, /\/views?\//i, /\/routes?\//i,
-        /\/services?\//i, /\/handlers?\//i, /\/features?\//i, /\/modules?\//i,
-        /\.vue$/, /\.jsx$/, /\.tsx$/,
+        /\/components?\//i,
+        /\/pages?\//i,
+        /\/views?\//i,
+        /\/routes?\//i,
+        /\/services?\//i,
+        /\/handlers?\//i,
+        /\/features?\//i,
+        /\/modules?\//i,
+        /\.vue$/,
+        /\.jsx$/,
+        /\.tsx$/,
       ],
     };
 
     const typeScores = {};
 
-    files.forEach((file) => {
+    files.forEach(file => {
       for (const [type, patterns] of Object.entries(typePatterns)) {
         for (const pattern of patterns) {
           if (pattern.test(file)) {
@@ -374,7 +403,7 @@ class AnalysisEngine {
     );
     if (functionMatches) {
       context.functions.push(
-        ...functionMatches.map((m) =>
+        ...functionMatches.map(m =>
           m
             .replace(/.*function\s+|const\s+|:.*/, '')
             .replace(/\s*=.*/, '')
@@ -386,17 +415,13 @@ class AnalysisEngine {
     // Class detection
     const classMatches = content.match(/class\s+(\w+)/g);
     if (classMatches) {
-      context.classes.push(
-        ...classMatches.map((m) => m.replace('class ', '').trim())
-      );
+      context.classes.push(...classMatches.map(m => m.replace('class ', '').trim()));
     }
 
     // Import/Export detection
     const importMatches = content.match(/import.*from\s+['"]([^'"]+)['"]/g);
     if (importMatches) {
-      context.imports.push(
-        ...importMatches.map((m) => m.match(/from\s+['"]([^'"]+)['"]/)[1])
-      );
+      context.imports.push(...importMatches.map(m => m.match(/from\s+['"]([^'"]+)['"]/)[1]));
     }
 
     const exportMatches = content.match(
@@ -404,13 +429,8 @@ class AnalysisEngine {
     );
     if (exportMatches) {
       context.exports.push(
-        ...exportMatches.map((m) =>
-          m
-            .replace(
-              /export\s+(?:default\s+)?(?:function|class|const|let|var)\s+/,
-              ''
-            )
-            .trim()
+        ...exportMatches.map(m =>
+          m.replace(/export\s+(?:default\s+)?(?:function|class|const|let|var)\s+/, '').trim()
         )
       );
     }
@@ -422,7 +442,7 @@ class AnalysisEngine {
     if (endpointMatches) {
       context.endpoints.push(
         ...endpointMatches.map(
-          (m) =>
+          m =>
             `${m.match(/\.(get|post|put|delete|patch)/)[1].toUpperCase()} ${m.match(/['"]([^'"]+)['"]/)[1]}`
         )
       );
@@ -434,7 +454,7 @@ class AnalysisEngine {
     );
     if (componentMatches) {
       context.components.push(
-        ...componentMatches.map((m) =>
+        ...componentMatches.map(m =>
           m
             .replace(/.*function\s+|const\s+|.*React\.forwardRef.*\(/, '')
             .replace(/\s*\(.*/, '')
@@ -451,14 +471,14 @@ class AnalysisEngine {
     // Function detection with better pattern
     const functionMatches = content.match(/function\s+([a-zA-Z_][a-zA-Z0-9_]*)/g);
     if (functionMatches) {
-      const functionNames = functionMatches.map((m) => m.replace('function ', '').trim());
+      const functionNames = functionMatches.map(m => m.replace('function ', '').trim());
       context.functions.push(...functionNames);
     }
 
     // Class detection
     const classMatches = content.match(/class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g);
     if (classMatches) {
-      const classNames = classMatches.map((m) => m.replace('class ', '').trim());
+      const classNames = classMatches.map(m => m.replace('class ', '').trim());
       context.classes.push(...classNames);
     }
 
@@ -489,16 +509,19 @@ class AnalysisEngine {
     // WordPress function detection
     const wpFunctionMatches = content.match(/(?:wp_|get_|is_|the_|do_|apply_|current_)\w+/g);
     if (wpFunctionMatches) {
-      const wpFunctions = wpFunctionMatches.filter(func => 
-        !['function', 'if', 'else', 'for', 'while', 'return'].includes(func) &&
-        !func.includes('(') // Avoid matches that include parentheses
+      const wpFunctions = wpFunctionMatches.filter(
+        func =>
+          !['function', 'if', 'else', 'for', 'while', 'return'].includes(func) &&
+          !func.includes('(') // Avoid matches that include parentheses
       );
       context.wordpress_functions = context.wordpress_functions || [];
       context.wordpress_functions.push(...wpFunctions);
     }
 
     // WordPress template detection
-    const templateMatches = content.match(/(?:get_template_part|get_header|get_footer|get_sidebar|load_template)\s*\(/g);
+    const templateMatches = content.match(
+      /(?:get_template_part|get_header|get_footer|get_sidebar|load_template)\s*\(/g
+    );
     if (templateMatches) {
       context.wordpress_templates = context.wordpress_templates || [];
       context.wordpress_templates.push(...templateMatches);
@@ -512,27 +535,19 @@ class AnalysisEngine {
     // Function detection
     const functionMatches = content.match(/def\s+(\w+)/g);
     if (functionMatches) {
-      context.functions.push(
-        ...functionMatches.map((m) => m.replace('def ', '').trim())
-      );
+      context.functions.push(...functionMatches.map(m => m.replace('def ', '').trim()));
     }
 
     // Class detection
     const classMatches = content.match(/class\s+(\w+)/g);
     if (classMatches) {
-      context.classes.push(
-        ...classMatches.map((m) => m.replace('class ', '').trim())
-      );
+      context.classes.push(...classMatches.map(m => m.replace('class ', '').trim()));
     }
 
     // Import detection
-    const importMatches = content.match(
-      /from\s+(\w+)(?:\.\w+)*\s+import|import\s+(\w+)/g
-    );
+    const importMatches = content.match(/from\s+(\w+)(?:\.\w+)*\s+import|import\s+(\w+)/g);
     if (importMatches) {
-      context.imports.push(
-        ...importMatches.map((m) => m.match(/(?:from\s+|import\s+)(\w+)/)[1])
-      );
+      context.imports.push(...importMatches.map(m => m.match(/(?:from\s+|import\s+)(\w+)/)[1]));
     }
   }
 
@@ -547,7 +562,7 @@ class AnalysisEngine {
     };
 
     // Check if this is a WordPress project
-    const hasWordPressFiles = files.some((file) =>
+    const hasWordPressFiles = files.some(file =>
       /wp-content|wp-includes|wp-admin|wp-config\.php/i.test(file)
     );
 
@@ -558,7 +573,7 @@ class AnalysisEngine {
     context.isWordPress = true;
 
     // Analyze each file for WordPress-specific context
-    files.forEach((file) => {
+    files.forEach(file => {
       const lowerFile = file.toLowerCase();
 
       // Detect WordPress components
@@ -755,8 +770,8 @@ class AnalysisEngine {
    */
   async analyzeComplexity(diff) {
     const lines = diff.split('\n');
-    const addedLines = lines.filter((line) => line.startsWith('+')).length;
-    const removedLines = lines.filter((line) => line.startsWith('-')).length;
+    const addedLines = lines.filter(line => line.startsWith('+')).length;
+    const removedLines = lines.filter(line => line.startsWith('-')).length;
 
     // Enhanced complexity indicators
     const complexity = {
@@ -842,25 +857,32 @@ class AnalysisEngine {
       }
 
       // Capture + and - lines that are meaningful code changes
-      if ((line.startsWith('+') || line.startsWith('-')) && 
-          !line.startsWith('+++') && 
-          !line.startsWith('---') && 
-          !/^[\s\-\+]*(function|class|import|export|const|let|var|def|if|else|for|while|return|switch|case).*$/i.test(line.substring(1).trim())) {
+      if (
+        (line.startsWith('+') || line.startsWith('-')) &&
+        !line.startsWith('+++') &&
+        !line.startsWith('---') &&
+        !/^[\s\-\+]*(function|class|import|export|const|let|var|def|if|else|for|while|return|switch|case).*$/i.test(
+          line.substring(1).trim()
+        )
+      ) {
         const content = line.substring(1).trim();
-        
+
         // Filter out comments and very short lines
-        if (content.length >= minLineLength && 
-            !content.startsWith('//') && 
-            !content.startsWith('/*') && 
-            !content.startsWith('*') && 
-            !content.startsWith('*/') && 
-            !content.startsWith('#') &&
-            !content.match(/^[\s\*\/]+$/)) { // Empty or whitespace-only lines
+        if (
+          content.length >= minLineLength &&
+          !content.startsWith('//') &&
+          !content.startsWith('/*') &&
+          !content.startsWith('*') &&
+          !content.startsWith('*/') &&
+          !content.startsWith('#') &&
+          !content.match(/^[\s\*\/]+$/)
+        ) {
+          // Empty or whitespace-only lines
           changes.push({
             file: currentFile,
             type: line.startsWith('+') ? 'addition' : 'deletion',
             content,
-            lineNum: -1 // Not tracking exact line numbers in diff analysis
+            lineNum: -1, // Not tracking exact line numbers in diff analysis
           });
         }
       }

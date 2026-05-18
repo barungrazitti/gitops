@@ -14,7 +14,7 @@ class ProgressTracker {
     this.options = {
       showElapsedTime: true,
       detailedFeedback: true,
-      stepTracking: true
+      stepTracking: true,
     };
   }
 
@@ -38,7 +38,7 @@ class ProgressTracker {
       status: 'pending', // pending, in-progress, completed, failed
       startTime: null,
       endTime: null,
-      duration: null
+      duration: null,
     });
     return this;
   }
@@ -67,19 +67,20 @@ class ProgressTracker {
     this.currentStep = this.steps.indexOf(step);
 
     // Update spinner
-    const elapsed = this.options.showElapsedTime ? 
-      ` [${this.getFormattedTime(Date.now() - this.startTime)}]` : '';
-    
-    const message = this.options.detailedFeedback ?
-      `${step.description}${elapsed}` :
-      `${step.name}${elapsed}`;
-    
+    const elapsed = this.options.showElapsedTime
+      ? ` [${this.getFormattedTime(Date.now() - this.startTime)}]`
+      : '';
+
+    const message = this.options.detailedFeedback
+      ? `${step.description}${elapsed}`
+      : `${step.name}${elapsed}`;
+
     if (this.spinner) {
       this.spinner.text = message;
     } else {
       this.spinner = ora({
         text: message,
-        spinner: 'clock'
+        spinner: 'clock',
       }).start();
     }
 
@@ -100,8 +101,7 @@ class ProgressTracker {
     step.duration = step.endTime - step.startTime;
 
     if (success) {
-      const elapsed = step.duration ? 
-        ` (${this.getFormattedTime(step.duration)})` : '';
+      const elapsed = step.duration ? ` (${this.getFormattedTime(step.duration)})` : '';
       this.spinner?.succeed(`${step.description}${elapsed}`);
     } else {
       this.spinner?.fail(`${step.description} - Failed`);
@@ -114,15 +114,16 @@ class ProgressTracker {
    * Update progress with custom message
    */
   updateProgress(message, details = {}) {
-    const elapsed = this.options.showElapsedTime ? 
-      ` [${this.getFormattedTime(Date.now() - this.startTime)}]` : '';
-    
-    const fullMessage = this.options.detailedFeedback ?
-      `${message}${details.progress ? ` (${details.progress})` : ''}${elapsed}` :
-      `${message}${elapsed}`;
-    
+    const elapsed = this.options.showElapsedTime
+      ? ` [${this.getFormattedTime(Date.now() - this.startTime)}]`
+      : '';
+
+    const fullMessage = this.options.detailedFeedback
+      ? `${message}${details.progress ? ` (${details.progress})` : ''}${elapsed}`
+      : `${message}${elapsed}`;
+
     if (this.spinner) this.spinner.text = fullMessage;
-    
+
     return this;
   }
 
@@ -133,17 +134,19 @@ class ProgressTracker {
     const completedSteps = this.steps.filter(s => s.status === 'completed').length;
     const totalSteps = this.steps.length;
     const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-    
+
     const elapsed = this.getFormattedTime(Date.now() - this.startTime);
-    
-    console.log(chalk.blue(`\n📊 Progress: ${completedSteps}/${totalSteps} steps completed (${progress}%)`));
+
+    console.log(
+      chalk.blue(`\n📊 Progress: ${completedSteps}/${totalSteps} steps completed (${progress}%)`)
+    );
     console.log(chalk.blue(`⏱️  Elapsed time: ${elapsed}`));
-    
+
     if (this.currentStep < this.steps.length) {
       const current = this.steps[this.currentStep];
       console.log(chalk.cyan(`🔄 Current: ${current.description}`));
     }
-    
+
     return this;
   }
 
@@ -154,14 +157,14 @@ class ProgressTracker {
     const seconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
-    
+
     if (hours > 0) {
       return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } if (minutes > 0) {
+    }
+    if (minutes > 0) {
       return `${minutes}m ${seconds % 60}s`;
-    } 
-      return `${seconds}s`;
-    
+    }
+    return `${seconds}s`;
   }
 
   /**
@@ -198,11 +201,11 @@ class ProgressTracker {
     } else {
       this.spinner?.fail(finalMessage || 'Process failed');
     }
-    
+
     // Stop spinner
     this.spinner?.stop();
     this.spinner = null;
-    
+
     return this;
   }
 
@@ -223,7 +226,7 @@ class ProgressTracker {
     const completed = this.steps.filter(s => s.status === 'completed').length;
     const failed = this.steps.filter(s => s.status === 'failed').length;
     const pending = this.steps.filter(s => s.status === 'pending').length;
-    
+
     return {
       totalSteps: this.steps.length,
       completed,
@@ -237,8 +240,8 @@ class ProgressTracker {
         description: step.description,
         status: step.status,
         duration: step.duration,
-        formattedDuration: step.duration ? this.getFormattedTime(step.duration) : null
-      }))
+        formattedDuration: step.duration ? this.getFormattedTime(step.duration) : null,
+      })),
     };
   }
 

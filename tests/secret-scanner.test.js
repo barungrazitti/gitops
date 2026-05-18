@@ -93,7 +93,7 @@ describe('SecretScanner', () => {
       scanner.addCustomPattern({
         name: 'custom',
         pattern: /CUSTOM/g,
-        replacement: '[REDACTED]'
+        replacement: '[REDACTED]',
       });
       expect(scanner.secretPatterns.length).toBe(initialLength + 1);
     });

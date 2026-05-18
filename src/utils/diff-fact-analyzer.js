@@ -28,7 +28,7 @@ class DiffFactAnalyzer {
       fileChanges,
       patterns,
       recommendation,
-      summary: this.buildSummary(fileChanges, stats, patterns)
+      summary: this.buildSummary(fileChanges, stats, patterns),
     };
   }
 
@@ -53,7 +53,7 @@ class DiffFactAnalyzer {
           addedLines: [],
           deletedLines: [],
           isNew: false,
-          isDeleted: false
+          isDeleted: false,
         };
       } else if (current) {
         if (line.startsWith('new file')) {
@@ -93,7 +93,7 @@ class DiffFactAnalyzer {
       filesDeleted: 0,
       filesModified: 0,
       filesRenamed: 0,
-      netChange: 0
+      netChange: 0,
     };
 
     for (const file of fileChanges) {
@@ -125,7 +125,7 @@ class DiffFactAnalyzer {
       isDocsOnly: false,
       isTestOnly: false,
       detectedOperations: [],
-      dominantFileCategory: 'code'
+      dominantFileCategory: 'code',
     };
 
     patterns.isDeletionOnly = stats.totalAdditions === 0 && stats.totalDeletions > 0;
@@ -163,13 +163,20 @@ class DiffFactAnalyzer {
     const allAddedContent = addedLines.join('\n');
     const allContent = allDeletedContent + '\n' + allAddedContent;
 
-    if (/console\.(log|debug|warn|error|info)/.test(allDeletedContent) &&
-        !/console\.(log|debug|warn|error|info)/.test(allAddedContent)) {
-      operations.push({ type: 'remove-console-logs', description: 'removed console.log/debug statements' });
+    if (
+      /console\.(log|debug|warn|error|info)/.test(allDeletedContent) &&
+      !/console\.(log|debug|warn|error|info)/.test(allAddedContent)
+    ) {
+      operations.push({
+        type: 'remove-console-logs',
+        description: 'removed console.log/debug statements',
+      });
     }
 
-    if (/console\.(log|debug|warn|error|info)/.test(allAddedContent) &&
-        !/console\.(log|debug|warn|error|info)/.test(allDeletedContent)) {
+    if (
+      /console\.(log|debug|warn|error|info)/.test(allAddedContent) &&
+      !/console\.(log|debug|warn|error|info)/.test(allDeletedContent)
+    ) {
       operations.push({ type: 'add-logging', description: 'added logging statements' });
     }
 
@@ -228,8 +235,11 @@ class DiffFactAnalyzer {
 
       if (/\.(md|txt|rst|adoc|doc)$/.test(name) || /readme/i.test(name)) {
         categories.add('docs');
-      } else if (/\.(json|yaml|yml|toml|ini|env|conf|config)$/.test(name) ||
-                 /\.gitignore$/.test(name) || /\.editorconfig$/.test(name)) {
+      } else if (
+        /\.(json|yaml|yml|toml|ini|env|conf|config)$/.test(name) ||
+        /\.gitignore$/.test(name) ||
+        /\.editorconfig$/.test(name)
+      ) {
         categories.add('config');
       } else if (/\.test\.|\.spec\.|tests?\//.test(name) || /__tests__/.test(name)) {
         categories.add('test');
@@ -250,8 +260,8 @@ class DiffFactAnalyzer {
    * @private
    */
   recommendType(fileChanges, stats, patterns) {
-    const hasConsoleRemoval = patterns.detectedOperations.some(op =>
-      op.type === 'remove-console-logs'
+    const hasConsoleRemoval = patterns.detectedOperations.some(
+      op => op.type === 'remove-console-logs'
     );
 
     if (patterns.isFileDeletion || (patterns.isDeletionOnly && !hasConsoleRemoval)) {
@@ -280,7 +290,11 @@ class DiffFactAnalyzer {
     }
 
     if (patterns.isMostlyRemovals && !hasNewCode) {
-      return { type: 'refactor', confidence: 0.85, reason: 'predominantly removed code without adding features' };
+      return {
+        type: 'refactor',
+        confidence: 0.85,
+        reason: 'predominantly removed code without adding features',
+      };
     }
 
     if (patterns.isDocsOnly) {
@@ -296,13 +310,17 @@ class DiffFactAnalyzer {
     }
 
     if (stats.totalAdditions > 0 && stats.totalDeletions > 0) {
-      const hasValidation = patterns.detectedOperations.some(op =>
-        op.type === 'add-validation' || op.type === 'add-error-handling'
+      const hasValidation = patterns.detectedOperations.some(
+        op => op.type === 'add-validation' || op.type === 'add-error-handling'
       );
       if (hasValidation) {
         return { type: 'fix', confidence: 0.8, reason: 'added validation or error handling' };
       }
-      return { type: 'feat', confidence: 0.5, reason: 'mixed changes with additions and deletions' };
+      return {
+        type: 'feat',
+        confidence: 0.5,
+        reason: 'mixed changes with additions and deletions',
+      };
     }
 
     return { type: 'chore', confidence: 0.5, reason: 'general changes' };
@@ -322,8 +340,8 @@ class DiffFactAnalyzer {
     if (stats.filesDeleted > 0) parts.push(`${stats.filesDeleted} deleted`);
     if (stats.filesModified > 0) parts.push(`${stats.filesModified} modified`);
 
-    const meaningfulOps = patterns.detectedOperations.filter(op =>
-      !['delete-file', 'add-file'].includes(op.type)
+    const meaningfulOps = patterns.detectedOperations.filter(
+      op => !['delete-file', 'add-file'].includes(op.type)
     );
     if (meaningfulOps.length > 0) {
       parts.push('key changes: ' + meaningfulOps.map(op => op.description).join(', '));
@@ -344,11 +362,17 @@ class DiffFactAnalyzer {
     const { stats, patterns, recommendation } = facts;
 
     constraints.push(`DIFF FACTS (you MUST reflect these in your commit message):`);
-    constraints.push(`- Files changed: ${stats.filesChanged} (${stats.filesAdded} added, ${stats.filesDeleted} deleted, ${stats.filesModified} modified)`);
-    constraints.push(`- Lines: +${stats.totalAdditions} additions, -${stats.totalDeletions} deletions (net: ${stats.netChange >= 0 ? '+' : ''}${stats.netChange})`);
+    constraints.push(
+      `- Files changed: ${stats.filesChanged} (${stats.filesAdded} added, ${stats.filesDeleted} deleted, ${stats.filesModified} modified)`
+    );
+    constraints.push(
+      `- Lines: +${stats.totalAdditions} additions, -${stats.totalDeletions} deletions (net: ${stats.netChange >= 0 ? '+' : ''}${stats.netChange})`
+    );
 
     if (patterns.isDeletionOnly) {
-      constraints.push(`- CRITICAL: This diff contains ONLY deletions. No new functionality was added.`);
+      constraints.push(
+        `- CRITICAL: This diff contains ONLY deletions. No new functionality was added.`
+      );
       constraints.push(`- The commit type MUST be "chore" or "refactor", NOT "feat" or "fix".`);
     }
 
@@ -357,8 +381,12 @@ class DiffFactAnalyzer {
     }
 
     if (patterns.isMostlyRemovals && !patterns.isDeletionOnly) {
-      constraints.push(`- This diff is predominantly deletions (${stats.totalDeletions} removed vs ${stats.totalAdditions} added).`);
-      constraints.push(`- Do NOT describe this as "improved" or "enhanced" - focus on what was removed.`);
+      constraints.push(
+        `- This diff is predominantly deletions (${stats.totalDeletions} removed vs ${stats.totalAdditions} added).`
+      );
+      constraints.push(
+        `- Do NOT describe this as "improved" or "enhanced" - focus on what was removed.`
+      );
     }
 
     if (patterns.isConfigOnly) {
@@ -374,11 +402,13 @@ class DiffFactAnalyzer {
     }
 
     if (patterns.detectedOperations.length > 0) {
-      const meaningfulOps = patterns.detectedOperations.filter(op =>
-        !['delete-file', 'add-file'].includes(op.type)
+      const meaningfulOps = patterns.detectedOperations.filter(
+        op => !['delete-file', 'add-file'].includes(op.type)
       );
       if (meaningfulOps.length > 0) {
-        constraints.push(`- Detected operations: ${meaningfulOps.map(op => op.description).join(', ')}`);
+        constraints.push(
+          `- Detected operations: ${meaningfulOps.map(op => op.description).join(', ')}`
+        );
       }
     }
 
@@ -396,19 +426,31 @@ class DiffFactAnalyzer {
   emptyResult() {
     return {
       stats: {
-        totalAdditions: 0, totalDeletions: 0, filesChanged: 0,
-        filesAdded: 0, filesDeleted: 0, filesModified: 0,
-        filesRenamed: 0, netChange: 0
+        totalAdditions: 0,
+        totalDeletions: 0,
+        filesChanged: 0,
+        filesAdded: 0,
+        filesDeleted: 0,
+        filesModified: 0,
+        filesRenamed: 0,
+        netChange: 0,
       },
       fileChanges: [],
       patterns: {
-        isDeletionOnly: false, isAdditionOnly: false, isMostlyRemovals: false,
-        isMostlyAdditions: false, isFileDeletion: false, isNewFile: false,
-        isConfigOnly: false, isDocsOnly: false, isTestOnly: false,
-        detectedOperations: [], dominantFileCategory: 'code'
+        isDeletionOnly: false,
+        isAdditionOnly: false,
+        isMostlyRemovals: false,
+        isMostlyAdditions: false,
+        isFileDeletion: false,
+        isNewFile: false,
+        isConfigOnly: false,
+        isDocsOnly: false,
+        isTestOnly: false,
+        detectedOperations: [],
+        dominantFileCategory: 'code',
       },
       recommendation: { type: 'chore', confidence: 0, reason: 'no diff provided' },
-      summary: 'no changes'
+      summary: 'no changes',
     };
   }
 }

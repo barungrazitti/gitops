@@ -40,8 +40,6 @@ const BINARY_EXTENSIONS = [
 ];
 
 class DiffManager {
-  constructor() {}
-
   /**
    * Check if a file is a binary/media file based on extension
    */
@@ -113,11 +111,7 @@ class DiffManager {
       };
     }
 
-    const smartTruncated = this.smartTruncateDiff(
-      filteredDiff,
-      MAX_SAFE_SIZE,
-      context
-    );
+    const smartTruncated = this.smartTruncateDiff(filteredDiff, MAX_SAFE_SIZE, context);
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,
@@ -153,20 +147,20 @@ class DiffManager {
       '.map',
     ];
 
-    const filteredChunks = fileChunks.filter((fc) => {
-      return !IGNORED_PATTERNS.some((pattern) => fc.fileName.includes(pattern));
+    const filteredChunks = fileChunks.filter(fc => {
+      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
     });
 
-    const scoredChunks = filteredChunks.map((fc) => {
+    const scoredChunks = filteredChunks.map(fc => {
       const score = this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
 
     scoredChunks.sort((a, b) => b.score - a.score);
 
-    let selectedContent = [];
-    let preservedFiles = [];
-    let skippedFiles = [];
+    const selectedContent = [];
+    const preservedFiles = [];
+    const skippedFiles = [];
     let currentSize = 0;
     const HEADER_BUDGET = Math.min(2000, maxSize * 0.05);
 
@@ -211,8 +205,8 @@ class DiffManager {
 
     // Build summary of skipped files for context
     const trulySkipped = skippedFiles
-      .filter((f) => !additionalPreservedFiles.includes(f.fileName))
-      .map((f) => f.fileName);
+      .filter(f => !additionalPreservedFiles.includes(f.fileName))
+      .map(f => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
@@ -222,9 +216,7 @@ class DiffManager {
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join(
-        '\n'
-      ),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
       reasoning,
       preservedFiles,
       skippedFiles: trulySkipped,
@@ -246,7 +238,7 @@ class DiffManager {
       other: [],
     };
 
-    skippedFiles.forEach((file) => {
+    skippedFiles.forEach(file => {
       if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
         groups.plugin.push(file);
       } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
@@ -267,47 +259,37 @@ class DiffManager {
 
     if (groups.plugin.length) {
       const plugins = new Set(
-        groups.plugin.map((f) => {
+        groups.plugin.map(f => {
           const match = f.match(/\/plugins\/([^\/]+)/);
           return match ? match[1] : f;
         })
       );
-      summary.push(
-        `# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`
-      );
+      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
     }
 
     if (groups.theme.length) {
       const themes = new Set(
-        groups.theme.map((f) => {
+        groups.theme.map(f => {
           const match = f.match(/\/themes\/([^\/]+)/);
           return match ? match[1] : f;
         })
       );
-      summary.push(
-        `# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`
-      );
+      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
     }
 
     if (groups.assets.length > 5) {
-      summary.push(
-        `# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`
-      );
+      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
     } else if (groups.assets.length) {
-      summary.push(
-        `# Assets: ${groups.assets.map((f) => f.split('/').pop()).join(', ')}`
-      );
+      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
     }
 
     if (groups.config.length) {
-      summary.push(
-        `# Config files: ${groups.config.map((f) => f.split('/').pop()).join(', ')}`
-      );
+      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
     }
 
     if (groups.vendor.length) {
       const vendorTypes = new Set(
-        groups.vendor.map((f) => {
+        groups.vendor.map(f => {
           if (f.includes('node_modules')) return 'npm';
           if (f.includes('vendor/composer')) return 'composer';
           return 'vendor';
@@ -355,11 +337,7 @@ class DiffManager {
         let isNewFile =
           line.includes('/dev/null') ||
           (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
-        if (
-          !isNewFile &&
-          lines[i + 1] &&
-          lines[i + 1].includes('new file mode')
-        ) {
+        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
           isNewFile = true;
         }
 
@@ -421,24 +399,14 @@ class DiffManager {
       score += 20;
     }
 
-    const ignoredPatterns = [
-      'node_modules',
-      '.git',
-      'dist',
-      'build',
-      'vendor',
-      '.lock',
-    ];
-    if (ignoredPatterns.some((p) => chunk.fileName.includes(p))) {
+    const ignoredPatterns = ['node_modules', '.git', 'dist', 'build', 'vendor', '.lock'];
+    if (ignoredPatterns.some(p => chunk.fileName.includes(p))) {
       score -= 50;
     }
 
     const semanticFiles = semanticContext?.files?.semantic || {};
     for (const [filePath, info] of Object.entries(semanticFiles)) {
-      if (
-        chunk.fileName.includes(filePath) ||
-        filePath.includes(chunk.fileName)
-      ) {
+      if (chunk.fileName.includes(filePath) || filePath.includes(chunk.fileName)) {
         if (info?.functions?.length > 0 || info?.classes?.length > 0) {
           score += 40;
         }
@@ -470,18 +438,17 @@ class DiffManager {
     let currentTokens = 0;
 
     // Rough estimation: 1 token ≈ 4 characters
-    const estimateTokens = (text) => Math.ceil(text.length / 4);
+    const estimateTokens = text => Math.ceil(text.length / 4);
 
     // Helper to detect semantic boundaries
-    const isSemanticBoundary = (line) => {
+    const isSemanticBoundary = line => {
       return (
         line.startsWith('diff --git') ||
         line.startsWith('index ') ||
         line.startsWith('---') ||
         line.startsWith('+++') ||
         (line.startsWith('@@') && currentChunk.length > 10) ||
-        (/^(function|class|def|const|let|var)\s+\w+/.test(line) &&
-          currentChunk.length > 5)
+        (/^(function|class|def|const|let|var)\s+\w+/.test(line) && currentChunk.length > 5)
       );
     };
 

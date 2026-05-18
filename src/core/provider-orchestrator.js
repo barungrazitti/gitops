@@ -14,21 +14,13 @@ class ProviderOrchestrator {
   /**
    * Generate commit messages with sequential fallback
    */
-  async generateWithSequentialFallback(
-    diff,
-    options,
-    activityLogger,
-    statsManager
-  ) {
+  async generateWithSequentialFallback(diff, options, activityLogger, statsManager) {
     const { preferredProvider, context, ...generationOptions } = options;
 
     // Determine providers to use - preferred first, then fallback
     const allProviders = ['groq', 'ollama'];
     const providers = preferredProvider
-      ? [
-          preferredProvider,
-          ...allProviders.filter((p) => p !== preferredProvider),
-        ]
+      ? [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)]
       : allProviders;
 
     // Enrich options with context first
@@ -37,8 +29,7 @@ class ProviderOrchestrator {
       context: {
         ...context,
         hasSemanticContext: !!(
-          context?.files?.semantic &&
-          Object.keys(context.files.semantic).length > 0
+          context?.files?.semantic && Object.keys(context.files.semantic).length > 0
         ),
       },
     };
@@ -81,11 +72,7 @@ class ProviderOrchestrator {
       };
     }
 
-    const smartTruncated = await this.smartTruncateDiff(
-      diff,
-      MAX_SAFE_SIZE,
-      context
-    );
+    const smartTruncated = await this.smartTruncateDiff(diff, MAX_SAFE_SIZE, context);
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,
@@ -121,20 +108,20 @@ class ProviderOrchestrator {
       '.map',
     ];
 
-    const filteredChunks = fileChunks.filter((fc) => {
-      return !IGNORED_PATTERNS.some((pattern) => fc.fileName.includes(pattern));
+    const filteredChunks = fileChunks.filter(fc => {
+      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
     });
 
-    const scoredChunks = filteredChunks.map((fc) => {
+    const scoredChunks = filteredChunks.map(fc => {
       const score = this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
 
     scoredChunks.sort((a, b) => b.score - a.score);
 
-    let selectedContent = [];
-    let preservedFiles = [];
-    let skippedFiles = [];
+    const selectedContent = [];
+    const preservedFiles = [];
+    const skippedFiles = [];
     let currentSize = 0;
     const HEADER_BUDGET = Math.min(2000, maxSize * 0.05);
 
@@ -179,8 +166,8 @@ class ProviderOrchestrator {
 
     // Build summary of skipped files for context
     const trulySkipped = skippedFiles
-      .filter((f) => !additionalPreservedFiles.includes(f.fileName))
-      .map((f) => f.fileName);
+      .filter(f => !additionalPreservedFiles.includes(f.fileName))
+      .map(f => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
@@ -190,9 +177,7 @@ class ProviderOrchestrator {
     }
 
     return {
-      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join(
-        '\n'
-      ),
+      data: [...selectedContent, ...skippedHeaders, skippedFileSummary].join('\n'),
       reasoning,
       preservedFiles,
       skippedFiles: trulySkipped,
@@ -214,7 +199,7 @@ class ProviderOrchestrator {
       other: [],
     };
 
-    skippedFiles.forEach((file) => {
+    skippedFiles.forEach(file => {
       if (file.includes('/plugins/') || file.includes('\\plugins\\')) {
         groups.plugin.push(file);
       } else if (file.includes('/themes/') || file.includes('\\themes\\')) {
@@ -235,47 +220,37 @@ class ProviderOrchestrator {
 
     if (groups.plugin.length) {
       const plugins = new Set(
-        groups.plugin.map((f) => {
+        groups.plugin.map(f => {
           const match = f.match(/\/plugins\/([^\/]+)/);
           return match ? match[1] : f;
         })
       );
-      summary.push(
-        `# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`
-      );
+      summary.push(`# Plugins: ${Array.from(plugins).join(', ')} (${groups.plugin.length} files)`);
     }
 
     if (groups.theme.length) {
       const themes = new Set(
-        groups.theme.map((f) => {
+        groups.theme.map(f => {
           const match = f.match(/\/themes\/([^\/]+)/);
           return match ? match[1] : f;
         })
       );
-      summary.push(
-        `# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`
-      );
+      summary.push(`# Themes: ${Array.from(themes).join(', ')} (${groups.theme.length} files)`);
     }
 
     if (groups.assets.length > 5) {
-      summary.push(
-        `# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`
-      );
+      summary.push(`# Assets: ${groups.assets.length} files (JS bundles, CSS, fonts, images)`);
     } else if (groups.assets.length) {
-      summary.push(
-        `# Assets: ${groups.assets.map((f) => f.split('/').pop()).join(', ')}`
-      );
+      summary.push(`# Assets: ${groups.assets.map(f => f.split('/').pop()).join(', ')}`);
     }
 
     if (groups.config.length) {
-      summary.push(
-        `# Config files: ${groups.config.map((f) => f.split('/').pop()).join(', ')}`
-      );
+      summary.push(`# Config files: ${groups.config.map(f => f.split('/').pop()).join(', ')}`);
     }
 
     if (groups.vendor.length) {
       const vendorTypes = new Set(
-        groups.vendor.map((f) => {
+        groups.vendor.map(f => {
           if (f.includes('node_modules')) return 'npm';
           if (f.includes('vendor/composer')) return 'composer';
           return 'vendor';
@@ -323,11 +298,7 @@ class ProviderOrchestrator {
         let isNewFile =
           line.includes('/dev/null') ||
           (i > 0 && lines[i - 1] && lines[i - 1].includes('new file mode'));
-        if (
-          !isNewFile &&
-          lines[i + 1] &&
-          lines[i + 1].includes('new file mode')
-        ) {
+        if (!isNewFile && lines[i + 1] && lines[i + 1].includes('new file mode')) {
           isNewFile = true;
         }
 
@@ -394,11 +365,7 @@ class ProviderOrchestrator {
     }
 
     // Boost score for files mentioned in semantic context
-    if (
-      semanticContext &&
-      semanticContext.files &&
-      semanticContext.files.semantic
-    ) {
+    if (semanticContext && semanticContext.files && semanticContext.files.semantic) {
       const semanticFiles = Object.keys(semanticContext.files.semantic);
       if (semanticFiles.includes(chunk.fileName)) {
         score += 5;
@@ -433,16 +400,10 @@ class ProviderOrchestrator {
         let actualPrompt;
 
         // Handle different diff strategies
-        if (
-          diffManagement.strategy === 'full' ||
-          diffManagement.strategy === 'smart-truncated'
-        ) {
+        if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
           // Simple case: diff in one prompt (full or smart-truncated)
           const prompt = provider.buildPrompt(diffManagement.data, options);
-          messages = await provider.generateCommitMessages(
-            diffManagement.data,
-            options
-          );
+          messages = await provider.generateCommitMessages(diffManagement.data, options);
           actualPrompt = prompt;
         } else {
           // Complex case: chunked processing
@@ -457,11 +418,7 @@ class ProviderOrchestrator {
               chunkIndex: i,
               totalChunks: diffManagement.data.length,
               isLastChunk,
-              chunkContext: isLastChunk
-                ? 'final'
-                : i === 0
-                  ? 'initial'
-                  : 'middle',
+              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
               // Add chunk-specific context
               context: {
                 ...options.context,
@@ -478,14 +435,8 @@ class ProviderOrchestrator {
             };
 
             // Generate with this chunk
-            const chunkPrompt = provider.buildPrompt(
-              chunk.content,
-              chunkOptions
-            );
-            const chunkResult = await provider.generateCommitMessages(
-              chunk.content,
-              chunkOptions
-            );
+            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
+            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
 
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);
@@ -538,8 +489,7 @@ class ProviderOrchestrator {
         await activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' ||
-            diffManagement.strategy === 'smart-truncated'
+          diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated'
             ? diffManagement.data
             : `Chunked processing (${diffManagement.chunks} chunks)`,
           null,
@@ -574,7 +524,7 @@ class ProviderOrchestrator {
     const uniqueMessages = [...new Set(messages)];
 
     // Score messages based on quality factors
-    const scored = uniqueMessages.map((msg) => ({
+    const scored = uniqueMessages.map(msg => ({
       message: msg,
       score: this.scoreCommitMessage(msg, diff),
     }));
@@ -582,7 +532,7 @@ class ProviderOrchestrator {
     // Sort by score and take best ones
     scored.sort((a, b) => b.score - a.score);
 
-    return scored.slice(0, count).map((item) => item.message);
+    return scored.slice(0, count).map(item => item.message);
   }
 
   /**
@@ -592,11 +542,7 @@ class ProviderOrchestrator {
     let score = 0;
 
     // Prefer conventional commit format
-    if (
-      /^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(
-        message
-      )
-    ) {
+    if (/^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:/.test(message)) {
       score += 10;
     }
 
@@ -609,10 +555,7 @@ class ProviderOrchestrator {
     }
 
     // Prefer messages with proper capitalization
-    if (
-      message[0] === message[0].toUpperCase() &&
-      message[0] !== message[0].toLowerCase()
-    ) {
+    if (message[0] === message[0].toUpperCase() && message[0] !== message[0].toLowerCase()) {
       score += 2;
     }
 
@@ -629,7 +572,7 @@ class ProviderOrchestrator {
       /\b(class|function|const|let|var)\s+\w+/i, // Code constructs
     ];
 
-    specificPatterns.forEach((pattern) => {
+    specificPatterns.forEach(pattern => {
       if (pattern.test(message)) {
         score += 3;
       }
@@ -643,7 +586,7 @@ class ProviderOrchestrator {
       /^\s*(improvements?|bug fix|updates?|refactor)\s*$/i,
     ];
 
-    genericPatterns.forEach((pattern) => {
+    genericPatterns.forEach(pattern => {
       if (pattern.test(message)) {
         score -= 20;
       }
@@ -657,7 +600,7 @@ class ProviderOrchestrator {
       /^\s*changes\s*$/i,
     ];
 
-    bannedPatterns.forEach((pattern) => {
+    bannedPatterns.forEach(pattern => {
       if (pattern.test(message)) {
         score = -100;
       }
@@ -689,10 +632,7 @@ class ProviderOrchestrator {
     const messageKeywords = this.extractKeywordsFromMessage(message);
 
     // Calculate overlap between diff entities and message
-    const entityOverlap = this.calculateEntityOverlap(
-      entitiesFromDiff,
-      messageKeywords
-    );
+    const entityOverlap = this.calculateEntityOverlap(entitiesFromDiff, messageKeywords);
     relevanceScore += entityOverlap * 8; // Weight entity overlap heavily
 
     // Check if the commit type matches the diff type
@@ -743,26 +683,20 @@ class ProviderOrchestrator {
     }
 
     // Extract function/class definitions from diff
-    const functionMatches =
-      diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const functionMatches = diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of functionMatches) {
       const funcName = match.replace(/function\s+|def\s+/, '').trim();
       if (funcName) entities.functions.push(funcName);
     }
 
-    const classMatches =
-      diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const classMatches = diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of classMatches) {
-      const className = match
-        .replace('class\s+', '')
-        .replace('class ', '')
-        .trim();
+      const className = match.replace('class\s+', '').replace('class ', '').trim();
       if (className) entities.classes.push(className);
     }
 
     // Extract variable declarations
-    const varMatches =
-      diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    const varMatches = diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
     for (const match of varMatches) {
       const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
       if (varName) entities.variables.push(varName);
@@ -770,9 +704,7 @@ class ProviderOrchestrator {
 
     // Extract method definitions in diff
     const methodMatches =
-      diff.match(
-        /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
-      ) || [];
+      diff.match(/[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g) || [];
     for (const match of methodMatches) {
       const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
       if (methodName && !entities.functions.includes(methodName)) {
@@ -781,8 +713,7 @@ class ProviderOrchestrator {
     }
 
     // Extract import/module statements
-    const importMatches =
-      diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
+    const importMatches = diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
     for (const match of importMatches) {
       const importName = match
         .replace(/(?:import|from|require)\s*/, '')
@@ -806,7 +737,7 @@ class ProviderOrchestrator {
       .toLowerCase()
       .replace(/[^\w\s]/g, ' ')
       .split(/\s+/)
-      .filter((word) => word.length > 2 && !this.isCommonStopWord(word));
+      .filter(word => word.length > 2 && !this.isCommonStopWord(word));
 
     return [...new Set(words)]; // Remove duplicates
   }
@@ -909,9 +840,7 @@ class ProviderOrchestrator {
     for (const func of entities.functions) {
       const funcName = func.toLowerCase();
       if (
-        messageKeywords.some(
-          (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
-        )
+        messageKeywords.some(keyword => funcName.includes(keyword) || keyword.includes(funcName))
       ) {
         overlapCount++;
       }
@@ -921,10 +850,7 @@ class ProviderOrchestrator {
     for (const cls of entities.classes) {
       const className = cls.toLowerCase();
       if (
-        messageKeywords.some(
-          (keyword) =>
-            className.includes(keyword) || keyword.includes(className)
-        )
+        messageKeywords.some(keyword => className.includes(keyword) || keyword.includes(className))
       ) {
         overlapCount++;
       }
@@ -935,8 +861,7 @@ class ProviderOrchestrator {
       const varNameLower = varName.toLowerCase();
       if (
         messageKeywords.some(
-          (keyword) =>
-            varNameLower.includes(keyword) || keyword.includes(varNameLower)
+          keyword => varNameLower.includes(keyword) || keyword.includes(varNameLower)
         )
       ) {
         overlapCount++;
@@ -949,11 +874,7 @@ class ProviderOrchestrator {
       const fileNameParts = fileName.split(/[\/\\]/); // Split by path separators
 
       for (const part of fileNameParts) {
-        if (
-          messageKeywords.some(
-            (keyword) => part.includes(keyword) || keyword.includes(part)
-          )
-        ) {
+        if (messageKeywords.some(keyword => part.includes(keyword) || keyword.includes(part))) {
           overlapCount++;
           break;
         }
@@ -975,18 +896,11 @@ class ProviderOrchestrator {
     // Determine what type of changes are in the diff
     const diffIndicators = {
       feat: /(\+.*function|\+.*class|\+.*def|\+.*export|\+.*import)/.test(diff),
-      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(
-        diff
-      ),
+      fix: /(\-.*bug|\-.*error|\-.*issue|\+.*correct|\+.*resolve|\+.*patch)/i.test(diff),
       docs: /(\+.*\.(md|txt|rst)|\+.*README|\+.*documentation)/i.test(diff),
-      refactor:
-        /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
-      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(
-        diff
-      ),
-      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(
-        diff
-      ),
+      refactor: /(\+.*refactor|\+.*restructure|\-.*\s+\+.*\s+.*reorganized)/.test(diff),
+      test: /(\+.*test|\+.*spec|\+.*describe|\+.*it\(|\+.*expect|\+.*assert)/i.test(diff),
+      style: /(\+.*css|\+.*style|\+.*format|\+.*indent|\+.*prettier)/i.test(diff),
     };
 
     return diffIndicators[changeType] || false;
@@ -1022,7 +936,7 @@ class ProviderOrchestrator {
     };
 
     if (scopeTypeMap[scope]) {
-      return fileTypes.some((type) => scopeTypeMap[scope].includes(type));
+      return fileTypes.some(type => scopeTypeMap[scope].includes(type));
     }
 
     return false;
@@ -1034,9 +948,7 @@ class ProviderOrchestrator {
   isMessageTooGenericForDiff(message, diff) {
     const entities = this.extractEntitiesFromDiff(diff);
     const hasSpecificEntities =
-      entities.functions.length > 0 ||
-      entities.classes.length > 0 ||
-      entities.variables.length > 0;
+      entities.functions.length > 0 || entities.classes.length > 0 || entities.variables.length > 0;
 
     const genericTerms = [
       /\bchanges?\b/i,
@@ -1049,7 +961,7 @@ class ProviderOrchestrator {
       /\benhancements?\b/i,
     ];
 
-    const hasGenericTerms = genericTerms.some((regex) => regex.test(message));
+    const hasGenericTerms = genericTerms.some(regex => regex.test(message));
 
     return hasSpecificEntities && hasGenericTerms;
   }

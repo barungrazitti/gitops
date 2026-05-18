@@ -5,16 +5,18 @@
 const ConfigManager = require('../src/core/config-manager');
 
 jest.mock('fs-extra');
-jest.mock('conf', () => jest.fn().mockImplementation(() => ({
+jest.mock('conf', () =>
+  jest.fn().mockImplementation(() => ({
     store: {},
     path: '/test/config.json',
-    get: jest.fn((key) => {
+    get: jest.fn(key => {
       const store = { defaultProvider: 'groq', conventionalCommits: true };
       return store[key];
     }),
     set: jest.fn(),
     clear: jest.fn(),
-  })));
+  }))
+);
 
 describe('ConfigManager', () => {
   let configManager;

@@ -104,7 +104,7 @@ class WhatChangedFormatter {
     // Group by directory for cleaner output
     for (const [dir, dirFiles] of Object.entries(grouped)) {
       const fileNames = dirFiles.map(f => this._truncateFileName(f.path, 40)).join(', ');
-      
+
       if (dir === '.') {
         lines.push(`Root files: ${fileNames}`);
       } else {
@@ -171,7 +171,9 @@ class WhatChangedFormatter {
     const grouped = {};
 
     for (const file of files) {
-      const dir = file.path.includes('/') ? file.path.substring(0, file.path.lastIndexOf('/')) : '.';
+      const dir = file.path.includes('/')
+        ? file.path.substring(0, file.path.lastIndexOf('/'))
+        : '.';
       if (!grouped[dir]) {
         grouped[dir] = [];
       }

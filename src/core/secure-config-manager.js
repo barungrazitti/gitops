@@ -15,7 +15,7 @@ class SecureConfigManager {
     // Generate a key for encryption (in a real app, this should be stored securely)
     this.key = this.generateOrLoadKey();
     this.algorithm = 'aes-256-gcm';
-    
+
     this.config = new Conf({
       projectName: 'ai-commit-generator',
       defaults: this.getDefaults(),
@@ -31,16 +31,15 @@ class SecureConfigManager {
     // In a real application, you'd want to store this key securely
     // For now, we'll derive it from a consistent source
     const keyPath = this.getKeyFilePath();
-    
+
     if (fs.existsSync(keyPath)) {
       return Buffer.from(fs.readFileSync(keyPath, 'utf8'), 'hex');
-    } 
-      // Generate a new key and save it
-      const newKey = crypto.randomBytes(32); // 256-bit key
-      fs.ensureDirSync(require('path').dirname(keyPath));
-      fs.writeFileSync(keyPath, newKey.toString('hex'));
-      return newKey;
-    
+    }
+    // Generate a new key and save it
+    const newKey = crypto.randomBytes(32); // 256-bit key
+    fs.ensureDirSync(require('path').dirname(keyPath));
+    fs.writeFileSync(keyPath, newKey.toString('hex'));
+    return newKey;
   }
 
   /**
@@ -57,17 +56,17 @@ class SecureConfigManager {
    */
   encrypt(data) {
     if (!data) return null;
-    
+
     const iv = crypto.randomBytes(16); // Initialization vector
     const cipher = crypto.createCipher(this.algorithm, this.key);
     const encrypted = Buffer.concat([cipher.update(data, 'utf8'), cipher.final()]);
     const authTag = cipher.getAuthTag();
-    
+
     // Return encrypted data with IV and auth tag
     return {
       data: encrypted.toString('hex'),
       iv: iv.toString('hex'),
-      authTag: authTag.toString('hex')
+      authTag: authTag.toString('hex'),
     };
   }
 
@@ -76,16 +75,16 @@ class SecureConfigManager {
    */
   decrypt(encryptedObj) {
     if (!encryptedObj) return null;
-    
+
     const decipher = crypto.createDecipher(this.algorithm, this.key);
     decipher.setAuthTag(Buffer.from(encryptedObj.authTag, 'hex'));
     decipher.setAAD(Buffer.from('', 'utf8')); // No additional authenticated data
-    
+
     const decrypted = Buffer.concat([
       decipher.update(Buffer.from(encryptedObj.data, 'hex')),
-      decipher.final()
+      decipher.final(),
     ]);
-    
+
     return decrypted.toString('utf8');
   }
 
@@ -108,14 +107,7 @@ class SecureConfigManager {
       timeout: 120000, // 2 minutes for large files
       retries: 3,
       customPrompts: {},
-      excludeFiles: [
-        '*.log',
-        '*.tmp',
-        'node_modules/**',
-        '.git/**',
-        'dist/**',
-        'build/**',
-      ],
+      excludeFiles: ['*.log', '*.tmp', 'node_modules/**', '.git/**', 'dist/**', 'build/**'],
       // Test validation settings
       testValidation: {
         enabled: false,
@@ -257,7 +249,7 @@ class SecureConfigManager {
         const encryptedApiKey = this.config.get('encryptedApiKey');
         return encryptedApiKey ? this.decrypt(encryptedApiKey) : null;
       }
-      
+
       return this.config.get(key);
     } catch (error) {
       throw new Error(`Failed to get configuration value: ${error.message}`);
@@ -271,7 +263,7 @@ class SecureConfigManager {
     try {
       // Validate the key-value pair
       const testConfig = { ...this.config.store };
-      
+
       if (key === 'apiKey') {
         // Special handling for API key - encrypt it
         const encryptedValue = this.encrypt(value);
@@ -279,7 +271,7 @@ class SecureConfigManager {
       } else {
         testConfig[key] = value;
       }
-      
+
       const { error } = this.schema.validate(testConfig);
 
       if (error) {
@@ -302,16 +294,16 @@ class SecureConfigManager {
   async setMultiple(values) {
     try {
       const testConfig = { ...this.config.store };
-      
+
       let encryptedApiKey = null;
       if (values.apiKey !== undefined) {
         encryptedApiKey = this.encrypt(values.apiKey);
         testConfig.encryptedApiKey = encryptedApiKey;
         delete values.apiKey;
       }
-      
+
       Object.assign(testConfig, values);
-      
+
       const { error } = this.schema.validate(testConfig);
 
       if (error) {
@@ -402,7 +394,7 @@ class SecureConfigManager {
     try {
       const config = await this.load();
       const apiKey = await this.get('apiKey'); // Get decrypted API key
-      
+
       const providerConfig = {
         apiKey,
         maxTokens: config.maxTokens,
@@ -414,38 +406,30 @@ class SecureConfigManager {
 
       // Provider-specific model handling - don't use global model for different providers
       switch (provider) {
-      case 'openai':
-        providerConfig.model =
-            config.model && config.model.startsWith('gpt')
-              ? config.model
-              : 'gpt-3.5-turbo';
-        break;
-      case 'anthropic':
-        providerConfig.model =
+        case 'openai':
+          providerConfig.model =
+            config.model && config.model.startsWith('gpt') ? config.model : 'gpt-3.5-turbo';
+          break;
+        case 'anthropic':
+          providerConfig.model =
             config.model && config.model.startsWith('claude')
               ? config.model
               : 'claude-3-sonnet-20240229';
-        break;
-      case 'gemini':
-        providerConfig.model =
-            config.model && config.model.includes('gemini')
-              ? config.model
-              : 'gemini-pro';
-        break;
-      case 'mistral':
-        providerConfig.model =
-            config.model && config.model.includes('mistral')
-              ? config.model
-              : 'mistral-medium';
-        break;
-      case 'cohere':
-        providerConfig.model =
-            config.model && config.model.includes('command')
-              ? config.model
-              : 'command';
-        break;
-      case 'groq':
-        providerConfig.model =
+          break;
+        case 'gemini':
+          providerConfig.model =
+            config.model && config.model.includes('gemini') ? config.model : 'gemini-pro';
+          break;
+        case 'mistral':
+          providerConfig.model =
+            config.model && config.model.includes('mistral') ? config.model : 'mistral-medium';
+          break;
+        case 'cohere':
+          providerConfig.model =
+            config.model && config.model.includes('command') ? config.model : 'command';
+          break;
+        case 'groq':
+          providerConfig.model =
             config.model &&
             (config.model.includes('mixtral') ||
               config.model.includes('llama') ||
@@ -456,26 +440,26 @@ class SecureConfigManager {
               config.model.includes('qwen'))
               ? config.model
               : 'llama-3.1-8b-instant';
-        break;
-      case 'ollama': {
-        // For Ollama, always use the default unless it's explicitly an Ollama model
-        const ollamaModels = [
-          'qwen2.5-coder:latest',
-          'deepseek-v3.1:671b-cloud',
-          'qwen3-coder:480b-cloud',
-          'mistral:7b-instruct',
-          'deepseek-r1:8b',
-        ];
-        providerConfig.model = ollamaModels.includes(config.model || '')
-          ? config.model
-          : 'qwen2.5-coder:latest';
-        providerConfig.baseURL = 'http://localhost:11434';
-        break;
-      }
-      default:
-        // For unknown providers, use basic config
-        providerConfig.model = config.model || 'default-model';
-        break;
+          break;
+        case 'ollama': {
+          // For Ollama, always use the default unless it's explicitly an Ollama model
+          const ollamaModels = [
+            'qwen2.5-coder:latest',
+            'deepseek-v3.1:671b-cloud',
+            'qwen3-coder:480b-cloud',
+            'mistral:7b-instruct',
+            'deepseek-r1:8b',
+          ];
+          providerConfig.model = ollamaModels.includes(config.model || '')
+            ? config.model
+            : 'qwen2.5-coder:latest';
+          providerConfig.baseURL = 'http://localhost:11434';
+          break;
+        }
+        default:
+          // For unknown providers, use basic config
+          providerConfig.model = config.model || 'default-model';
+          break;
       }
 
       return providerConfig;
@@ -491,13 +475,13 @@ class SecureConfigManager {
     try {
       const config = this.config.store;
       const allConfig = { ...config };
-      
+
       // Decrypt API key for return
       if (allConfig.encryptedApiKey) {
         allConfig.apiKey = this.decrypt(allConfig.encryptedApiKey);
         delete allConfig.encryptedApiKey;
       }
-      
+
       return allConfig;
     } catch (error) {
       throw new Error(`Failed to get all configuration: ${error.message}`);
@@ -514,9 +498,7 @@ class SecureConfigManager {
 
     const apiKey = await this.get('apiKey'); // Get decrypted API key
     if (!apiKey) {
-      throw new Error(
-        `API key not configured for ${provider}. Run 'aicommit setup' to configure.`
-      );
+      throw new Error(`API key not configured for ${provider}. Run 'aicommit setup' to configure.`);
     }
 
     return true;
@@ -534,8 +516,13 @@ class SecureConfigManager {
     if (!availableProviders.includes(provider.toLowerCase())) {
       return {
         valid: false,
-        errors: [`Unknown provider: ${provider}. Available providers: ${availableProviders.join(', ')}`],
-        suggestions: ['Check the provider name spelling', 'Refer to documentation for supported providers']
+        errors: [
+          `Unknown provider: ${provider}. Available providers: ${availableProviders.join(', ')}`,
+        ],
+        suggestions: [
+          'Check the provider name spelling',
+          'Refer to documentation for supported providers',
+        ],
       };
     }
 
@@ -546,7 +533,7 @@ class SecureConfigManager {
       valid: result.valid,
       errors: result.errors,
       warnings: result.warnings,
-      suggestions: result.suggestions
+      suggestions: result.suggestions,
     };
   }
 
@@ -574,7 +561,13 @@ class SecureConfigManager {
 
     for (const [key, value] of Object.entries(override)) {
       if (value !== undefined && value !== null) {
-        if (typeof value === 'object' && value !== null && !Array.isArray(value) && typeof result[key] === 'object' && result[key] !== null) {
+        if (
+          typeof value === 'object' &&
+          value !== null &&
+          !Array.isArray(value) &&
+          typeof result[key] === 'object' &&
+          result[key] !== null
+        ) {
           result[key] = this.mergeConfig(result[key], value);
         } else {
           result[key] = value;

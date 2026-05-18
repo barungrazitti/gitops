@@ -1,5 +1,5 @@
 // Final test with new default model
-const validateInput = (input) => {
+const validateInput = input => {
   if (!input || typeof input !== 'string') {
     throw new Error('Invalid input: must be a non-empty string');
   }
@@ -10,5 +10,5 @@ const validateInput = (input) => {
 };
 
 module.exports = {
-  validateInput
+  validateInput,
 };
