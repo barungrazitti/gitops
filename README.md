@@ -3,7 +3,7 @@
 ![Version](https://img.shields.io/github/package-json/v/barungrazitti/gitops)
 ![License](https://img.shields.io/github/license/barungrazitti/gitops)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Tests](https://img.shields.io/badge/tests-423%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-723%20passing-brightgreen)
 ![Security](https://img.shields.io/badge/security-20%2B%20patterns-brightgreen)
 
 **Automate your git workflow with AI-powered commit messages**
@@ -195,8 +195,8 @@ Impact:
 
 | Metric            | Status                              |
 | ----------------- | ----------------------------------- |
-| Latest Release    | [v1.4.0](CHANGELOG.md) (2026-04-11) |
-| Test Coverage     | 423 tests, 19 suites                |
+| Latest Release    | [v1.5.0](CHANGELOG.md) (2026-05-18) |
+| Test Coverage     | 723 tests, 37 suites                 |
 | Security Patterns | 23 detection patterns               |
 | Quality Gates     | QUAL-01, QUAL-02 enforced           |
 | Documentation     | Complete with 20+ guides            |
@@ -229,8 +229,8 @@ src/
 ├── utils/          # Utilities (security, validation, etc.)
 └── commands/       # CLI commands
 bin/
-├── aic.js          # Main CLI entry
-└── aicommit.js     # Commit generator CLI
+├── aic.js             # Main CLI (auto git workflow)
+└── aicommit.js        # Commit generator CLI
 tests/              # Test suites
 docs/               # Documentation
 ```
@@ -250,7 +250,7 @@ npm run test:coverage
 npm run test:watch
 ```
 
-**Current Status:** 423 passing tests across 19 test suites
+**Current Status:** 723 passing tests across 37 test suites
 
 ---
 
@@ -268,6 +268,7 @@ npm run test:watch
 npm install
 mkdir -p ~/.local/bin
 ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
+ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aicommit
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -291,6 +292,7 @@ ls -la ~/.local/bin/aic
 # Recreate if missing
 mkdir -p ~/.local/bin
 ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
+ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aicommit
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
@@ -347,4 +349,4 @@ Made with ❤️ by [Barun Tayenjam](https://github.com/barungrazitti)
 
 ---
 
-_Last updated: 2026-04-11_
+_Last updated: 2026-05-18_

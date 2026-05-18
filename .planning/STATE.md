@@ -1,9 +1,9 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
+milestone: v1.0 (archived)
 milestone_name: Stability & Quality Refactoring
-status: shipped
-last_updated: "2026-04-11T13:15:00.000Z"
+status: archived
+last_updated: "2026-05-18"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -18,7 +18,7 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-11)
 
 **Core value:** A more stable, maintainable, and developer-friendly codebase with reliable error reporting, consistent style, and relevant AI-generated commit messages.
-**Current focus:** Planning next milestone
+**Current focus:** v1.0 archived, planning next milestone
 
 ## Phase Progress
 

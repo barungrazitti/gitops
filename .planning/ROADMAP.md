@@ -1,27 +1,13 @@
-# Roadmap: Git-Ops Stability & Quality Refactoring
+# Roadmap: Git-Ops (AI Commit Generator)
 
 ## Milestones
 
-- ✅ **v1.0 Stability & Quality Refactoring** — Phases 1-3 (shipped 2026-04-11)
+- ✅ **v1.0 Stability & Quality Refactoring** — Phases 1-3 (archived 2026-05-18)
 
-## Phases
+## Backlog
 
-<details>
-<summary>✅ v1.0 Stability & Quality Refactoring (Phases 1-3) — SHIPPED 2026-04-11</summary>
-
-- [x] Phase 1: Stability & Error Recovery (3/3 plans) — completed 2026-03-20
-- [x] Phase 2: Quality & Standards (3/3 plans) — completed 2026-03-20
-- [x] Phase 3: Improve Commit Message Relevance (4/4 plans) — completed 2026-04-09
-
-</details>
-
-## Progress
-
-| Phase                            | Milestone | Plans Complete | Status   | Completed   |
-| -------------------------------- | --------- | -------------- | -------- | ----------- |
-| 1. Stability & Error Recovery    | v1.0      | 3/3            | Complete | 2026-03-20  |
-| 2. Quality & Standards           | v1.0      | 3/3            | Complete | 2026-03-20  |
-| 3. Improve Commit Message Relevance | v1.0   | 4/4            | Complete | 2026-04-09  |
+<!-- Planning next milestone -->
 
 ---
-*Roadmap updated: 2026-04-11 after v1.0 milestone completion*
+
+*Roadmap updated: 2026-05-18 after v1.0 milestone archival*
