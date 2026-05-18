@@ -38,7 +38,7 @@ npm install
 
 # Test installation with npx
 echo "🧪 Testing installation..."
-if npx aic --version &> /dev/null; then
+if node bin/aicommit.js --version &> /dev/null; then
     echo "✅ Installation successful! You can use 'npx aic' immediately."
 else
     echo "❌ Installation failed."
