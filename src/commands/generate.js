@@ -122,6 +122,7 @@ class GenerateCommand {
       // Advanced cache check with semantic similarity
       let messages = [];
       let fromCache = false;
+      let context = {};
       if (mergedOptions.cache !== false) {
         spinner.text = chalk.blue('💾 Checking for cached results...');
         // Only cache exact matches to avoid complexity
@@ -139,7 +140,7 @@ class GenerateCommand {
       if (!messages || messages.length === 0) {
         // Analyze repository context
         spinner.text = chalk.blue('🧩 Analyzing repository context...');
-        const context = await this.analysisEngine.analyzeRepository();
+        context = await this.analysisEngine.analyzeRepository();
 
         // Generate commit messages with sequential fallback
         spinner.text = chalk.blue('🤖 Generating commit messages with AI...');

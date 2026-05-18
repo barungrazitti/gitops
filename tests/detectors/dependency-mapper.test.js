@@ -17,6 +17,7 @@ jest.mock('fs-extra', () => {
 });
 
 const fs = require('fs-extra');
+const path = require('path');
 const DependencyMapper = require('../../src/detectors/dependency-mapper');
 
 describe('DependencyMapper', () => {
