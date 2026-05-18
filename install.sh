@@ -60,6 +60,7 @@ case $choice in
         echo "🔗 Creating local symlink..."
         mkdir -p ~/.local/bin
         ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
+        ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aicommit
         
         # Add to PATH if not already there
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -68,7 +69,7 @@ case $choice in
             echo "   Please restart your terminal or run 'source ~/.zshrc' (or ~/.bashrc)"
         fi
         
-        echo "✅ Local symlink created!"
+        echo "✅ Local symlinks created!"
         echo "🚀 Quick start:"
         echo "   aic setup"
         echo "   aic"
@@ -91,11 +92,12 @@ case $choice in
                 echo "❌ Global installation failed. Falling back to local symlink..."
                 mkdir -p ~/.local/bin
                 ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
+                ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aicommit
                 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
                     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null
                     echo "✅ Added ~/.local/bin to PATH in your shell config."
                 fi
-                echo "✅ Local symlink created as fallback!"
+                echo "✅ Local symlinks created as fallback!"
                 echo "🚀 Quick start:"
                 echo "   aic setup"
                 echo "   aic"
@@ -113,11 +115,12 @@ case $choice in
         echo "❌ Invalid choice. Using local symlink option."
         mkdir -p ~/.local/bin
         ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
+        ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aicommit
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null
             echo "✅ Added ~/.local/bin to PATH in your shell config."
         fi
-        echo "✅ Local symlink created!"
+        echo "✅ Local symlinks created!"
         echo "🚀 Quick start:"
         echo "   aic setup"
         echo "   aic"

@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * AI Commit Message Generator CLI Entry Point
  */
