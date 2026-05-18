@@ -44,7 +44,7 @@ describe('HookManager', () => {
        const fs = require('fs-extra');
        fs.pathExists.mockResolvedValue(true);
        // Mock content that indicates our hook is already installed
-       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ');
+       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# ');
        
        await expect(hookManager.install()).rejects.toThrow('already installed');
      });
@@ -63,12 +63,13 @@ describe('HookManager', () => {
       await expect(hookManager.uninstall()).rejects.toThrow();
     });
 
-    it('should uninstall successfully', async () => {
-      const fs = require('fs-extra');
-      fs.pathExists.mockResolvedValue(true);
-      fs.readFile.mockResolvedValue('#!/bin/bash\naic commit');
-      
-      const result = await hookManager.uninstall();
+     it('should uninstall successfully', async () => {
+       const fs = require('fs-extra');
+       fs.pathExists.mockResolvedValue(true);
+       // Mock content that indicates our hook is installed
+       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# ');
+       
+       const result = await hookManager.uninstall();
       expect(result.success).toBe(true);
     });
   });

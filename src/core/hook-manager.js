@@ -133,8 +133,8 @@ class HookManager {
   /**
    * Generate the hook script
    */
-  generateHookScript() {
-    return `#!/bin/sh
+   generateHookScript() {
+     return `#!/bin/bash
 #
 # AI Commit Generator Hook
 # This hook automatically generates commit messages using AI

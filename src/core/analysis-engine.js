@@ -250,7 +250,7 @@ class AnalysisEngine {
       return 'wordpress';
     }
 
-     return topScope ? topScope[0] : null;
+      return topScope ? topScope[0] : 'general';
   }
 
   /**
