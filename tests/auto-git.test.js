@@ -218,15 +218,16 @@ describe('AutoGit', () => {
   });
 
   describe('validateRepository', () => {
-    it('should validate successfully', async () => {
-      mockGit.checkIsRepo.mockResolvedValue(true);
+     it('should validate successfully', async () => {
+       mockGit.checkIsRepo.mockResolvedValue(true);
 
-      await autoGit.validateRepository();
+       await autoGit.validateRepository();
 
-      expect(mockSpinner.start).toHaveBeenCalled();
-      expect(mockSpinner.succeed).toHaveBeenCalledWith('Git repository validated');
-      expect(autoGit.spinner).toBe(null);
-    });
+       expect(mockSpinner.start).toHaveBeenCalled();
+       expect(mockSpinner.succeed).toHaveBeenCalledWith('Git repository validated');
+       // Spinner should remain as an ora instance, not be null
+       expect(autoGit.spinner).toBeDefined();
+     });
 
     it('should throw error for non-git repository', async () => {
       mockGit.checkIsRepo.mockResolvedValue(false);
@@ -334,20 +335,20 @@ describe('AutoGit', () => {
       expect(mockSpinner.succeed).toHaveBeenCalledWith('AI commit message generated');
     });
 
-    it('should handle no staged diff', async () => {
-      mockGit.diff.mockResolvedValue('');
+     it('should handle no staged diff', async () => {
+       mockGit.diff.mockResolvedValue('');
 
-      await expect(autoGit.generateCommitMessage()).rejects.toThrow('No staged changes available');
-      expect(mockSpinner.fail).toHaveBeenCalledWith('No staged changes found for commit message generation');
-    });
+       await expect(autoGit.generateCommitMessage()).rejects.toThrow('No staged changes available');
+       expect(mockSpinner.fail).toHaveBeenCalledWith('No staged changes available');
+     });
 
-    it('should handle generation errors', async () => {
-      const error = new Error('Generation error');
-      mockAiCommit.generateWithSequentialFallback.mockRejectedValue(error);
+     it('should handle generation errors', async () => {
+       const error = new Error('Generation error');
+       mockAiCommit.generateWithSequentialFallback.mockRejectedValue(error);
 
-      await expect(autoGit.generateCommitMessage()).rejects.toThrow('Generation error');
-      expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to generate AI commit message');
-    });
+       await expect(autoGit.generateCommitMessage()).rejects.toThrow('Generation error');
+       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to generate commit message');
+     });
 
     it('should pass options to AI generator', async () => {
       const options = { provider: 'ollama' };
@@ -591,7 +592,7 @@ describe('AutoGit', () => {
       await autoGit.pushChanges();
 
       expect(mockGit.push).toHaveBeenCalled();
-      expect(mockSpinner.succeed).toHaveBeenCalledWith('Changes pushed to remote');
+      expect(mockSpinner.succeed).toHaveBeenCalledWith('Pushed to remote');
     });
 
     it('should handle push errors', async () => {

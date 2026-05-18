@@ -106,29 +106,37 @@ class HookManager {
     }
   }
 
-  /**
-   * Check if hook is installed
-   */
-  async isInstalled() {
-    try {
-      const repoRoot = await this.gitManager.getRepositoryRoot();
-      const hookPath = path.join(
-        repoRoot,
-        '.git',
-        'hooks',
-        'prepare-commit-msg'
-      );
+   /**
+    * Check if hook is installed
+    */
+   async isInstalled() {
+     try {
+       const repoRoot = await this.gitManager.getRepositoryRoot();
+       const hookPath = path.join(
+         repoRoot,
+         '.git',
+         'hooks',
+         'prepare-commit-msg'
+       );
 
-      if (!(await fs.pathExists(hookPath))) {
-        return false;
-      }
+       if (!(await fs.pathExists(hookPath))) {
+         return false;
+       }
 
-      const content = await fs.readFile(hookPath, 'utf8');
-      return content.includes('ai-commit-generator');
-    } catch (error) {
-      return false;
-    }
-  }
+       const content = await fs.readFile(hookPath, 'utf8');
+       return content.includes('ai-commit-generator');
+     } catch (error) {
+       return false;
+     }
+   }
+
+   /**
+    * Get the hook file path
+    */
+   async getHookPath() {
+     const repoRoot = await this.gitManager.getRepositoryRoot();
+     return path.join(repoRoot, '.git', 'hooks', 'prepare-commit-msg');
+   }
 
   /**
    * Generate the hook script

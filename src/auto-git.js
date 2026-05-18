@@ -245,126 +245,133 @@ class AutoGit {
     }
   }
 
-  /**
-   * Pull latest changes and handle conflicts with AI-powered resolution
+/**
+   * Pull latest changes and handle any conflicts
    */
   async pullAndHandleConflicts() {
     try {
+      this.spinner.start('Pulling latest changes...');
       const pullResult = await this.git.pull();
 
-      if (pullResult && pullResult.files && pullResult.files.length > 0) {
-        // Check for conflicts using git status (more reliable)
-        const status = await this.git.status();
-        const hasConflicts = status.conflicted.length > 0;
-
-        if (hasConflicts) {
-          console.log(chalk.yellow(`⚠ Merge conflicts in ${status.conflicted.length} file(s)`));
-          status.conflicted.forEach(file => {
-            console.log(chalk.gray(`  • ${file}`));
-          });
-
-          const { resolutionStrategy } = await inquirer.prompt([
-            {
-              type: 'list',
-              name: 'resolutionStrategy',
-              message: 'Choose conflict resolution strategy:',
-              choices: [
-                {
-                  name: '🤖 AI-powered resolution (intelligent merge)',
-                  value: 'ai',
-                },
-                {
-                  name: '💾 Keep current changes (theirs)',
-                  value: 'ours',
-                },
-                {
-                  name: '📥 Use incoming changes (mine)',
-                  value: 'theirs',
-                },
-                {
-                  name: '🔧 Manual resolution',
-                  value: 'manual',
-                },
-                {
-                  name: '❌ Cancel operation',
-                  value: 'cancel',
-                },
-              ],
-              default: 'ai',
-            },
-          ]);
-
-          if (resolutionStrategy === 'cancel') {
-            throw new Error('Pull cancelled due to conflicts');
-          }
-
-          if (resolutionStrategy === 'manual') {
-            console.log(chalk.yellow('\n📝 Manual conflict resolution required:'));
-            console.log(chalk.dim('   1. Resolve conflicts in your editor'));
-            console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
-            console.log(chalk.dim('   3. Continue with: git commit'));
-            throw new Error('Manual conflict resolution required. Please resolve conflicts and run again.');
-          }
-
-          try {
-            if (resolutionStrategy === 'ai') {
-              await this.resolveConflictsWithAI(status.conflicted);
-            } else {
-              // Traditional resolution
-              const checkoutFlag = resolutionStrategy === 'ours' ? '--ours' : '--theirs';
-
-              for (const file of status.conflicted) {
-                await this.git.raw(['checkout', checkoutFlag, '--', file]);
-              }
-
-              await this.git.add('.');
-              await this.git.commit(`Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`);
-
-              console.log(chalk.green(`✓ Resolved ${status.conflicted.length} conflict(s)`));
-            }
-          } catch (resolveError) {
-            console.log(chalk.red('✗ Failed to resolve conflicts'));
-            throw new Error(`Resolution failed: ${resolveError.message}`);
-          }
-        }
+      if (!pullResult || !pullResult.files || pullResult.files.length === 0) {
+        this.spinner.succeed('Already up to date');
+        return;
       }
-    } catch (error) {
-      if (error.message.includes('Not possible to fast-forward')) {
-          try {
-            await this.git.pull(['--rebase']);
-            console.log(chalk.green('✓ Rebased and pulled changes'));
-          } catch (rebaseError) {
-            console.log(chalk.red('✗ Rebase failed'));
-            const status = await this.git.status();
-            if (status.conflicted.length > 0) {
-              throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
-            }
-            throw new Error(`Failed to rebase: ${rebaseError.message}`);
-          }
-          return;
+
+      // Check for conflicts using git status (more reliable)
+      const status = await this.git.status();
+      const hasConflicts = status.conflicted.length > 0;
+
+      if (hasConflicts) {
+        console.log(chalk.yellow(`⚠ Merge conflicts in ${status.conflicted.length} file(s)`));
+        status.conflicted.forEach(file => {
+          console.log(chalk.gray(`  • ${file}`));
+        });
+
+        const { resolutionStrategy } = await inquirer.prompt([
+          {
+            type: 'list',
+            name: 'resolutionStrategy',
+            message: 'Choose conflict resolution strategy:',
+            choices: [
+              {
+                name: '🤖 AI-powered resolution (intelligent merge)',
+                value: 'ai',
+              },
+              {
+                name: '💾 Keep current changes (theirs)',
+                value: 'ours',
+              },
+              {
+                name: '📥 Use incoming changes (mine)',
+                value: 'theirs',
+              },
+              {
+                name: '🔧 Manual resolution',
+                value: 'manual',
+              },
+              {
+                name: '❌ Cancel operation',
+                value: 'cancel',
+              },
+            ],
+            default: 'ai',
+          },
+        ]);
+
+        if (resolutionStrategy === 'cancel') {
+          throw new Error('Pull cancelled due to conflicts');
         }
 
-        console.log(chalk.red(`✗ Pull failed: ${error.message}`));
+        if (resolutionStrategy === 'manual') {
+          console.log(chalk.yellow('\n📝 Manual conflict resolution required:'));
+          console.log(chalk.dim('   1. Resolve conflicts in your editor'));
+          console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
+          console.log(chalk.dim('   3. Continue with: git commit'));
+          throw new Error('Manual conflict resolution required. Please resolve conflicts and run again.');
+        }
 
-        if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
-          const { skipPull } = await inquirer.prompt([
-            {
-              type: 'confirm',
-              name: 'skipPull',
-              message: 'Skip pull and continue with push?',
-              default: false,
-            },
-          ]);
+        try {
+          if (resolutionStrategy === 'ai') {
+            await this.resolveConflictsWithAI(status.conflicted);
+          } else {
+            // Traditional resolution
+            const checkoutFlag = resolutionStrategy === 'ours' ? '--ours' : '--theirs';
 
-          if (skipPull) {
-            console.log(chalk.yellow('✓ Skipping pull'));
+            for (const file of status.conflicted) {
+              await this.git.raw(['checkout', checkoutFlag, '--', file]);
+            }
+
+            await this.git.add('.');
+            await this.git.commit(`Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`);
+
+            console.log(chalk.green(`✓ Resolved ${status.conflicted.length} conflict(s)`));
+            this.spinner.succeed('Pull and conflict resolution complete');
             return;
           }
+        } catch (resolveError) {
+          console.log(chalk.red('✗ Failed to resolve conflicts'));
+          throw new Error(`Resolution failed: ${resolveError.message}`);
         }
-
-        throw error;
       }
+      this.spinner.succeed('Pull successful with no conflicts');
+    } catch (error) {
+      if (error.message.includes('Not possible to fast-forward')) {
+        try {
+          await this.git.pull(['--rebase']);
+          console.log(chalk.green('✓ Rebased and pulled changes'));
+        } catch (rebaseError) {
+          console.log(chalk.red('✗ Rebase failed'));
+          const status = await this.git.status();
+          if (status.conflicted.length > 0) {
+            throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
+          }
+          throw new Error(`Failed to rebase: ${rebaseError.message}`);
+        }
+        return;
+      }
+
+      console.log(chalk.red(`✗ Pull failed: ${error.message}`));
+
+      if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
+        const { skipPull } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'skipPull',
+            message: 'Skip pull and continue with push?',
+            default: false,
+          },
+        ]);
+
+        if (skipPull) {
+          console.log(chalk.yellow('✓ Skipping pull'));
+          return;
+        }
+      }
+
+      throw error;
     }
+  }
 
   /**
    * Resolve conflicts using AI with intelligent merging

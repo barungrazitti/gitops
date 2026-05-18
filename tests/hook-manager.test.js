@@ -82,21 +82,27 @@ describe('HookManager', () => {
     });
   });
 
-  describe('checkHookInstalled', () => {
-    it('should return true when hook is installed', async () => {
-      const fs = require('fs-extra');
-      fs.pathExists.mockResolvedValue(true);
-      fs.readFile.mockResolvedValue('#!/bin/bash\naic commit');
-      
-      const result = await hookManager.checkHookInstalled();
-      expect(result).toBe(true);
-    });
+   describe('checkHookInstalled', () => {
+     it('should return true when hook is installed', async () => {
+       const fs = require('fs-extra');
+       fs.pathExists.mockResolvedValue(true);
+       // Mock content that indicates our hook is installed
+       fs.readFile.mockResolvedValue('#!/bin/bash\n# AI Commit Generator Hook\n# This hook automatically generates commit messages using AI\n# ai-commit-generator\n# ');
+       
+       const result = await hookManager.isInstalled();
+       expect(result).toBe(true);
+     });
 
-    it('should return false when not installed', async () => {
-      const result = await hookManager.checkHookInstalled();
-      expect(result).toBe(false);
-    });
-  });
+     it('should return false when not installed', async () => {
+       const fs = require('fs-extra');
+       fs.pathExists.mockResolvedValue(true);
+       // Mock content that does NOT indicate our hook is installed
+       fs.readFile.mockResolvedValue('#!/bin/bash\naic commit');
+       
+       const result = await hookManager.isInstalled();
+       expect(result).toBe(false);
+     });
+   });
 
    describe('getHookPath', () => {
      it('should return correct path', async () => {
