@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * AIC (AI Commit) - Super simple git workflow automation
  *
