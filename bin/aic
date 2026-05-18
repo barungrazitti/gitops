@@ -1,0 +1,7 @@
+#!/bin/bash
+PKG_LINK="$(cd "$(dirname "$0")/../lib/node_modules/ai-commit-generator" && pwd -P 2>/dev/null)" || {
+  echo "aic: package not found" >&2
+  exit 1
+}
+cd "$PKG_LINK" || exit 1
+exec node bin/aic.js "$@"
