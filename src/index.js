@@ -880,78 +880,141 @@ Do not explain the error, just provide the solution.`;
 
   /**
    * Extract key entities from diff (functions, classes, filenames, etc.)
+   * Separates entities from added (+) and removed (-) lines
    */
   extractEntitiesFromDiff(diff) {
     const entities = {
-      functions: [],
-      classes: [],
-      variables: [],
-      filenames: [],
-      fileTypes: [],
-      methods: [],
+      functions: { added: [], removed: [] },
+      classes: { added: [], removed: [] },
+      variables: { added: [], removed: [] },
+      filenames: { added: [], removed: [] },
+      fileTypes: { added: [], removed: [] },
+      methods: { added: [], removed: [] },
     };
 
-    // Extract file names from diff
+    // Extract file names from diff (these are in headers, not +/- lines)
     const fileMatches = diff.match(/diff --git a\/(.+?) b\/(.+)/g) || [];
     for (const match of fileMatches) {
       const fileMatch = match.match(/diff --git a\/(.+?) b\/(.+)/);
       if (fileMatch) {
         const filePath = fileMatch[2];
-        entities.filenames.push(filePath);
+        entities.filenames.added.push(filePath); // File paths are neutral (neither added nor removed)
 
         // Extract file type/extension
         const ext = filePath.split('.').pop();
-        if (ext) entities.fileTypes.push(ext);
+        if (ext) entities.fileTypes.added.push(ext);
       }
     }
 
-    // Extract function/class definitions from diff
-    const functionMatches =
-      diff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
-    for (const match of functionMatches) {
+    // Process diff line by line to distinguish added vs removed content
+    const lines = diff.split('\n');
+    
+    // Extract function/class definitions from ADDED lines
+    const addedLines = lines.filter(line => line.startsWith('+') && !line.startsWith('+++'));
+    const addedDiff = addedLines.join('\n');
+    
+    // Extract function/class definitions from REMOVED lines
+    const removedLines = lines.filter(line => line.startsWith('-') && !line.startsWith('---'));
+    const removedDiff = removedLines.join('\n');
+
+    // Extract function/class definitions from added diff
+    const functionMatchesAdded =
+      addedDiff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of functionMatchesAdded) {
       const funcName = match.replace(/function\s+|def\s+/, '').trim();
-      if (funcName) entities.functions.push(funcName);
+      if (funcName) entities.functions.added.push(funcName);
     }
 
-    const classMatches =
-      diff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
-    for (const match of classMatches) {
+    // Extract function/class definitions from removed diff
+    const functionMatchesRemoved =
+      removedDiff.match(/(?:function\s+|def\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of functionMatchesRemoved) {
+      const funcName = match.replace(/function\s+|def\s+/, '').trim();
+      if (funcName) entities.functions.removed.push(funcName);
+    }
+
+    // Extract class definitions from added diff
+    const classMatchesAdded =
+      addedDiff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of classMatchesAdded) {
       const className = match
         .replace('class\s+', '')
         .replace('class ', '')
         .trim();
-      if (className) entities.classes.push(className);
+      if (className) entities.classes.added.push(className);
     }
 
-    // Extract variable declarations
-    const varMatches =
-      diff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
-    for (const match of varMatches) {
+    // Extract class definitions from removed diff
+    const classMatchesRemoved =
+      removedDiff.match(/(?:class\s+)([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of classMatchesRemoved) {
+      const className = match
+        .replace('class\s+', '')
+        .replace('class ', '')
+        .trim();
+      if (className) entities.classes.removed.push(className);
+    }
+
+    // Extract variable declarations from added diff
+    const varMatchesAdded =
+      addedDiff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of varMatchesAdded) {
       const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
-      if (varName) entities.variables.push(varName);
+      if (varName) entities.variables.added.push(varName);
     }
 
-    // Extract method definitions in diff
-    const methodMatches =
-      diff.match(
+    // Extract variable declarations from removed diff
+    const varMatchesRemoved =
+      removedDiff.match(/(?:const|let|var)\s+([A-Za-z_][A-Za-z0-9_]*)/g) || [];
+    for (const match of varMatchesRemoved) {
+      const varName = match.replace(/(?:const|let|var)\s+/, '').trim();
+      if (varName) entities.variables.removed.push(varName);
+    }
+
+    // Extract method definitions from added diff
+    const methodMatchesAdded =
+      addedDiff.match(
         /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
       ) || [];
-    for (const match of methodMatches) {
+    for (const match of methodMatchesAdded) {
       const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
-      if (methodName && !entities.functions.includes(methodName)) {
-        entities.methods.push(methodName);
+      if (methodName && !entities.functions.added.includes(methodName)) {
+        entities.methods.added.push(methodName);
       }
     }
 
-    // Extract import/module statements
-    const importMatches =
-      diff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
-    for (const match of importMatches) {
+    // Extract method definitions from removed diff
+    const methodMatchesRemoved =
+      removedDiff.match(
+        /[A-Za-z_][A-Za-z0-9_]*\s*:\s*function|([A-Za-z_][A-Za-z0-9_]*)\s*\(/g
+      ) || [];
+    for (const match of methodMatchesRemoved) {
+      const methodName = match.replace(/\s*:\s*function|\s*\(/, '').trim();
+      if (methodName && !entities.functions.removed.includes(methodName)) {
+        entities.methods.removed.push(methodName);
+      }
+    }
+
+    // Extract import/module statements from added diff
+    const importMatchesAdded =
+      addedDiff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
+    for (const match of importMatchesAdded) {
       const importName = match
         .replace(/(?:import|from|require)\s*/, '')
         .replace(/['"`].*?['"`]/, '')
         .trim();
-      if (importName) entities.variables.push(importName);
+      if (importName) entities.variables.added.push(importName);
+    }
+
+    // Extract import/module statements from removed diff
+    const importMatchesRemoved =
+      removedDiff.match(/(?:import|from|require)\s*.*?['"`]([^'"`]+)['"`]/g) || [];
+    for (const match of importMatchesRemoved) {
+      const importName = match
+        .replace(/(?:import|from|require)\s*/, '')
+        .replace(/['"`].*?['"`]/, '')
+        .trim();
+      if (importName) entities.variables.removed.push(importName);
     }
 
     return entities;
@@ -1064,24 +1127,37 @@ Do not explain the error, just provide the solution.`;
 
   /**
    * Calculate overlap between entities from diff and keywords from message
+   * Gives more weight to added entities than removed ones
    */
   calculateEntityOverlap(entities, messageKeywords) {
     let overlapCount = 0;
 
-    // Check for function name matches
-    for (const func of entities.functions) {
+    // Check for function name matches (added functions get more weight)
+    for (const func of entities.functions.added) {
       const funcName = func.toLowerCase();
       if (
         messageKeywords.some(
           (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
         )
       ) {
-        overlapCount++;
+        overlapCount += 2; // Added functions are more relevant
+      }
+    }
+    
+    // Removed functions get less weight
+    for (const func of entities.functions.removed) {
+      const funcName = func.toLowerCase();
+      if (
+        messageKeywords.some(
+          (keyword) => funcName.includes(keyword) || keyword.includes(funcName)
+        )
+      ) {
+        overlapCount += 1; // Removed functions are less relevant
       }
     }
 
-    // Check for class name matches
-    for (const cls of entities.classes) {
+    // Check for class name matches (added classes get more weight)
+    for (const cls of entities.classes.added) {
       const className = cls.toLowerCase();
       if (
         messageKeywords.some(
@@ -1089,12 +1165,25 @@ Do not explain the error, just provide the solution.`;
             className.includes(keyword) || keyword.includes(className)
         )
       ) {
-        overlapCount++;
+        overlapCount += 2; // Added classes are more relevant
+      }
+    }
+    
+    // Removed classes get less weight
+    for (const cls of entities.classes.removed) {
+      const className = cls.toLowerCase();
+      if (
+        messageKeywords.some(
+          (keyword) =>
+            className.includes(keyword) || keyword.includes(className)
+        )
+      ) {
+        overlapCount += 1; // Removed classes are less relevant
       }
     }
 
-    // Check for variable name matches
-    for (const varName of entities.variables) {
+    // Check for variable name matches (added variables get more weight)
+    for (const varName of entities.variables.added) {
       const varNameLower = varName.toLowerCase();
       if (
         messageKeywords.some(
@@ -1102,12 +1191,25 @@ Do not explain the error, just provide the solution.`;
             varNameLower.includes(keyword) || keyword.includes(varNameLower)
         )
       ) {
-        overlapCount++;
+        overlapCount += 2; // Added variables are more relevant
+      }
+    }
+    
+    // Removed variables get less weight
+    for (const varName of entities.variables.removed) {
+      const varNameLower = varName.toLowerCase();
+      if (
+        messageKeywords.some(
+          (keyword) =>
+            varNameLower.includes(keyword) || keyword.includes(varNameLower)
+        )
+      ) {
+        overlapCount += 1; // Removed variables are less relevant
       }
     }
 
-    // Check for filename matches
-    for (const file of entities.filenames) {
+    // Check for filename matches (filenames are neutral)
+    for (const file of entities.filenames.added) {
       const fileName = file.toLowerCase().replace(/\.[^/.]+$/, ''); // Remove extension
       const fileNameParts = fileName.split(/[\/\\]/); // Split by path separators
 
@@ -1117,7 +1219,7 @@ Do not explain the error, just provide the solution.`;
             (keyword) => part.includes(keyword) || keyword.includes(part)
           )
         ) {
-          overlapCount++;
+          overlapCount += 1; // File names have normal weight
           break;
         }
       }
