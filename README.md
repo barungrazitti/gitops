@@ -176,18 +176,21 @@ Every commit message is validated for:
 ### Example Output
 
 ```
-feat(auth): add JWT token validation to improve security
+feat(cli): add shebang to bin scripts for direct execution
 
-What Changed:
-- Added JWT validation in AuthService
-- Updated login endpoint
+📊 Quality: 78 (Good)
+   • Specificity: ✓
+   • Format: ✓
+   • Reasoning: ✓
 
-Why Changed:
-- To prevent unauthorized access with expired tokens
-
-Impact:
-- Affects 2 files that depend on AuthService
+Generated in 892ms (Groq)
 ```
+
+**Actual output format:**
+- Single-line conventional commit messages (type: description)
+- Quality score shown by default (hidden with `--quiet`)
+- Processing time and provider info
+- No "What Changed" / "Why Changed" / "Impact" sections — those formatters require AI context
 
 ---
 

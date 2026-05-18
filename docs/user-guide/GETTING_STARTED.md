@@ -146,24 +146,20 @@ $ aic
 
 📝 Generated commit messages:
 
-1. feat(auth): add JWT token validation to improve security
+1. feat(cli): add shebang to bin scripts for direct execution
 
-   What Changed:
-   - Added JWT validation in AuthService
-   - Updated login endpoint
+📊 Quality: 78 (Good)
+   • Specificity: ✓
+   • Format: ✓
+   • Reasoning: ✓
 
-   Why Changed:
-   - To prevent unauthorized access with expired tokens
+Generated in 892ms (Groq)
 
-   Impact:
-   - Affects 2 files that depend on AuthService
-
-2. feat(api): enhance authentication with JWT support
-...
-
-✅ Committed: feat(auth): add JWT token validation to improve security
-✓ Done in 2.3s
+✅ Committed: feat(cli): add shebang to bin scripts
+✓ Done in 1.2s
 ```
+
+**Note:** Output format is single-line conventional commits with quality scores. The "What Changed / Why Changed / Impact" sections shown in older examples require full AI context and are not currently generated.
 
 ---
 
