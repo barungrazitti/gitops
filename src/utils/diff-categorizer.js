@@ -150,50 +150,6 @@ class DiffCategorizer {
 
     return Array.from(entities);
   }
-
-  /**
-   * Get default thresholds
-   * @returns {object} Default thresholds
-   */
-  getDefaults() {
-    return { ...this.defaultThresholds };
-  }
-
-  /**
-   * Validate thresholds
-   * @param {object} thresholds - Thresholds to validate
-   * @returns {object} { valid: boolean, errors: array }
-   */
-  validateThresholds(thresholds) {
-    const errors = [];
-
-    if (!thresholds || typeof thresholds !== 'object') {
-      return { valid: false, errors: ['Thresholds must be an object'] };
-    }
-
-    const validateMetric = (metric, name) => {
-      if (!metric || typeof metric !== 'object') {
-        errors.push(`${name} must be an object`);
-        return false;
-      }
-      if (typeof metric.small !== 'number' || metric.small < 0) {
-        errors.push(`${name}.small must be a non-negative number`);
-      }
-      if (typeof metric.medium !== 'number' || metric.medium < metric.small) {
-        errors.push(`${name}.medium must be a number greater than small`);
-      }
-      return true;
-    };
-
-    if (thresholds.tokens) validateMetric(thresholds.tokens, 'tokens');
-    if (thresholds.files) validateMetric(thresholds.files, 'files');
-    if (thresholds.entities) validateMetric(thresholds.entities, 'entities');
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  }
 }
 
 module.exports = DiffCategorizer;

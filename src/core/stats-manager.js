@@ -60,56 +60,6 @@ class StatsManager {
   }
 
   /**
-   * Record cache hit
-   */
-  async recordCacheHit() {
-    try {
-      const current = this.stats.get('cacheHits') || 0;
-      this.stats.set('cacheHits', current + 1);
-    } catch (error) {
-      console.warn('Failed to record cache hit:', error.message);
-    }
-  }
-
-  /**
-   * Record cache miss
-   */
-  async recordCacheMiss() {
-    try {
-      const current = this.stats.get('cacheMisses') || 0;
-      this.stats.set('cacheMisses', current + 1);
-    } catch (error) {
-      console.warn('Failed to record cache miss:', error.message);
-    }
-  }
-
-  /**
-   * Record error
-   */
-  async recordError(error, provider) {
-    try {
-      const current = this.stats.get('errorCount') || 0;
-      this.stats.set('errorCount', current + 1);
-
-      // Store recent errors (keep last 50)
-      const errors = this.stats.get('recentErrors') || [];
-      errors.push({
-        message: error.message,
-        provider,
-        timestamp: Date.now(),
-      });
-
-      if (errors.length > 50) {
-        errors.shift();
-      }
-
-      this.stats.set('recentErrors', errors);
-    } catch (err) {
-      console.warn('Failed to record error stats:', err.message);
-    }
-  }
-
-  /**
    * Get usage statistics
    */
   async getStats() {

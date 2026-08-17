@@ -22,33 +22,6 @@ Use conventional format: type(scope): description
 {{/if}}`
 );
 
-const chunkSummaryPromptTemplate = Handlebars.compile(
-  `Summarize this chunk into 1-2 key changes. Focus on WHAT changed, not implementation details.
-
-Chunk {{chunkIndex}} of {{totalChunks}}:
-
-\`\`\`diff
-{{chunkContent}}
-\`\`\`
-
-Return: 1-2 sentence summary of the primary changes in this chunk.`
-);
-
-const combineSummariesPromptTemplate = Handlebars.compile(
-  `Combine these {{chunkCount}} summaries into one cohesive commit message.
-
-Summaries:
-{{summaries}}
-
-{{#if conventional}}
-IMPORTANT: Combine into ONE commit message following conventional format: type(scope): description
-{{else}}
-Combine into ONE concise commit message.
-{{/if}}
-
-Preserve key changes from all chunks. Focus on the most significant changes.`
-);
-
 function buildSmallDiffPrompt(options) {
   const { category, entityList, entityCount, conventional, context } = options;
 
@@ -67,10 +40,6 @@ function buildSmallDiffPrompt(options) {
   return prompt;
 }
 
-function buildForcedSpecificityInstructions() {
-  return forcedSpecificityInstructions({});
-}
-
 function buildSingleLineChangePrompt(highlightedLine) {
   return singleLineChangeTemplate({ highlightedLine });
 }
@@ -78,19 +47,6 @@ function buildSingleLineChangePrompt(highlightedLine) {
 function buildLargeDiffPrompt(options) {
   const { chunkCount, chunkSummaries, conventional } = options;
   return largeDiffTemplate({ chunkCount, chunkSummaries, conventional });
-}
-
-function buildChunkSummaryPrompt(chunkContent, chunkIndex, totalChunks) {
-  return chunkSummaryPromptTemplate({ chunkContent, chunkIndex, totalChunks });
-}
-
-function buildCombineSummariesPrompt(summaries, conventional = false) {
-  const summaryText = summaries.map((s, i) => `[${i + 1}] ${s}`).join('\n');
-  return combineSummariesPromptTemplate({
-    chunkCount: summaries.length,
-    summaries: summaryText,
-    conventional,
-  });
 }
 
 function entityListByType(entities) {
@@ -113,16 +69,7 @@ function entityListByType(entities) {
 
 module.exports = {
   buildSmallDiffPrompt,
-  buildForcedSpecificityInstructions,
   buildSingleLineChangePrompt,
   buildLargeDiffPrompt,
-  buildChunkSummaryPrompt,
-  buildCombineSummariesPrompt,
   entityListByType,
-  smallDiffTemplate,
-  forcedSpecificityInstructions,
-  singleLineChangeTemplate,
-  largeDiffTemplate,
-  chunkSummaryPromptTemplate,
-  combineSummariesPromptTemplate,
 };

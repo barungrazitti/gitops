@@ -225,72 +225,6 @@ class CacheManager {
   }
 
   /**
-   * Find similar cache key with semantic validation
-   */
-  async findSimilarKey(targetDiff, threshold = 0.75) {
-    try {
-      // Check memory cache first (fastest)
-      const memoryKeys = this.memoryCache.keys();
-      for (const key of memoryKeys) {
-        const cached = this.memoryCache.get(key);
-        if (cached && cached.diff) {
-          if (this.validateSemanticSimilarity(targetDiff, cached.diff, threshold)) {
-            return key;
-          }
-        }
-      }
-
-      // Also check persistent cache
-      if (fs.existsSync(this.cacheDir)) {
-        const files = await fs.readdir(this.cacheDir);
-        const cacheFiles = files.filter(f => f.endsWith('.json'));
-
-        for (const file of cacheFiles) {
-          const filePath = path.join(this.cacheDir, file);
-          try {
-            const cacheData = await fs.readJson(filePath);
-            if (
-              cacheData.diff &&
-              this.validateSemanticSimilarity(targetDiff, cacheData.diff, threshold)
-            ) {
-              return file.replace('.json', '');
-            }
-          } catch (error) {
-            // Skip corrupted files
-            continue;
-          }
-        }
-      }
-
-      return null;
-    } catch (error) {
-      return null;
-    }
-  }
-
-  /**
-   * Find similar cached entries
-   */
-  async findSimilar(diff, threshold = 0.75) {
-    const similarKey = await this.findSimilarKey(diff, threshold);
-    if (similarKey) {
-      const cached = this.memoryCache.get(similarKey);
-      if (cached) {
-        return cached.messages;
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Check if diff is similar to cached diffs (deprecated - use findSimilar instead)
-   */
-  async findSimilarByCalculateSimilarity(diff, threshold = 0.8) {
-    return this.findSimilar(diff, threshold);
-  }
-
-  /**
    * Validate semantic similarity between diffs
    */
   validateSemanticSimilarity(diff1, diff2, threshold = 0.7) {
@@ -343,18 +277,6 @@ class CacheManager {
         );
       })
       .map(line => line.substring(1).trim().toLowerCase());
-  }
-
-  /**
-   * Quick hash for fast similarity comparison
-   */
-  quickHash(text) {
-    let hash = 0;
-    const words = text.toLowerCase().split(/\s+/).slice(0, 50); // First 50 words
-    for (const word of words) {
-      hash += word.charCodeAt(0) * word.length;
-    }
-    return hash;
   }
 
   /**

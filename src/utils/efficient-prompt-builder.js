@@ -33,7 +33,6 @@ class EfficientPromptBuilder {
       enhancedPrompt,
       promptInstructions,
       strictValidation,
-      diffFacts,
     } = options;
 
     // Handle null/undefined diff
@@ -145,11 +144,6 @@ For BINARY FILES with no code changes:
   - Be specific about WHAT changed, not implementation details
   - Avoid technical jargon unless necessary
   - Consider: "What does this enable for users?"`;
-
-    // Add diff facts as hard constraints (prevents hallucination)
-    if (diffFacts) {
-      prompt += `\n\n${this.buildDiffFactConstraints(diffFacts)}`;
-    }
 
     // Add anti-hallucination instructions
     prompt += `\n\nANTI-HALLUCINATION RULES (CRITICAL):
@@ -638,14 +632,6 @@ Single best commit message:`;
     }
 
     return examples.slice(0, 2).join(', ');
-  }
-
-  /**
-   * Build constraint text from diff facts analysis
-   */
-  buildDiffFactConstraints(diffFacts) {
-    const DiffFactAnalyzer = require('./diff-fact-analyzer');
-    return new DiffFactAnalyzer().buildPromptConstraints(diffFacts);
   }
 }
 

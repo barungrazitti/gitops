@@ -3,9 +3,6 @@
  */
 
 const path = require('path');
-const SecretScanner = require('./secret-scanner');
-
-const secretScanner = new SecretScanner();
 
 class InputSanitizer {
   /**
@@ -164,18 +161,6 @@ class InputSanitizer {
     }
 
     return true;
-  }
-
-  /**
-   * Sanitize diff content to remove potential secrets
-   */
-  static sanitizeDiffContent(diff) {
-    if (typeof diff !== 'string') {
-      return diff;
-    }
-
-    // Use the advanced secret scanner to redact secrets
-    return secretScanner.scanAndRedact(diff);
   }
 
   /**

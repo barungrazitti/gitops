@@ -123,9 +123,4 @@ if (require.main === module) {
 
 module.exports = {
   program,
-  handleGenerate: () => {},
-  handleConfig: () => {},
-  handleSetup: () => {},
-  handleHook: () => {},
-  handleStats: () => {},
 };

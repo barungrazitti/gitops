@@ -43,30 +43,6 @@ class TokenCounter {
     }
     return this.encodingCache.get(model);
   }
-
-  /**
-   * Clear encoding cache
-   */
-  clearCache() {
-    this.encodingCache.clear();
-  }
-
-  /**
-   * Estimate cost for tokens (used for budget tracking)
-   * @param {number} tokens - Token count
-   * @param {string} provider - Provider name (groq, ollama, etc.)
-   * @returns {number} Estimated cost in USD
-   */
-  estimateCost(tokens, provider = 'groq') {
-    const costs = {
-      groq: 0.0000001, // Approximate cost per token
-      ollama: 0, // Local models are free
-      openai: 0.00003,
-    };
-
-    const costPerToken = costs[provider] || costs.groq;
-    return tokens * costPerToken;
-  }
 }
 
 module.exports = TokenCounter;

@@ -122,12 +122,6 @@ describe('InputSanitizer', () => {
     });
   });
 
-  describe('sanitizeDiffContent', () => {
-    it('should return non-string unchanged', () => {
-      expect(InputSanitizer.sanitizeDiffContent(null)).toBe(null);
-    });
-  });
-
   describe('sanitizeRepoUrl', () => {
     it('should return non-string unchanged', () => {
       expect(InputSanitizer.sanitizeRepoUrl(null)).toBe(null);

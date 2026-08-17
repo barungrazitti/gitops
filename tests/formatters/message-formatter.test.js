@@ -36,43 +36,6 @@ describe('MessageFormatter (refactored)', () => {
     });
   });
 
-  describe('formatWithContext()', () => {
-    it('should format message with full context', () => {
-      const context = {
-        components: { packages: ['auth'] },
-        dependencies: { affected: [] },
-      };
-      const message = 'Add authentication';
-
-      const result = formatter.formatWithContext(message, context, {
-        conventional: true,
-      });
-
-      expect(result).toBeDefined();
-      expect(result.length).toBeGreaterThan(message.length);
-    });
-
-    it('should include what/why/impact sections', () => {
-      const context = {
-        components: { packages: ['auth'] },
-        dependencies: { affected: ['module-a'] },
-        conventions: { commitType: 'feat' },
-      };
-      const message = 'Add authentication';
-
-      const result = formatter.formatWithContext(message, context, {
-        includeSections: ['what', 'why', 'impact'],
-      });
-
-      expect(result).toMatch(/(Affected|Why|Impact)/i);
-    });
-
-    it('should return message as-is when empty', () => {
-      const result = formatter.formatWithContext('', {});
-      expect(result).toBe('');
-    });
-  });
-
   describe('applyConventionalFormat()', () => {
     it('should return already conventional format as-is', () => {
       const message = 'feat(auth): add login';

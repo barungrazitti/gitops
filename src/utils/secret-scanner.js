@@ -295,18 +295,6 @@ class SecretScanner {
   }
 
   /**
-   * Check if content is safe (no secrets or PII detected)
-   */
-  isSafe(content) {
-    const secrets = this.scan(content);
-    return {
-      safe: secrets.length === 0,
-      detectedCount: secrets.length,
-      detected: secrets,
-    };
-  }
-
-  /**
    * Check if content contains secrets
    */
   containsSecrets(content) {

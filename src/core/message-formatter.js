@@ -1,20 +1,8 @@
 /**
  * Message Formatter - Formats commit messages according to conventions
- *
- * Refactored to delegate to modular formatters (Phase 3: Formatters Module)
- * - WhatChangedFormatter: Component and file-level change descriptions
- * - WhyChangedFormatter: Motivation and reasoning detection
- * - ImpactFormatter: Breaking changes and dependency impact
- * - FormatterFactory: Strategy selection (conventional/freeform)
  */
 
-const FormatterFactory = require('../formatters/formatter-factory');
-
 class MessageFormatter {
-  constructor() {
-    this.formatterFactory = new FormatterFactory();
-  }
-
   /**
    * Format commit message according to options
    */
@@ -26,18 +14,6 @@ class MessageFormatter {
       formatted = this.applyConventionalFormat(formatted, options);
     }
     return this.cleanupFormatting(this.applyLengthConstraints(formatted));
-  }
-
-  /**
-   * Format message with full context (what/why/impact)
-   */
-  formatWithContext(message, context, options = {}) {
-    if (!message) return message;
-    const composite = this.formatterFactory.createCompositeFormatter({
-      conventional: options.conventional,
-      includeSections: options.includeSections || ['what', 'why', 'impact'],
-    });
-    return composite.format(message, context);
   }
 
   /**

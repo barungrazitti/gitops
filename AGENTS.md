@@ -4,7 +4,7 @@
 
 ### Testing
 
-- `npm test` - Run full Jest test suite (520 tests, 25 suites)
+- `npm test` - Run full Jest test suite (453 tests, 24 suites)
 - `npx jest tests/auto-git.test.js` - Run single test file
 - `npm run test:coverage` - Jest with coverage report
 - `npm run test:watch` - Jest in watch mode
@@ -99,12 +99,15 @@
 - Dead base-provider methods (~600 lines: analyzeDiffContent, WithValidation, etc.)
 - `bin/aicommit.js`, `bin/aic.c` — single `aic` entry point now
 - All `docs/` directory and secondary .md files (only README.md + AGENTS.md remain)
+- `src/formatters/` (formatter-factory + sections, ~1,000 lines) — only consumer was dead `MessageFormatter.formatWithContext`
+- `src/utils/performance-utils.js` (291 lines) — zero callers
+- Dead cache/stats surface: `findSimilar*`, `quickHash`, `recordCacheHit/Miss/Error`, duplicate `isSafe`, `sanitizeDiffContent`, `TokenCounter.estimateCost/clearCache`, unused prompt-template builders, `DiffCategorizer.getDefaults/validateThresholds`
 
 ## Project Status
 
 | Metric | Status |
 |--------|--------|
-| Tests | 520 tests, 25 suites ✅ |
+| Tests | 453 tests, 24 suites ✅ |
 | Lint | 0 errors, 0 warnings ✅ |
 | Default model | `openai/gpt-oss-20b` (Groq) |
 | Entry point | `bin/aic` (single command) |

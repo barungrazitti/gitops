@@ -1,10 +1,8 @@
 const parseDiff = require('parse-diff');
-const TokenCounter = require('./token-counter');
 const EntityExtractor = require('./entity-extractor');
 
 class DiffSummarizer {
   constructor() {
-    this.tokenCounter = new TokenCounter();
     this.entityExtractor = new EntityExtractor();
   }
 
