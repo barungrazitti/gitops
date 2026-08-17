@@ -3,8 +3,10 @@
  *
  * One interface in: generate(diff, options) → messages[].
  * Owns: diff shaping, prompt assembly, provider sequencing (with fallback),
- * chunk loop, response parsing, ranking, quality gates, and activity logging.
+ * response parsing, ranking, quality gates, and activity logging.
  * Providers are thin adapters (generateResponse: text in → text out).
+ * Note: the DiffShaper budget contract returns 'full'/'smart-truncated' today;
+ * there is no chunked strategy in production, so the pipeline is single-pass.
  */
 
 const chalk = require('chalk');
@@ -33,8 +35,9 @@ class GenerationPipeline {
    * @param {Object} deps.activityLogger - Structured activity logging.
    * @param {Object} deps.statsManager - Usage statistics.
    * @param {Object} [deps.providerFactory] - Creates provider adapters (injectable for tests).
+   * @param {Object} [deps.configManager] - Config store shared with provider adapters.
    */
-  constructor({ diffShaper, promptBuilder, messageRanker, messageValidator, activityLogger, statsManager, providerFactory = AIProviderFactory }) {
+  constructor({ diffShaper, promptBuilder, messageRanker, messageValidator, activityLogger, statsManager, providerFactory = AIProviderFactory, configManager }) {
     this.diffShaper = diffShaper;
     this.promptBuilder = promptBuilder;
     this.messageRanker = messageRanker;
@@ -42,6 +45,7 @@ class GenerationPipeline {
     this.activityLogger = activityLogger;
     this.statsManager = statsManager;
     this.providerFactory = providerFactory;
+    this.configManager = configManager;
   }
 
   /**
@@ -83,6 +87,10 @@ class GenerationPipeline {
       diffManagement.data,
       enrichedOptions.context
     );
+    enrichedOptions.typeHint = this.diffShaper.getCompatibleTypeHint(
+      context?.files?.type,
+      enrichedOptions.diffAnalysis
+    );
 
     // Step 2: Use sequential fallback mode
     return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
@@ -97,80 +105,27 @@ class GenerationPipeline {
     for (const providerName of providers) {
       try {
         const startProviderTime = Date.now();
-        const provider = this.providerFactory.create(providerName);
+        const provider = this.providerFactory.create(providerName, {
+          configManager: this.configManager,
+          activityLogger: this.activityLogger,
+        });
 
-        let messages;
-        let actualPrompt;
+        // Single-pass generation: prompt assembled ONCE here; providers are
+        // thin text-in/text-out adapters. No chunked strategy exists in the
+        // DiffShaper budget contract today.
+        const actualPrompt = this.promptBuilder.buildPrompt(diffManagement.data, options);
+        const raw = await provider.generateResponse(
+          this.applyProviderPreamble(providerName, actualPrompt),
+          COMMIT_GENERATION_OPTIONS
+        );
+        const candidates = this.parseCommitMessages(raw);
 
-        // Handle different diff strategies
-        if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
-          // Simple case: diff in one prompt (full or smart-truncated)
-          // Prompt is assembled ONCE here; providers are thin text-in/text-out adapters.
-          actualPrompt = this.promptBuilder.buildPrompt(diffManagement.data, options);
-          const raw = await provider.generateResponse(
-            this.applyProviderPreamble(providerName, actualPrompt),
-            COMMIT_GENERATION_OPTIONS
-          );
-          messages = this.parseCommitMessages(raw);
-        } else {
-          // Complex case: chunked processing
-          console.log(
-            chalk.blue(`📦 Processing ${diffManagement.chunks} chunks with ${providerName}...`)
-          );
-
-          const chunkMessages = [];
-
-          for (let i = 0; i < diffManagement.data.length; i++) {
-            const chunk = diffManagement.data[i];
-            const isLastChunk = i === diffManagement.data.length - 1;
-
-            const chunkOptions = {
-              ...options,
-              chunkIndex: i,
-              totalChunks: diffManagement.data.length,
-              isLastChunk,
-              chunkContext: isLastChunk ? 'final' : i === 0 ? 'initial' : 'middle',
-              // Add chunk-specific context
-              context: {
-                ...options.context,
-                chunkInfo: {
-                  index: i,
-                  total: diffManagement.data.length,
-                  size: chunk.size,
-                  files: chunk.context.files,
-                  functions: chunk.context.functions,
-                  classes: chunk.context.classes,
-                  hasSignificantChanges: chunk.context.hasSignificantChanges,
-                },
-              },
-            };
-
-            // Generate with this chunk
-            const chunkPrompt = this.promptBuilder.buildPrompt(chunk.content, chunkOptions);
-            const rawChunk = await provider.generateResponse(
-              this.applyProviderPreamble(providerName, chunkPrompt),
-              COMMIT_GENERATION_OPTIONS
-            );
-            const chunkResult = this.parseCommitMessages(rawChunk);
-
-            if (chunkResult && chunkResult.length > 0) {
-              chunkMessages.push(...chunkResult);
-
-              // Log the actual prompt for this chunk
-              await this.activityLogger.logAIInteraction(
-                providerName,
-                'commit_generation_chunk',
-                chunkPrompt,
-                chunkResult[0], // Log first message
-                Date.now() - startProviderTime,
-                true
-              );
-            }
-          }
-
-          messages = this.messageRanker.selectBestMessages(chunkMessages, options.count || 3);
-          actualPrompt = `Chunked processing (${diffManagement.chunks} chunks)`;
-        }
+        // Rank candidates against the actual diff (relevance scoring)
+        const messages = this.messageRanker.selectBestMessages(
+          candidates,
+          options.count || 3,
+          diffManagement.data
+        );
 
         const responseTime = Date.now() - startProviderTime;
 
@@ -226,9 +181,7 @@ class GenerationPipeline {
         await this.activityLogger.logAIInteraction(
           providerName,
           'commit_generation',
-          diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated'
-            ? diffManagement.data
-            : `Chunked processing (${diffManagement.chunks} chunks)`,
+          diffManagement.data,
           null,
           responseTime,
           false

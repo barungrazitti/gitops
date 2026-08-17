@@ -7,8 +7,8 @@ const BaseProvider = require('./base-provider');
 const CircuitBreaker = require('../core/circuit-breaker');
 
 class OllamaProvider extends BaseProvider {
-  constructor() {
-    super();
+  constructor(deps = {}) {
+    super(deps);
     this.name = 'ollama';
     this.baseURL = 'http://localhost:11434';
 

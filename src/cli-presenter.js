@@ -36,7 +36,9 @@ class CLIPresenter {
   }
 
   /**
-   * Interactive message selection
+   * Interactive message selection.
+   * Returns a discriminated result: { action: 'commit', message } |
+   * { action: 'regenerate' } | { action: 'cancel' }.
    */
   async selectMessage(messages, options = {}) {
     const rl = this.createReadline();
@@ -70,34 +72,33 @@ class CLIPresenter {
 
       if (choiceNum === messages.length + 3) {
         console.log(chalk.yellow('Commit cancelled.'));
-        return null;
+        return { action: 'cancel' };
       }
 
       if (choiceNum === messages.length + 1) {
         console.log(chalk.yellow('Regenerating commit messages...'));
         rl.close();
-        // Return special value to trigger regeneration
-        return 'regenerate';
+        return { action: 'regenerate' };
       }
 
       if (choiceNum === messages.length + 2) {
         const customMessage = await question('Enter your custom commit message: ');
         if (!customMessage.trim()) {
           console.log(chalk.red('Message cannot be empty'));
-          return null;
+          return { action: 'cancel' };
         }
         rl.close();
-        return customMessage.trim();
+        return { action: 'commit', message: customMessage.trim() };
       }
 
       if (choiceNum >= 1 && choiceNum <= messages.length) {
         rl.close();
-        return messages[choiceNum - 1];
+        return { action: 'commit', message: messages[choiceNum - 1] };
       }
 
       console.log(chalk.red('Invalid choice'));
       rl.close();
-      return null;
+      return { action: 'cancel' };
     } catch (error) {
       rl.close();
       throw error;

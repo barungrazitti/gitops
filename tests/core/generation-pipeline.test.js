@@ -20,6 +20,7 @@ describe('GenerationPipeline', () => {
           confidence: 0.8,
           keywords: ['add'],
         }),
+        getCompatibleTypeHint: jest.fn().mockReturnValue('feat'),
       },
       promptBuilder: {
         buildPrompt: jest.fn().mockReturnValue('PROMPT FOR DIFF'),
@@ -61,8 +62,28 @@ describe('GenerationPipeline', () => {
       });
 
       expect(messages).toEqual(['feat: add new constant', 'fix: unrelated message']);
-      expect(deps.providerFactory.create).toHaveBeenCalledWith('groq');
+      expect(deps.providerFactory.create).toHaveBeenCalledWith('groq', expect.anything());
       expect(deps.promptBuilder.buildPrompt).toHaveBeenCalledTimes(1);
+    });
+
+    it('ranks parsed candidates against the shaped diff with the requested count', async () => {
+      deps.providerFactory.create.mockReturnValue({
+        generateResponse: jest
+          .fn()
+          .mockResolvedValue('feat: add new constant\nfix: unrelated message\nchore: bump'),
+      });
+
+      await pipeline.generate(fakeDiff, {
+        context: { files: {} },
+        preferredProvider: 'groq',
+        count: 2,
+      });
+
+      expect(deps.messageRanker.selectBestMessages).toHaveBeenCalledWith(
+        ['feat: add new constant', 'fix: unrelated message', 'chore: bump'],
+        2,
+        fakeDiff
+      );
     });
 
     it('builds the prompt once per provider attempt (no double building)', async () => {
@@ -89,8 +110,8 @@ describe('GenerationPipeline', () => {
       });
 
       expect(messages).toEqual(['feat: add new constant']);
-      expect(deps.providerFactory.create).toHaveBeenNthCalledWith(1, 'groq');
-      expect(deps.providerFactory.create).toHaveBeenNthCalledWith(2, 'ollama');
+      expect(deps.providerFactory.create).toHaveBeenNthCalledWith(1, 'groq', expect.anything());
+      expect(deps.providerFactory.create).toHaveBeenNthCalledWith(2, 'ollama', expect.anything());
     });
 
     it('throws when all providers fail', async () => {

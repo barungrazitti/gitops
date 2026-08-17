@@ -5,13 +5,11 @@
 
 const chalk = require('chalk');
 const inquirer = require('inquirer');
-const simpleGit = require('simple-git');
 const ora = require('ora');
-const AICommitGenerator = require('./index');
+const { DIFF_MARKER_REGEX } = require('./core/conflict-resolver');
 
 class AutoGit {
   constructor({ gitManager, analysisEngine, configManager, generateMessages, conflictResolver, activityLogger } = {}) {
-    this.git = simpleGit();
     this.gitManager = gitManager;
     this.analysisEngine = analysisEngine;
     this.configManager = configManager;
@@ -20,7 +18,7 @@ class AutoGit {
     this.activityLogger = activityLogger;
     this.spinner = ora();
     // Configure git to prefer merge over rebase for safety
-    this.git.raw(['config', 'pull.rebase', 'false']);
+    this.gitManager.configurePullStrategy();
   }
 
   /**
@@ -32,6 +30,19 @@ class AutoGit {
     // Handle dry run mode
     if (options.dryRun) {
       await this.activityLogger.info('auto_git_started', { options });
+
+      // Emit the message that WOULD be committed (stdout seam for hooks:
+      // `aic --dry-run | head -1` must receive a real candidate message).
+      let dryRunMessage = null;
+      try {
+        dryRunMessage = await this.generateCommitMessage(options);
+      } catch (e) {
+        dryRunMessage = null;
+      }
+      if (dryRunMessage) {
+        console.log(dryRunMessage);
+      }
+
       await this.activityLogger.info('auto_git_completed', {
         reason: 'dry_run',
         duration: Date.now() - startTime,
@@ -125,7 +136,7 @@ class AutoGit {
   async validateRepository() {
     this.spinner.start('Validating git repository...');
     try {
-      const isRepo = await this.git.checkIsRepo();
+      const isRepo = await this.gitManager.validateRepository();
       if (!isRepo) {
         this.spinner.fail('Repository validation failed');
         throw new Error('Not a git repository');
@@ -143,7 +154,7 @@ class AutoGit {
   async checkForChanges() {
     this.spinner.start('Checking for changes...');
     try {
-      const status = await this.git.status();
+      const status = await this.gitManager.getStatus();
       const hasChanges =
         status.files.length > 0 ||
         status.not_added.length > 0 ||
@@ -172,7 +183,7 @@ class AutoGit {
     this.spinner.start('Staging changes...');
     try {
       // Stage all changes including new files
-      await this.git.add('.');
+      await this.gitManager.stageAll();
       this.spinner.succeed('Changes staged');
     } catch (error) {
       this.spinner.fail('Failed to stage changes');
@@ -190,7 +201,7 @@ class AutoGit {
       const context = await this.analysisEngine.analyzeRepository();
 
       // Get the staged diff
-      const diff = await this.git.diff(['--staged']);
+      const diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
         this.spinner.fail('No staged changes available');
@@ -198,16 +209,16 @@ class AutoGit {
       }
 
       // Check for and clean up conflict markers before generating commit
-      if (/^<{7}|^={7}\s*$|^>{7}/m.test(diff)) {
+      if (DIFF_MARKER_REGEX.test(diff)) {
         this.spinner.text = chalk.yellow('Conflict markers detected, cleaning up...');
         const cleanupResult = await this.conflictResolver.detectAndCleanupConflictMarkers();
 
         if (cleanupResult.cleaned) {
           // Re-stage the cleaned files
-          await this.git.add(['.']);
+          await this.gitManager.stageAll();
 
           // Get fresh diff after cleanup
-          const newDiff = await this.git.diff(['--staged']);
+          const newDiff = await this.gitManager.getStagedDiff();
 
           if (newDiff && newDiff.trim().length > 0) {
             // Generate commit message from cleaned diff
@@ -248,7 +259,7 @@ class AutoGit {
   async commitChanges(message, _options) {
     this.spinner.start('Committing changes...');
     try {
-      await this.git.commit(message);
+      await this.gitManager.commit(message);
       this.spinner.succeed(`Committed: ${message}`);
     } catch (error) {
       this.spinner.fail('Failed to commit changes');
@@ -263,7 +274,7 @@ class AutoGit {
   async pullAndHandleConflicts() {
     try {
       this.spinner.start('Pulling latest changes...');
-      const pullResult = await this.git.pull();
+      const pullResult = await this.gitManager.pull();
 
       if (!pullResult || !pullResult.files || pullResult.files.length === 0) {
         this.spinner.succeed('Already up to date');
@@ -271,7 +282,7 @@ class AutoGit {
       }
 
       // Check for conflicts using git status (more reliable)
-      const status = await this.git.status();
+      const status = await this.gitManager.getStatus();
       const hasConflicts = status.conflicted.length > 0;
 
       if (hasConflicts) {
@@ -330,14 +341,13 @@ class AutoGit {
             await this.resolveConflictsWithAI(status.conflicted);
           } else {
             // Traditional resolution
-            const checkoutFlag = resolutionStrategy === 'ours' ? '--ours' : '--theirs';
 
             for (const file of status.conflicted) {
-              await this.git.raw(['checkout', checkoutFlag, '--', file]);
+              await this.gitManager.checkoutSide(file, resolutionStrategy);
             }
 
-            await this.git.add('.');
-            await this.git.commit(
+            await this.gitManager.stageAll();
+            await this.gitManager.commit(
               `Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`
             );
 
@@ -354,11 +364,11 @@ class AutoGit {
     } catch (error) {
       if (error.message.includes('Not possible to fast-forward')) {
         try {
-          await this.git.pull(['--rebase']);
+          await this.gitManager.pull({ rebase: true });
           console.log(chalk.green('✓ Rebased and pulled changes'));
         } catch (rebaseError) {
           console.log(chalk.red('✗ Rebase failed'));
-          const status = await this.git.status();
+          const status = await this.gitManager.getStatus();
           if (status.conflicted.length > 0) {
             throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
           }
@@ -422,13 +432,13 @@ class AutoGit {
           throw new Error('Operation cancelled due to resolution failure');
         }
 
-        await this.git.raw(['checkout', `--${fallback}`, '--', file]);
+        await this.gitManager.checkoutSide(file, fallback);
       }
     }
 
     // Stage all resolved files
-    await this.git.add('.');
-    await this.git.commit('AI-resolved merge conflicts with intelligent merging');
+    await this.gitManager.stageAll();
+    await this.gitManager.commit('AI-resolved merge conflicts with intelligent merging');
 
     await this.activityLogger.logConflictResolution(conflictedFiles, 'ai', true, {
       resolutionTime: Date.now() - resolutionStartTime,
@@ -443,8 +453,8 @@ class AutoGit {
   async resolveFileConflictsWithAI(filePath) {
     try {
       // Both sides of the conflict (theirs = current/HEAD, ours = incoming)
-      const currentContent = await this.git.show([`--theirs`, `:${filePath}`]);
-      const incomingContent = await this.git.show([`--ours`, `:${filePath}`]);
+      const currentContent = await this.gitManager.showIndexSide(filePath, 'theirs');
+      const incomingContent = await this.gitManager.showIndexSide(filePath, 'ours');
 
       // Resolve via AI and write the result back to the working copy
       const resolvedContent = await this.conflictResolver.resolveConflictWithAI({
@@ -454,7 +464,7 @@ class AutoGit {
         language: filePath.split('.').pop() === 'php' ? 'php' : 'javascript',
       });
 
-      const repoRoot = await this.git.revparse(['--show-toplevel']);
+      const repoRoot = await this.gitManager.getRepositoryRoot();
       const fullPath = require('path').join(repoRoot, filePath);
       const fs = require('fs-extra');
       await fs.writeFile(fullPath, resolvedContent, 'utf8');
@@ -469,7 +479,7 @@ class AutoGit {
   async pushChanges() {
     this.spinner.start('Pushing changes to remote...');
     try {
-      await this.git.push();
+      await this.gitManager.push();
       this.spinner.succeed('Pushed to remote');
     } catch (error) {
       this.spinner.fail('Failed to push changes');

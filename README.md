@@ -3,7 +3,7 @@
 ![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Tests](https://img.shields.io/badge/tests-453%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-480%20passing-brightgreen)
 
 **Automate your git workflow with AI-powered commit messages**
 
@@ -158,7 +158,7 @@ staged diff ──▶ SecretScanner (redact) ──▶ DiffShaper (18KB budget, 
 
 ```bash
 npm install         # Install dependencies
-npm test            # Run test suite (453 tests, 24 suites)
+npm test            # Run test suite (480 tests, 25 suites)
 npm run lint        # ESLint
 npm run test:coverage
 ```

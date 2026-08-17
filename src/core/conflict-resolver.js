@@ -11,6 +11,25 @@ const fs = require('fs-extra');
 const AIProviderFactory = require('../providers/ai-provider-factory');
 const SecretScanner = require('../utils/secret-scanner');
 
+// Line-anchored conflict marker vocabulary (single source of truth).
+// Substring matching false-positives on source code that merely mentions markers.
+const CONFLICT_MARKER_REGEX = /^<{7}|^={7}\s*$|^>{7}/m;
+
+// Marker vocabulary for diff text, where added marker lines carry a '+' prefix.
+const DIFF_MARKER_REGEX = /^\+?<{7}|^\+?={7}\s*$|^\+?>{7}/m;
+
+const LANG_MAP = {
+  js: 'javascript',
+  ts: 'typescript',
+  py: 'python',
+  php: 'php',
+  html: 'html',
+  css: 'css',
+  json: 'json',
+  md: 'markdown',
+  sql: 'sql',
+};
+
 class ConflictResolver {
   /**
    * @param {Object} deps
@@ -34,10 +53,10 @@ class ConflictResolver {
     let collectingCurrent = false;
     let collectingIncoming = false;
 
-    for (const line of lines) {
+    for (const [index, line] of lines.entries()) {
       if (line.startsWith('<<<<<<<')) {
         currentConflict = {
-          startLine: lines.indexOf(line),
+          startLine: index,
           currentVersion: [],
           incomingVersion: [],
         };
@@ -48,7 +67,7 @@ class ConflictResolver {
         collectingIncoming = true;
       } else if (line.startsWith('>>>>>>>')) {
         if (currentConflict) {
-          currentConflict.endLine = lines.indexOf(line);
+          currentConflict.endLine = index;
           currentConflict.currentVersion = currentConflict.currentVersion.join('\n');
           currentConflict.incomingVersion = currentConflict.incomingVersion.join('\n');
           conflicts.push(currentConflict);
@@ -66,6 +85,41 @@ class ConflictResolver {
     }
 
     return conflicts;
+  }
+
+  /**
+   * Replace the next conflict block in `cleanedContent` with `resolved`.
+   * Blocks are located sequentially so earlier resolutions stay in place.
+   * @param {string} cleanedContent - Content with remaining markers.
+   * @param {string} resolved - Replacement text.
+   * @returns {{ content: string, replaced: boolean }}
+   */
+  _replaceConflictBlock(cleanedContent, resolved) {
+    const blockStart = cleanedContent.indexOf('<<<<<<<');
+    const markerEnd = cleanedContent.indexOf('>>>>>>>', blockStart);
+
+    if (blockStart < 0 || markerEnd < blockStart) {
+      return { content: cleanedContent, replaced: false };
+    }
+
+    // Consume the entire '>>>>>>>' line (branch label + newline)
+    let endOfBlock = cleanedContent.indexOf('\n', markerEnd);
+    if (endOfBlock === -1) {
+      endOfBlock = cleanedContent.length;
+    } else {
+      endOfBlock += 1;
+    }
+
+    const tail = cleanedContent.slice(endOfBlock);
+    let replacement = resolved;
+    if (resolved && !resolved.endsWith('\n') && tail.length > 0 && !tail.startsWith('\n')) {
+      replacement = resolved + '\n';
+    }
+
+    return {
+      content: cleanedContent.slice(0, blockStart) + replacement + tail,
+      replaced: true,
+    };
   }
 
   /**
@@ -131,7 +185,10 @@ RESOLVED CODE (output only):
 
     try {
       const config = await this.configManager.getAll();
-      const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
+      const provider = AIProviderFactory.create(config.defaultProvider || 'groq', {
+        configManager: this.configManager,
+        activityLogger: this.activityLogger,
+      });
 
       // Use the general-purpose completion path (generateResponse) - commit
       // generation prompts are wrapped in commit-only instructions at the
@@ -172,7 +229,7 @@ RESOLVED CODE (output only):
   async detectAndCleanupConflictMarkers() {
     const diff = await this.gitManager.getStagedDiff();
 
-    if (!diff || !/^<{7}|^={7}\s*$|^>{7}/m.test(diff)) {
+    if (!diff || !DIFF_MARKER_REGEX.test(diff)) {
       return { cleaned: false, filesFixed: 0, diff };
     }
 
@@ -191,102 +248,73 @@ RESOLVED CODE (output only):
     let aiUsed = false;
 
     for (const file of files) {
-      // Extract file diff
+      // Extract this file's diff
       const escapeRegExp = str => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const fileDiffPattern = new RegExp(
         `diff --git a/${escapeRegExp(file.fileA)} b/${escapeRegExp(file.fileB)}[\\s\\S]*?(?=diff --git a|$)`,
         'g'
       );
-      const fileMatches = [...diff.matchAll(fileDiffPattern)];
+      const fileMatch = diff.match(fileDiffPattern);
+      const fileDiff = fileMatch ? fileMatch[0] : '';
 
-      for (const fileMatch of fileMatches) {
-        const fileDiff = fileMatch[0];
-        if (/^<{7}|^={7}\s*$|^>{7}/m.test(fileDiff)) {
-          // Check if file exists and read it
-          const fullPath = path.isAbsolute(file.fileB)
-            ? file.fileB
-            : path.resolve(process.cwd(), file.fileB);
+      if (!fileDiff || !DIFF_MARKER_REGEX.test(fileDiff)) {
+        continue;
+      }
 
+      // Check if file exists and read it
+      const fullPath = path.isAbsolute(file.fileB)
+        ? file.fileB
+        : path.resolve(process.cwd(), file.fileB);
+
+      try {
+        const content = await fs.readFile(fullPath, 'utf8');
+        if (!CONFLICT_MARKER_REGEX.test(content)) {
+          continue;
+        }
+
+        // Parse and resolve conflicts using AI
+        const conflicts = this.parseConflictBlocks(content);
+        let cleanedContent = content;
+        let fileResolved = 0;
+        let fileAiUsed = false;
+        const extension = file.fileB.split('.').pop();
+        const language = LANG_MAP[extension] || 'javascript';
+
+        for (const conflict of conflicts) {
+          // Resolve each conflict block
           try {
-            const content = await fs.readFile(fullPath, 'utf8');
-            if (/^<{7}|^={7}\s*$|^>{7}/m.test(content)) {
-              // Parse and resolve conflicts using AI
-              const conflicts = this.parseConflictBlocks(content);
-              let cleanedContent = content;
-              let fileResolved = 0;
-              let fileAiUsed = false;
+            const resolved = await this.resolveConflictWithAI({
+              filePath: file.fileB,
+              currentVersion: conflict.currentVersion,
+              incomingVersion: conflict.incomingVersion,
+              language,
+            });
 
-              for (const conflict of conflicts) {
-                // Resolve each conflict block
-                const ext = file.fileB.split('.').pop();
-                const langMap = {
-                  js: 'javascript',
-                  ts: 'typescript',
-                  py: 'python',
-                  php: 'php',
-                  html: 'html',
-                  css: 'css',
-                  json: 'json',
-                  md: 'markdown',
-                  sql: 'sql',
-                };
-                const language = langMap[ext] || 'javascript';
-
-                // Locate this conflict block in the working copy (sequential,
-                // so earlier resolutions are preserved)
-                const blockStart = cleanedContent.indexOf('<<<<<<<');
-                const markerEnd = cleanedContent.indexOf('>>>>>>>', blockStart);
-
-                try {
-                  const resolved = await this.resolveConflictWithAI({
-                    filePath: file.fileB,
-                    currentVersion: conflict.currentVersion,
-                    incomingVersion: conflict.incomingVersion,
-                    language,
-                  });
-
-                  if (blockStart >= 0 && markerEnd >= blockStart) {
-                    // Include the rest of the '>>>>>>>' line (branch label + newline)
-                    let endOfBlock = markerEnd + '>>>>>>>'.length;
-                    if (cleanedContent[endOfBlock] === '\n') endOfBlock += 1;
-
-                    cleanedContent =
-                      cleanedContent.slice(0, blockStart) + resolved + cleanedContent.slice(endOfBlock);
-                  } else {
-                    cleanedContent = cleanedContent.replace(
-                      `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                      `${resolved}\n`
-                    );
-                  }
-
-                  fileResolved++;
-                  fileAiUsed = true;
-                } catch (e) {
-                  // Fallback: use current version
-                  if (blockStart >= 0 && markerEnd >= blockStart) {
-                    let endOfBlock = markerEnd + '>>>>>>>'.length;
-                    if (cleanedContent[endOfBlock] === '\n') endOfBlock += 1;
-                    cleanedContent =
-                      cleanedContent.slice(0, blockStart) +
-                      conflict.currentVersion +
-                      cleanedContent.slice(endOfBlock);
-                  }
-                }
-              }
-
-              if (fileResolved > 0) {
-                await fs.writeFile(fullPath, cleanedContent, 'utf8');
-                console.log(
-                  chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`)
-                );
-                totalResolved += fileResolved;
-                if (fileAiUsed) aiUsed = true;
-              }
+            const result = this._replaceConflictBlock(cleanedContent, resolved);
+            if (result.replaced) {
+              cleanedContent = result.content;
+              fileResolved++;
+              fileAiUsed = true;
             }
           } catch (e) {
-            // File might not exist (deleted), skip
+            // Fallback: use current version
+            const result = this._replaceConflictBlock(cleanedContent, conflict.currentVersion);
+            if (result.replaced) {
+              cleanedContent = result.content;
+            }
           }
         }
+
+        if (fileResolved > 0) {
+          await fs.writeFile(fullPath, cleanedContent, 'utf8');
+          console.log(
+            chalk.green(`  ✅ Resolved ${fileResolved} conflict(s) in ${file.fileB}`)
+          );
+          totalResolved += fileResolved;
+          if (fileAiUsed) aiUsed = true;
+        }
+      } catch (e) {
+        // File might not exist (deleted), skip
       }
     }
 
@@ -340,3 +368,5 @@ RESOLVED CODE (output only):
 }
 
 module.exports = ConflictResolver;
+module.exports.CONFLICT_MARKER_REGEX = CONFLICT_MARKER_REGEX;
+module.exports.DIFF_MARKER_REGEX = DIFF_MARKER_REGEX;

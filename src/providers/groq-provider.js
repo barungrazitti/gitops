@@ -7,8 +7,8 @@ const BaseProvider = require('./base-provider');
 const CircuitBreaker = require('../core/circuit-breaker');
 
 class GroqProvider extends BaseProvider {
-  constructor() {
-    super();
+  constructor(deps = {}) {
+    super(deps);
     this.name = 'groq';
     this.model = 'openai/gpt-oss-20b';
     this.client = null;

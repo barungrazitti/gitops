@@ -8,9 +8,14 @@ const ConfigManager = require('../core/config-manager');
 const ActivityLogger = require('../core/activity-logger');
 
 class BaseProvider {
-  constructor() {
-    this.configManager = new ConfigManager();
-    this.activityLogger = new ActivityLogger();
+  /**
+   * @param {Object} [deps] - Shared collaborators (from the composition root).
+   * @param {Object} [deps.configManager] - Config store instance.
+   * @param {Object} [deps.activityLogger] - Activity logger instance.
+   */
+  constructor({ configManager = new ConfigManager(), activityLogger = new ActivityLogger() } = {}) {
+    this.configManager = configManager;
+    this.activityLogger = activityLogger;
     this.name = 'base';
     this.client = null;
   }

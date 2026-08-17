@@ -33,7 +33,7 @@ class ErrorHandler {
     try {
       const errorType = this.identifyErrorType(error);
 
-      if (this.generator && this.generator.isAIAvailable(options)) {
+      if (this.generator && (await this.generator.isAIAvailable(options))) {
         try {
           const suggestion = await this.generator.getAISuggestion(error, options);
           if (suggestion) {

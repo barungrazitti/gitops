@@ -1,5 +1,7 @@
 /**
- * AI Provider Factory - Creates AI provider instances
+ * AI Provider Factory - Creates AI provider instances.
+ * create(name, deps) threads shared collaborators (configManager,
+ * activityLogger) into adapters so they are not fabricated per call.
  */
 
 const GroqProvider = require('./groq-provider');
@@ -8,8 +10,12 @@ const OllamaProvider = require('./ollama-provider');
 class AIProviderFactory {
   /**
    * Create an AI provider instance
+   * @param {string} providerName - Name of the provider ('groq' | 'ollama').
+   * @param {Object} [deps] - Shared collaborators for the adapter.
+   * @param {Object} [deps.configManager] - Config store instance.
+   * @param {Object} [deps.activityLogger] - Activity logger instance.
    */
-  static create(providerName) {
+  static create(providerName, deps = {}) {
     if (!providerName) {
       throw new Error(
         `Provider name is required. Got: ${providerName}. Available providers: groq, ollama`
@@ -18,88 +24,13 @@ class AIProviderFactory {
 
     switch (providerName.toLowerCase()) {
       case 'groq':
-        return new GroqProvider();
+        return new GroqProvider(deps);
       case 'ollama':
-        return new OllamaProvider();
+        return new OllamaProvider(deps);
       default:
         throw new Error(
           `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
         );
-    }
-  }
-
-  /**
-   * Get list of available providers
-   */
-  static getAvailableProviders() {
-    return [
-      {
-        name: 'groq',
-        displayName: 'Groq',
-        description: 'Fast inference models',
-        requiresApiKey: true,
-        models: [
-          'openai/gpt-oss-20b',
-          'llama-3.1-8b-instant',
-          'llama-3.3-70b-versatile',
-          'qwen/qwen3-32b',
-          'meta-llama/llama-4-scout-17b-16e-instruct',
-        ],
-      },
-      {
-        name: 'ollama',
-        displayName: 'Ollama (Local)',
-        description: 'Local models via Ollama',
-        requiresApiKey: false,
-        models: [
-          'deepseek-v3.1:671b-cloud',
-          'qwen3-coder:480b-cloud',
-          'qwen2.5-coder:latest',
-          'mistral:7b-instruct',
-          'deepseek-r1:8b',
-        ],
-      },
-    ];
-  }
-
-  /**
-   * Check if a provider is available
-   */
-  static isProviderAvailable(providerName) {
-    const providers = this.getAvailableProviders();
-    return providers.some(p => p.name === providerName.toLowerCase());
-  }
-
-  /**
-   * Get default provider with fallback
-   */
-  static getDefaultProvider() {
-    try {
-      const configManager = require('../core/config-manager');
-      const manager = new configManager();
-      const defaultProvider = manager.get('defaultProvider');
-
-      if (defaultProvider && this.isProviderAvailable(defaultProvider)) {
-        return this.create(defaultProvider);
-      }
-    } catch (error) {
-      // Fall through to fallback
-    }
-
-    // Fallback to groq
-    return this.create('groq');
-  }
-
-  /**
-   * Get provider configuration
-   */
-  static getProviderConfig(providerName) {
-    try {
-      const configManager = require('../core/config-manager');
-      const manager = new configManager();
-      return manager.get(providerName) || {};
-    } catch (error) {
-      return {};
     }
   }
 
@@ -113,152 +44,6 @@ class AIProviderFactory {
     } catch (error) {
       throw new Error(`Provider validation failed: ${error.message}`);
     }
-  }
-
-  /**
-   * Test provider connection
-   */
-  static async testProvider(providerName, config) {
-    try {
-      const provider = this.create(providerName);
-      return await provider.test(config);
-    } catch (error) {
-      throw new Error(`Provider test failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Get available models for a specific provider
-   */
-  static async getProviderModels(providerName, config = {}) {
-    try {
-      const provider = this.create(providerName);
-
-      // Set config if provided
-      if (config.apiKey) {
-        provider.config = config;
-      }
-
-      return await provider.getAvailableModels();
-    } catch (error) {
-      console.warn(`Failed to get models for ${providerName}: ${error.message}`);
-      return [];
-    }
-  }
-
-  /**
-   * Set provider-specific configuration
-   */
-  static async setProviderConfig(providerName, config) {
-    if (!providerName) {
-      throw new Error('Provider name is required');
-    }
-
-    if (!config || typeof config !== 'object') {
-      return; // Nothing to set
-    }
-
-    const availableProviders = this.getAvailableProviders();
-    const providerInfo = availableProviders.find(p => p.name === providerName.toLowerCase());
-
-    if (!providerInfo) {
-      throw new Error(
-        `Unsupported AI provider: ${providerName}. Supported providers: groq, ollama`
-      );
-    }
-
-    const configManager = require('../core/config-manager');
-    const manager = new configManager();
-
-    // Set provider-specific configs
-    for (const [key, value] of Object.entries(config)) {
-      await manager.set(`${providerName}.${key}`, value);
-    }
-  }
-
-  /**
-   * Get available models for all providers
-   */
-  static async getAllAvailableModels(configs = {}) {
-    const providers = this.getAvailableProviders();
-    const results = {};
-
-    for (const providerInfo of providers) {
-      try {
-        const config = configs[providerInfo.name] || {};
-        const models = await this.getProviderModels(providerInfo.name, config);
-
-        results[providerInfo.name] = {
-          ...providerInfo,
-          models,
-          available: models.length > 0,
-          lastChecked: new Date().toISOString(),
-        };
-      } catch (error) {
-        results[providerInfo.name] = {
-          ...providerInfo,
-          models: [],
-          available: false,
-          error: error.message,
-          lastChecked: new Date().toISOString(),
-        };
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * Get best available model across all providers
-   */
-  static async getBestAvailableModel(configs = {}) {
-    const allModels = await this.getAllAvailableModels(configs);
-
-    // Priority order for providers (best to worst for commit messages)
-    const providerPriority = ['groq', 'ollama'];
-
-    for (const providerName of providerPriority) {
-      const providerData = allModels[providerName];
-      if (providerData && providerData.available && providerData.models.length > 0) {
-        // Find recommended model or use first available
-        const recommendedModel = providerData.models.find(m => m.recommended && m.available);
-        const firstAvailable = providerData.models.find(m => m.available);
-
-        const selectedModel = recommendedModel || firstAvailable;
-
-        if (selectedModel) {
-          return {
-            provider: providerName,
-            model: selectedModel,
-            providerInfo: providerData,
-          };
-        }
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Auto-configure provider with best available model
-   */
-  static async autoConfigureProvider(configs = {}) {
-    const bestOption = await this.getBestAvailableModel(configs);
-
-    if (!bestOption) {
-      throw new Error('No available AI providers found. Please configure at least one provider.');
-    }
-
-    return {
-      provider: bestOption.provider,
-      model: bestOption.model.id,
-      recommendation: {
-        reason: `Selected ${bestOption.model.name} from ${bestOption.providerInfo.displayName}`,
-        alternatives: Object.keys(configs)
-          .filter(p => ['groq', 'ollama'].includes(p))
-          .filter(p => p !== bestOption.provider),
-      },
-    };
   }
 }
 

@@ -3,7 +3,6 @@
  */
 
 // Mock all dependencies before requiring
-jest.mock('simple-git');
 jest.mock('../src/index');
 jest.mock('ora');
 jest.mock('inquirer');
@@ -14,7 +13,6 @@ jest.mock('path', () => ({
   isAbsolute: jest.fn(p => String(p).startsWith('/')),
 }));
 
-const simpleGit = require('simple-git');
 const ora = require('ora');
 const inquirer = require('inquirer');
 const AICommitGenerator = require('../src/index');
@@ -22,27 +20,27 @@ const AutoGit = require('../src/auto-git');
 
 describe('AutoGit', () => {
   let autoGit;
-  let mockGit;
+  let mockGitManager;
   let mockAiCommit;
   let mockSpinner;
 
   beforeEach(() => {
     jest.clearAllMocks();
 
-    // Setup mock git
-    mockGit = {
-      raw: jest.fn(),
-      checkIsRepo: jest.fn(),
-      status: jest.fn(),
-      add: jest.fn(),
-      diff: jest.fn(),
-      pull: jest.fn(),
+    // Setup mock git manager (the git facade)
+    mockGitManager = {
+      configurePullStrategy: jest.fn().mockResolvedValue(),
+      validateRepository: jest.fn(),
+      getStatus: jest.fn(),
+      stageAll: jest.fn(),
+      getStagedDiff: jest.fn(),
       commit: jest.fn(),
+      pull: jest.fn(),
       push: jest.fn(),
-      revparse: jest.fn(),
-      show: jest.fn(),
+      checkoutSide: jest.fn(),
+      showIndexSide: jest.fn(),
+      getRepositoryRoot: jest.fn(),
     };
-    simpleGit.mockReturnValue(mockGit);
 
     // Setup mock AI commit generator and collaborators
     mockAiCommit = {
@@ -76,7 +74,7 @@ describe('AutoGit', () => {
     ora.mockReturnValue(mockSpinner);
 
     autoGit = new AutoGit({
-      gitManager: {},
+      gitManager: mockGitManager,
       analysisEngine: mockAiCommit.analysisEngine,
       configManager: mockAiCommit.configManager,
       generateMessages: mockAiCommit.generateMessages,
@@ -86,16 +84,15 @@ describe('AutoGit', () => {
   });
 
   describe('constructor', () => {
-    it('should initialize with git and injected collaborators', () => {
-      expect(simpleGit).toHaveBeenCalled();
-      expect(autoGit.git).toBe(mockGit);
+    it('should initialize with injected git facade and collaborators', () => {
+      expect(autoGit.gitManager).toBe(mockGitManager);
       expect(autoGit.activityLogger).toBe(mockAiCommit.activityLogger);
       expect(autoGit.analysisEngine).toBe(mockAiCommit.analysisEngine);
       expect(autoGit.conflictResolver).toBe(mockAiCommit.conflictResolver);
     });
 
     it('should configure git to prefer merge over rebase', () => {
-      expect(mockGit.raw).toHaveBeenCalledWith(['config', 'pull.rebase', 'false']);
+      expect(mockGitManager.configurePullStrategy).toHaveBeenCalled();
     });
   });
 
@@ -111,11 +108,26 @@ describe('AutoGit', () => {
     });
 
     it('should handle dry run mode', async () => {
+      const stdoutSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
       await autoGit.run({ dryRun: true });
 
       expect(autoGit.validateRepository).not.toHaveBeenCalled();
       expect(autoGit.stageChanges).not.toHaveBeenCalled();
       expect(autoGit.pushChanges).not.toHaveBeenCalled();
+      expect(autoGit.generateCommitMessage).toHaveBeenCalled();
+      expect(stdoutSpy).toHaveBeenCalledWith('test commit');
+      stdoutSpy.mockRestore();
+    });
+
+    it('should stay silent on dry run when no message can be generated', async () => {
+      autoGit.generateCommitMessage = jest.fn().mockRejectedValue(new Error('no staged changes'));
+      const stdoutSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      await autoGit.run({ dryRun: true });
+
+      expect(stdoutSpy).not.toHaveBeenCalled();
+      stdoutSpy.mockRestore();
     });
 
     it('should complete full workflow successfully', async () => {
@@ -235,7 +247,7 @@ describe('AutoGit', () => {
 
   describe('validateRepository', () => {
     it('should validate successfully', async () => {
-      mockGit.checkIsRepo.mockResolvedValue(true);
+      mockGitManager.validateRepository.mockResolvedValue(true);
 
       await autoGit.validateRepository();
 
@@ -246,7 +258,7 @@ describe('AutoGit', () => {
     });
 
     it('should throw error for non-git repository', async () => {
-      mockGit.checkIsRepo.mockResolvedValue(false);
+      mockGitManager.validateRepository.mockResolvedValue(false);
 
       await expect(autoGit.validateRepository()).rejects.toThrow('Not a git repository');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Repository validation failed');
@@ -254,7 +266,7 @@ describe('AutoGit', () => {
 
     it('should handle git errors', async () => {
       const error = new Error('Git error');
-      mockGit.checkIsRepo.mockRejectedValue(error);
+      mockGitManager.validateRepository.mockRejectedValue(error);
 
       await expect(autoGit.validateRepository()).rejects.toThrow('Git error');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Repository validation failed');
@@ -263,7 +275,7 @@ describe('AutoGit', () => {
 
   describe('checkForChanges', () => {
     it('should detect changes', async () => {
-      mockGit.status.mockResolvedValue({
+      mockGitManager.getStatus.mockResolvedValue({
         files: ['test.js'],
         not_added: [],
         created: [],
@@ -279,7 +291,7 @@ describe('AutoGit', () => {
     });
 
     it('should detect no changes', async () => {
-      mockGit.status.mockResolvedValue({
+      mockGitManager.getStatus.mockResolvedValue({
         files: [],
         not_added: [],
         created: [],
@@ -295,7 +307,7 @@ describe('AutoGit', () => {
     });
 
     it('should detect unstaged changes', async () => {
-      mockGit.status.mockResolvedValue({
+      mockGitManager.getStatus.mockResolvedValue({
         files: [],
         not_added: ['new.js'],
         created: [],
@@ -311,7 +323,7 @@ describe('AutoGit', () => {
 
     it('should handle status errors', async () => {
       const error = new Error('Status error');
-      mockGit.status.mockRejectedValue(error);
+      mockGitManager.getStatus.mockRejectedValue(error);
 
       await expect(autoGit.checkForChanges()).rejects.toThrow('Status error');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to check for changes');
@@ -320,17 +332,17 @@ describe('AutoGit', () => {
 
   describe('stageChanges', () => {
     it('should stage all changes', async () => {
-      mockGit.add.mockResolvedValue();
+      mockGitManager.stageAll.mockResolvedValue();
 
       await autoGit.stageChanges();
 
-      expect(mockGit.add).toHaveBeenCalledWith('.');
+      expect(mockGitManager.stageAll).toHaveBeenCalledWith();
       expect(mockSpinner.succeed).toHaveBeenCalledWith('Changes staged');
     });
 
     it('should handle staging errors', async () => {
       const error = new Error('Stage error');
-      mockGit.add.mockRejectedValue(error);
+      mockGitManager.stageAll.mockRejectedValue(error);
 
       await expect(autoGit.stageChanges()).rejects.toThrow('Stage error');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to stage changes');
@@ -339,7 +351,7 @@ describe('AutoGit', () => {
 
   describe('generateCommitMessage', () => {
     beforeEach(() => {
-      mockGit.diff.mockResolvedValue('test diff');
+      mockGitManager.getStagedDiff.mockResolvedValue('test diff');
     });
 
     it('should generate commit message successfully', async () => {
@@ -352,7 +364,7 @@ describe('AutoGit', () => {
     });
 
     it('should handle no staged diff', async () => {
-      mockGit.diff.mockResolvedValue('');
+      mockGitManager.getStagedDiff.mockResolvedValue('');
 
       await expect(autoGit.generateCommitMessage()).rejects.toThrow('No staged changes available');
       expect(mockSpinner.fail).toHaveBeenCalledWith('No staged changes available');
@@ -383,17 +395,17 @@ describe('AutoGit', () => {
 
   describe('commitChanges', () => {
     it('should commit successfully', async () => {
-      mockGit.commit.mockResolvedValue();
+      mockGitManager.commit.mockResolvedValue();
 
       await autoGit.commitChanges('test message');
 
-      expect(mockGit.commit).toHaveBeenCalledWith('test message');
+      expect(mockGitManager.commit).toHaveBeenCalledWith('test message');
       expect(mockSpinner.succeed).toHaveBeenCalledWith('Committed: test message');
     });
 
     it('should handle commit errors', async () => {
       const error = new Error('Commit error');
-      mockGit.commit.mockRejectedValue(error);
+      mockGitManager.commit.mockRejectedValue(error);
 
       await expect(autoGit.commitChanges('test message')).rejects.toThrow('Commit error');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to commit changes');
@@ -402,11 +414,11 @@ describe('AutoGit', () => {
 
   describe('pullAndHandleConflicts', () => {
     beforeEach(() => {
-      mockGit.pull.mockResolvedValue({ files: [] });
+      mockGitManager.pull.mockResolvedValue({ files: [] });
     });
 
     it('should pull successfully with no conflicts', async () => {
-      mockGit.pull.mockResolvedValue({ files: [] });
+      mockGitManager.pull.mockResolvedValue({ files: [] });
 
       await autoGit.pullAndHandleConflicts();
 
@@ -414,7 +426,7 @@ describe('AutoGit', () => {
     });
 
     it('should handle already up to date', async () => {
-      mockGit.pull.mockResolvedValue(null);
+      mockGitManager.pull.mockResolvedValue(null);
 
       await autoGit.pullAndHandleConflicts();
 
@@ -422,8 +434,8 @@ describe('AutoGit', () => {
     });
 
     it('should handle conflicts with AI resolution', async () => {
-      mockGit.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGit.status.mockResolvedValue({
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({
         conflicted: ['test.js'],
       });
 
@@ -436,8 +448,8 @@ describe('AutoGit', () => {
     });
 
     it('should handle conflicts with manual resolution', async () => {
-      mockGit.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGit.status.mockResolvedValue({
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({
         conflicted: ['test.js'],
       });
 
@@ -449,42 +461,42 @@ describe('AutoGit', () => {
     });
 
     it('should handle conflicts by keeping current changes', async () => {
-      mockGit.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGit.status.mockResolvedValue({
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({
         conflicted: ['test.js'],
       });
 
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'ours' });
-      mockGit.add.mockResolvedValue();
-      mockGit.commit.mockResolvedValue();
+      mockGitManager.stageAll.mockResolvedValue();
+      mockGitManager.commit.mockResolvedValue();
 
       await autoGit.pullAndHandleConflicts();
 
-      expect(mockGit.raw).toHaveBeenCalledWith(['checkout', '--ours', '--', 'test.js']);
-      expect(mockGit.add).toHaveBeenCalledWith('.');
-      expect(mockGit.commit).toHaveBeenCalled();
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'ours');
+      expect(mockGitManager.stageAll).toHaveBeenCalledWith();
+      expect(mockGitManager.commit).toHaveBeenCalled();
     });
 
     it('should handle conflicts by using incoming changes', async () => {
-      mockGit.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGit.status.mockResolvedValue({
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({
         conflicted: ['test.js'],
       });
 
       inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'theirs' });
-      mockGit.add.mockResolvedValue();
-      mockGit.commit.mockResolvedValue();
+      mockGitManager.stageAll.mockResolvedValue();
+      mockGitManager.commit.mockResolvedValue();
 
       await autoGit.pullAndHandleConflicts();
 
-      expect(mockGit.raw).toHaveBeenCalledWith(['checkout', '--theirs', '--', 'test.js']);
-      expect(mockGit.add).toHaveBeenCalledWith('.');
-      expect(mockGit.commit).toHaveBeenCalled();
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'theirs');
+      expect(mockGitManager.stageAll).toHaveBeenCalledWith();
+      expect(mockGitManager.commit).toHaveBeenCalled();
     });
 
     it('should cancel operation when user chooses', async () => {
-      mockGit.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGit.status.mockResolvedValue({
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({
         conflicted: ['test.js'],
       });
 
@@ -497,7 +509,7 @@ describe('AutoGit', () => {
 
     it('should handle non-conflict pull errors', async () => {
       const error = new Error('Network error');
-      mockGit.pull.mockRejectedValue(error);
+      mockGitManager.pull.mockRejectedValue(error);
 
       inquirer.prompt.mockResolvedValue({ skipPull: true });
 
@@ -517,8 +529,8 @@ describe('AutoGit', () => {
   describe('resolveConflictsWithAI', () => {
     beforeEach(() => {
       autoGit.resolveFileConflictsWithAI = jest.fn().mockResolvedValue();
-      mockGit.add.mockResolvedValue();
-      mockGit.commit.mockResolvedValue();
+      mockGitManager.stageAll.mockResolvedValue();
+      mockGitManager.commit.mockResolvedValue();
       // Ensure spinner is available for this method
       autoGit.spinner = mockSpinner;
     });
@@ -531,7 +543,7 @@ describe('AutoGit', () => {
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledTimes(2);
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledWith('file1.js');
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledWith('file2.js');
-      expect(mockGit.commit).toHaveBeenCalledWith(
+      expect(mockGitManager.commit).toHaveBeenCalledWith(
         'AI-resolved merge conflicts with intelligent merging'
       );
       expect(mockAiCommit.activityLogger.logConflictResolution).toHaveBeenCalledWith(
@@ -548,11 +560,11 @@ describe('AutoGit', () => {
       autoGit.resolveFileConflictsWithAI.mockRejectedValue(error);
 
       inquirer.prompt.mockResolvedValue({ fallback: 'ours' });
-      mockGit.raw.mockResolvedValue();
+      mockGitManager.checkoutSide.mockResolvedValue();
 
       await autoGit.resolveConflictsWithAI(conflictedFiles);
 
-      expect(mockGit.raw).toHaveBeenCalledWith(['checkout', '--ours', '--', 'file1.js']);
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('file1.js', 'ours');
     });
 
     it('should cancel when fallback is cancelled', async () => {
@@ -572,10 +584,10 @@ describe('AutoGit', () => {
     const fs = require('fs-extra');
 
     beforeEach(() => {
-      mockGit.revparse.mockResolvedValue('/repo/root');
-      mockGit.show.mockImplementation(args => {
-        if (args[0] === '--theirs') return Promise.resolve('current');
-        if (args[0] === '--ours') return Promise.resolve('incoming');
+      mockGitManager.getRepositoryRoot.mockResolvedValue('/repo/root');
+      mockGitManager.showIndexSide.mockImplementation((filePath, side) => {
+        if (side === 'theirs') return Promise.resolve('current');
+        if (side === 'ours') return Promise.resolve('incoming');
       });
       fs.readFile.mockResolvedValue('conflicted content');
       fs.writeFile.mockResolvedValue();
@@ -585,8 +597,8 @@ describe('AutoGit', () => {
     it('should resolve conflicts successfully', async () => {
       await autoGit.resolveFileConflictsWithAI('test.js');
 
-      expect(mockGit.show).toHaveBeenCalledWith(['--theirs', ':test.js']);
-      expect(mockGit.show).toHaveBeenCalledWith(['--ours', ':test.js']);
+      expect(mockGitManager.showIndexSide).toHaveBeenCalledWith('test.js', 'theirs');
+      expect(mockGitManager.showIndexSide).toHaveBeenCalledWith('test.js', 'ours');
       expect(mockAiCommit.conflictResolver.resolveConflictWithAI).toHaveBeenCalledWith({
         filePath: 'test.js',
         currentVersion: 'current',
@@ -616,17 +628,17 @@ describe('AutoGit', () => {
 
   describe('pushChanges', () => {
     it('should push successfully', async () => {
-      mockGit.push.mockResolvedValue();
+      mockGitManager.push.mockResolvedValue();
 
       await autoGit.pushChanges();
 
-      expect(mockGit.push).toHaveBeenCalled();
+      expect(mockGitManager.push).toHaveBeenCalled();
       expect(mockSpinner.succeed).toHaveBeenCalledWith('Pushed to remote');
     });
 
     it('should handle push errors', async () => {
       const error = new Error('Push error');
-      mockGit.push.mockRejectedValue(error);
+      mockGitManager.push.mockRejectedValue(error);
 
       await expect(autoGit.pushChanges()).rejects.toThrow('Push error');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to push changes');

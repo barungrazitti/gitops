@@ -43,6 +43,8 @@ describe('GitManager', () => {
       checkout: jest.fn().mockResolvedValue(),
       checkoutLocalBranch: jest.fn().mockResolvedValue(),
       deleteLocalBranch: jest.fn().mockResolvedValue(),
+      raw: jest.fn().mockResolvedValue(),
+      show: jest.fn().mockResolvedValue('file content'),
     };
 
     const simpleGit = require('simple-git');
@@ -345,6 +347,158 @@ describe('GitManager', () => {
       mockGit.push.mockRejectedValue(new Error('Push error'));
 
       await expect(gitManager.pushCommits()).rejects.toThrow('Failed to push commits');
+    });
+  });
+
+  describe('getStatus', () => {
+    it('should return the raw status result', async () => {
+      mockGit.status.mockResolvedValue({ conflicted: [], staged: ['a.js'], not_added: ['b.js'] });
+
+      const result = await gitManager.getStatus();
+
+      expect(result.conflicted).toEqual([]);
+      expect(result.staged).toEqual(['a.js']);
+    });
+
+    it('should handle status errors', async () => {
+      mockGit.status.mockRejectedValue(new Error('Status error'));
+
+      await expect(gitManager.getStatus()).rejects.toThrow('Failed to get git status');
+    });
+  });
+
+  describe('stageAll', () => {
+    it('should stage all changes', async () => {
+      await gitManager.stageAll();
+
+      expect(mockGit.add).toHaveBeenCalledWith('.');
+    });
+
+    it('should handle stage errors', async () => {
+      mockGit.add.mockRejectedValue(new Error('Add error'));
+
+      await expect(gitManager.stageAll()).rejects.toThrow('Failed to stage changes');
+    });
+  });
+
+  describe('pull', () => {
+    it('should pull without rebase by default', async () => {
+      mockGit.pull.mockResolvedValue({ files: ['a.js'] });
+
+      const result = await gitManager.pull();
+
+      expect(mockGit.pull).toHaveBeenCalledWith();
+      expect(result.files).toEqual(['a.js']);
+    });
+
+    it('should pull with rebase when requested', async () => {
+      await gitManager.pull({ rebase: true });
+
+      expect(mockGit.pull).toHaveBeenCalledWith(['--rebase']);
+    });
+
+    it('should handle pull errors', async () => {
+      mockGit.pull.mockRejectedValue(new Error('Pull error'));
+
+      await expect(gitManager.pull()).rejects.toThrow('Failed to pull changes');
+    });
+  });
+
+  describe('push', () => {
+    it('should push to the default remote', async () => {
+      mockGit.push.mockResolvedValue({ pushed: true });
+
+      const result = await gitManager.push();
+
+      expect(mockGit.push).toHaveBeenCalledWith();
+      expect(result.pushed).toBe(true);
+    });
+
+    it('should handle push errors', async () => {
+      mockGit.push.mockRejectedValue(new Error('Push error'));
+
+      await expect(gitManager.push()).rejects.toThrow('Failed to push changes');
+    });
+  });
+
+  describe('checkoutSide', () => {
+    it('should checkout the ours side of a conflicted file', async () => {
+      await gitManager.checkoutSide('test.js', 'ours');
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['checkout', '--ours', '--', 'test.js']);
+    });
+
+    it('should checkout the theirs side of a conflicted file', async () => {
+      await gitManager.checkoutSide('test.js', 'theirs');
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['checkout', '--theirs', '--', 'test.js']);
+    });
+
+    it('should reject invalid sides', async () => {
+      await expect(gitManager.checkoutSide('test.js', 'mine')).rejects.toThrow(
+        'Invalid checkout side'
+      );
+    });
+
+    it('should reject empty file paths', async () => {
+      await expect(gitManager.checkoutSide('', 'ours')).rejects.toThrow(
+        'Checkout requires a file path'
+      );
+    });
+
+    it('should handle checkout errors', async () => {
+      mockGit.raw.mockRejectedValue(new Error('Checkout error'));
+
+      await expect(gitManager.checkoutSide('test.js', 'ours')).rejects.toThrow(
+        'Failed to checkout ours version of test.js'
+      );
+    });
+  });
+
+  describe('showIndexSide', () => {
+    it('should show the ours side of a conflicted file', async () => {
+      mockGit.show.mockResolvedValue('incoming content');
+
+      const result = await gitManager.showIndexSide('test.js', 'ours');
+
+      expect(mockGit.show).toHaveBeenCalledWith(['--ours', ':test.js']);
+      expect(result).toBe('incoming content');
+    });
+
+    it('should show the theirs side of a conflicted file', async () => {
+      await gitManager.showIndexSide('test.js', 'theirs');
+
+      expect(mockGit.show).toHaveBeenCalledWith(['--theirs', ':test.js']);
+    });
+
+    it('should reject invalid sides', async () => {
+      await expect(gitManager.showIndexSide('test.js', 'mine')).rejects.toThrow(
+        'Invalid show side'
+      );
+    });
+
+    it('should handle show errors', async () => {
+      mockGit.show.mockRejectedValue(new Error('Show error'));
+
+      await expect(gitManager.showIndexSide('test.js', 'ours')).rejects.toThrow(
+        'Failed to show ours version of test.js'
+      );
+    });
+  });
+
+  describe('configurePullStrategy', () => {
+    it('should set pull.rebase to false', async () => {
+      await gitManager.configurePullStrategy();
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['config', 'pull.rebase', 'false']);
+    });
+
+    it('should handle config errors', async () => {
+      mockGit.raw.mockRejectedValue(new Error('Config error'));
+
+      await expect(gitManager.configurePullStrategy()).rejects.toThrow(
+        'Failed to configure pull strategy'
+      );
     });
   });
 });

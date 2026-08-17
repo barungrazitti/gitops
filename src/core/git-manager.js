@@ -106,6 +106,101 @@ class GitManager {
   }
 
   /**
+   * Get full git status result (files, conflicted, not_added, etc.)
+   */
+  async getStatus() {
+    try {
+      const status = await this.git.status();
+      return status;
+    } catch (error) {
+      throw new Error(`Failed to get git status: ${error.message}`);
+    }
+  }
+
+  /**
+   * Stage all changes including new files
+   */
+  async stageAll() {
+    try {
+      await this.git.add('.');
+    } catch (error) {
+      throw new Error(`Failed to stage changes: ${error.message}`);
+    }
+  }
+
+  /**
+   * Pull latest changes from the default remote
+   */
+  async pull(options = {}) {
+    try {
+      if (options.rebase) {
+        return await this.git.pull(['--rebase']);
+      }
+      return await this.git.pull();
+    } catch (error) {
+      throw new Error(`Failed to pull changes: ${error.message}`);
+    }
+  }
+
+  /**
+   * Push commits to the default remote
+   */
+  async push() {
+    try {
+      return await this.git.push();
+    } catch (error) {
+      throw new Error(`Failed to push changes: ${error.message}`);
+    }
+  }
+
+  /**
+   * Checkout one side of a conflicted file (ours/theirs)
+   */
+  async checkoutSide(file, side) {
+    const VALID_SIDES = ['ours', 'theirs'];
+    if (!VALID_SIDES.includes(side)) {
+      throw new Error(`Invalid checkout side: ${side} (expected ours or theirs)`);
+    }
+    if (typeof file !== 'string' || file.length === 0) {
+      throw new Error('Checkout requires a file path');
+    }
+    try {
+      return await this.git.raw(['checkout', `--${side}`, '--', file]);
+    } catch (error) {
+      throw new Error(`Failed to checkout ${side} version of ${file}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Show the index version on one side of a conflicted file (ours/theirs)
+   */
+  async showIndexSide(filePath, side) {
+    const VALID_SIDES = ['ours', 'theirs'];
+    if (!VALID_SIDES.includes(side)) {
+      throw new Error(`Invalid show side: ${side} (expected ours or theirs)`);
+    }
+    if (typeof filePath !== 'string' || filePath.length === 0) {
+      throw new Error('Show requires a file path');
+    }
+    try {
+      return await this.git.show([`--${side}`, `:${filePath}`]);
+    } catch (error) {
+      throw new Error(`Failed to show ${side} version of ${filePath}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Configure git to prefer merge over rebase for safety
+   */
+  async configurePullStrategy() {
+    try {
+      await this.git.raw(['config', 'pull.rebase', 'false']);
+    } catch (error) {
+      throw new Error(`Failed to configure pull strategy: ${error.message}`);
+    }
+  }
+
+  /**
    * Check if there are staged changes
    */
   async hasStagedChanges() {

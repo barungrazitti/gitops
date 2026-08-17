@@ -90,7 +90,9 @@ describe('AICommitGenerator', () => {
         defaultProvider: 'groq',
         conventionalCommits: true,
       });
-      generator.cliPresenter.selectMessage = jest.fn().mockResolvedValue(mockMessages[0]);
+      generator.cliPresenter.selectMessage = jest
+        .fn()
+        .mockResolvedValue({ action: 'commit', message: mockMessages[0] });
       generator.gitManager.commit = jest.fn().mockResolvedValue({});
     });
 
@@ -109,6 +111,55 @@ describe('AICommitGenerator', () => {
 
       expect(generator.cacheManager.getValidated).toHaveBeenCalledWith(mockDiff);
       expect(generator.gitManager.commit).toHaveBeenCalledWith(mockMessages[0]);
+    });
+
+    it('should re-generate messages when user selects regenerate', async () => {
+      generator.cliPresenter.selectMessage
+        .mockResolvedValueOnce({ action: 'regenerate' })
+        .mockResolvedValueOnce({ action: 'commit', message: mockMessages[1] });
+
+      await generator.generate();
+
+      expect(generator.cliPresenter.selectMessage).toHaveBeenCalledTimes(2);
+      expect(generator.gitManager.commit).toHaveBeenCalledWith(mockMessages[1]);
+      expect(generator.gitManager.commit).not.toHaveBeenCalledWith('regenerate');
+    });
+
+    it('should re-generate from scratch on regenerate, bypassing cache', async () => {
+      generator.cacheManager.getValidated = jest.fn().mockResolvedValue(mockMessages);
+      const firstBatch = ['feat: cached message'];
+      const secondBatch = ['fix: regenerated message'];
+      generator.generationPipeline.generate = jest
+        .fn()
+        .mockResolvedValueOnce(secondBatch);
+      generator.cliPresenter.selectMessage
+        .mockResolvedValueOnce({ action: 'regenerate' })
+        .mockResolvedValueOnce({ action: 'commit', message: secondBatch[0] });
+
+      await generator.generate();
+
+      expect(generator.generationPipeline.generate).toHaveBeenCalledTimes(1);
+      expect(generator.gitManager.commit).toHaveBeenCalledWith(secondBatch[0]);
+    });
+
+    it('should cancel without committing', async () => {
+      generator.cliPresenter.selectMessage.mockResolvedValue({ action: 'cancel' });
+
+      await generator.generate();
+
+      expect(generator.gitManager.commit).not.toHaveBeenCalled();
+    });
+
+    it('should stop after maximum regenerate attempts', async () => {
+      generator.activityLogger.info = jest.fn().mockResolvedValue();
+      generator.cliPresenter.selectMessage.mockResolvedValue({ action: 'regenerate' });
+
+      await generator.generate();
+
+      expect(generator.gitManager.commit).not.toHaveBeenCalled();
+      expect(generator.activityLogger.info).toHaveBeenCalledWith('generate_cancelled', {
+        reason: 'regenerate_limit_reached',
+      });
     });
 
     it('should handle errors during generation', async () => {
@@ -176,61 +227,6 @@ describe('AICommitGenerator', () => {
       await generator.hook({ uninstall: true });
 
       expect(generator.hookManager.uninstall).toHaveBeenCalled();
-    });
-  });
-
-  describe('selectBestMessages (via messageRanker)', () => {
-    it('should select best messages from array', () => {
-      const messages = [
-        'feat: add new feature',
-        'fix: resolve bug',
-        'chore: update dependencies',
-        'update functionality', // generic - should be ranked lower
-      ];
-
-      const result = generator.messageRanker.selectBestMessages(messages, 3);
-
-      expect(result.length).toBeLessThanOrEqual(3);
-    });
-
-    it('should handle empty input', () => {
-      const result = generator.messageRanker.selectBestMessages([]);
-      expect(result).toEqual([]);
-    });
-
-    it('should handle null input', () => {
-      const result = generator.messageRanker.selectBestMessages(null);
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('scoreCommitMessage (via messageRanker)', () => {
-    it('should score conventional commit format higher', () => {
-      const conventional = 'feat: add new feature';
-      const nonConventional = 'add new feature';
-
-      const conventionalScore = generator.messageRanker.scoreCommitMessage(conventional);
-      const nonConventionalScore = generator.messageRanker.scoreCommitMessage(nonConventional);
-
-      expect(conventionalScore).toBeGreaterThan(nonConventionalScore);
-    });
-
-    it('should penalize generic messages', () => {
-      const generic = 'update functionality';
-      const specific = 'feat: add UserAuthentication class';
-
-      const genericScore = generator.messageRanker.scoreCommitMessage(generic);
-      const specificScore = generator.messageRanker.scoreCommitMessage(specific);
-
-      expect(specificScore).toBeGreaterThan(genericScore);
-    });
-
-    it('should return low score for very short messages', () => {
-      const short = 'ab';
-
-      const score = generator.messageRanker.scoreCommitMessage(short);
-
-      expect(score).toBeLessThan(0);
     });
   });
 

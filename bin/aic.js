@@ -15,6 +15,82 @@ const { program } = require('commander');
 const chalk = require('chalk');
 const { version } = require('../package.json');
 const AICommitGenerator = require('../src/index');
+const ConfigManager = require('../src/core/config-manager');
+const GitManager = require('../src/core/git-manager');
+const CacheManager = require('../src/core/cache-manager');
+const AnalysisEngine = require('../src/core/analysis-engine');
+const MessageFormatter = require('../src/core/message-formatter');
+const MessageRanker = require('../src/core/message-ranker');
+const MessageValidator = require('../src/core/message-validator');
+const StatsManager = require('../src/core/stats-manager');
+const HookManager = require('../src/core/hook-manager');
+const ActivityLogger = require('../src/core/activity-logger');
+const MetricsScorer = require('../src/utils/metrics-scorer');
+const DiffShaper = require('../src/core/diff-shaper');
+const EfficientPromptBuilder = require('../src/utils/efficient-prompt-builder');
+const GenerationPipeline = require('../src/core/generation-pipeline');
+const ConflictResolver = require('../src/core/conflict-resolver');
+const CLIPresenter = require('../src/cli-presenter');
+
+// Composition root: every collaborator is built once and injected everywhere.
+const buildGenerator = () => {
+  const configManager = new ConfigManager();
+  const activityLogger = new ActivityLogger();
+  const gitManager = new GitManager();
+  const cacheManager = new CacheManager();
+  const analysisEngine = new AnalysisEngine();
+  const messageFormatter = new MessageFormatter();
+  const messageRanker = new MessageRanker();
+  const messageValidator = new MessageValidator();
+  const statsManager = new StatsManager();
+  const hookManager = new HookManager();
+  const diffShaper = new DiffShaper();
+  const metricsScorer = new MetricsScorer();
+
+  const generationPipeline = new GenerationPipeline({
+    diffShaper,
+    promptBuilder: new EfficientPromptBuilder({ diffShaper }),
+    messageRanker,
+    messageValidator,
+    activityLogger,
+    statsManager,
+    configManager,
+  });
+
+  const conflictResolver = new ConflictResolver({
+    configManager,
+    gitManager,
+    activityLogger,
+  });
+
+  const cliPresenter = new CLIPresenter({
+    configManager,
+    statsManager,
+    activityLogger,
+    hookManager,
+    metricsScorer,
+  });
+
+  const generator = new AICommitGenerator({
+    gitManager,
+    configManager,
+    cacheManager,
+    analysisEngine,
+    messageFormatter,
+    statsManager,
+    hookManager,
+    activityLogger,
+    diffShaper,
+    messageRanker,
+    messageValidator,
+    metricsScorer,
+    generationPipeline,
+    conflictResolver,
+    cliPresenter,
+  });
+
+  return { generator, gitManager, analysisEngine, configManager, activityLogger, generationPipeline, conflictResolver };
+};
 
 program
   .name('aic')
@@ -33,14 +109,14 @@ program
   .option('--enterprise-mode', 'Block commits with ANY sensitive data (strict security)')
   .action(async (message, options) => {
     try {
-      const generator = new AICommitGenerator();
+      const { gitManager, analysisEngine, configManager, activityLogger, generationPipeline, conflictResolver } = buildGenerator();
       const autoGit = new (require('../src/auto-git'))({
-        gitManager: generator.gitManager,
-        analysisEngine: generator.analysisEngine,
-        configManager: generator.configManager,
-        generateMessages: (diff, options) => generator.generationPipeline.generate(diff, options),
-        conflictResolver: generator.conflictResolver,
-        activityLogger: generator.activityLogger,
+        gitManager,
+        analysisEngine,
+        configManager,
+        generateMessages: (diff, opts) => generationPipeline.generate(diff, opts),
+        conflictResolver,
+        activityLogger,
       });
       await autoGit.run(options);
     } catch (error) {
@@ -57,7 +133,7 @@ program
   .option('--reset', 'Reset configuration to defaults')
   .action(async (options) => {
     try {
-      const generator = new AICommitGenerator();
+      const { generator } = buildGenerator();
       await generator.config(options);
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
@@ -70,7 +146,7 @@ program
   .description('Interactive setup wizard')
   .action(async () => {
     try {
-      const generator = new AICommitGenerator();
+      const { generator } = buildGenerator();
       await generator.setup();
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
@@ -85,7 +161,7 @@ program
   .option('--uninstall', 'Uninstall prepare-commit-msg hook')
   .action(async (options) => {
     try {
-      const generator = new AICommitGenerator();
+      const { generator } = buildGenerator();
       await generator.hook(options);
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
@@ -100,7 +176,7 @@ program
   .option('--export', 'Export detailed logs to file')
   .action(async (options) => {
     try {
-      const generator = new AICommitGenerator();
+      const { generator } = buildGenerator();
       await generator.stats(options);
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);

@@ -30,51 +30,81 @@ const CLIPresenter = require('./cli-presenter');
 const AIProviderFactory = require('./providers/ai-provider-factory');
 
 class AICommitGenerator {
-  constructor() {
-    this.gitManager = new GitManager();
-    this.configManager = new ConfigManager();
-    this.cacheManager = new CacheManager();
-    this.analysisEngine = new AnalysisEngine();
-    this.messageFormatter = new MessageFormatter();
-    this.statsManager = new StatsManager();
-    this.hookManager = new HookManager();
-    this.activityLogger = new ActivityLogger();
-    this.diffShaper = new DiffShaper();
-    this.messageRanker = new MessageRanker();
-    this.messageValidator = new MessageValidator();
-    this.metricsScorer = new MetricsScorer();
+  /**
+   * @param {Object} [deps] - Prebuilt collaborators (composition root).
+   * Every dependency falls back to a fresh instance so `new AICommitGenerator()`
+   * keeps working unchanged.
+   */
+  constructor(deps = {}) {
+    const {
+      gitManager = new GitManager(),
+      configManager = new ConfigManager(),
+      cacheManager = new CacheManager(),
+      analysisEngine = new AnalysisEngine(),
+      messageFormatter = new MessageFormatter(),
+      statsManager = new StatsManager(),
+      hookManager = new HookManager(),
+      activityLogger = new ActivityLogger(),
+      diffShaper = new DiffShaper(),
+      messageRanker = new MessageRanker(),
+      messageValidator = new MessageValidator(),
+      metricsScorer = new MetricsScorer(),
+      conflictResolver,
+      generationPipeline,
+      cliPresenter,
+    } = deps;
+
+    this.gitManager = gitManager;
+    this.configManager = configManager;
+    this.cacheManager = cacheManager;
+    this.analysisEngine = analysisEngine;
+    this.messageFormatter = messageFormatter;
+    this.statsManager = statsManager;
+    this.hookManager = hookManager;
+    this.activityLogger = activityLogger;
+    this.diffShaper = diffShaper;
+    this.messageRanker = messageRanker;
+    this.messageValidator = messageValidator;
+    this.metricsScorer = metricsScorer;
     this.errorHandler = new ErrorHandler(this);
     this.aiProviderFactory = AIProviderFactory;
-    this.conflictResolver = new ConflictResolver({
-      configManager: this.configManager,
-      gitManager: this.gitManager,
-      activityLogger: this.activityLogger,
-    });
+    this.conflictResolver =
+      conflictResolver ||
+      new ConflictResolver({
+        configManager: this.configManager,
+        gitManager: this.gitManager,
+        activityLogger: this.activityLogger,
+      });
 
-    this.generationPipeline = new GenerationPipeline({
-      diffShaper: this.diffShaper,
-      promptBuilder: new EfficientPromptBuilder({ diffShaper: this.diffShaper }),
-      messageRanker: this.messageRanker,
-      messageValidator: this.messageValidator,
-      activityLogger: this.activityLogger,
-      statsManager: this.statsManager,
-    });
+    this.generationPipeline =
+      generationPipeline ||
+      new GenerationPipeline({
+        diffShaper: this.diffShaper,
+        promptBuilder: new EfficientPromptBuilder({ diffShaper: this.diffShaper }),
+        messageRanker: this.messageRanker,
+        messageValidator: this.messageValidator,
+        activityLogger: this.activityLogger,
+        statsManager: this.statsManager,
+        configManager: this.configManager,
+      });
 
-    this.cliPresenter = new CLIPresenter({
-      configManager: this.configManager,
-      statsManager: this.statsManager,
-      activityLogger: this.activityLogger,
-      hookManager: this.hookManager,
-      metricsScorer: this.metricsScorer,
-    });
+    this.cliPresenter =
+      cliPresenter ||
+      new CLIPresenter({
+        configManager: this.configManager,
+        statsManager: this.statsManager,
+        activityLogger: this.activityLogger,
+        hookManager: this.hookManager,
+        metricsScorer: this.metricsScorer,
+      });
   }
 
   /**
    * Check if AI provider is available and configured
    */
-  isAIAvailable(options = {}) {
+  async isAIAvailable(options = {}) {
     try {
-      const config = this.configManager.getAll(); // Synchronous version for this check
+      const config = await this.configManager.getAll();
       const provider = options.provider || config.defaultProvider || 'groq';
 
       if (provider === 'ollama') {
@@ -99,7 +129,10 @@ class AICommitGenerator {
       const config = await this.configManager.getAll();
       const providerName = options.provider || config.defaultProvider || 'groq';
 
-      const provider = this.aiProviderFactory.create(providerName);
+      const provider = this.aiProviderFactory.create(providerName, {
+        configManager: this.configManager,
+        activityLogger: this.activityLogger,
+      });
 
       const prompt = `I encountered an error while trying to generate a git commit message.
 Error: ${error.message}
@@ -238,69 +271,95 @@ Do not explain the error, just provide the solution.`;
         }
       }
 
-      // Advanced analysis and generation with intelligent merging
-      if (!messages || messages.length === 0) {
-        // Analyze repository context
-        spinner.text = chalk.blue('🧩 Analyzing repository context...');
-        const context = await this.analysisEngine.analyzeRepository();
+      // Generation + interactive selection loop (regenerate re-enters generation)
+      const MAX_REGENERATE_ATTEMPTS = 3;
+      let regenerateCount = 0;
 
-        // Generate commit messages via the pipeline (sequential fallback inside)
-        spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
-        messages = await this.generationPipeline.generate(diff, {
-          context,
-          count: parseInt(mergedOptions.count) || 1,
-          type: mergedOptions.type,
-          language: mergedOptions.language || 'en',
-          conventional: mergedOptions.conventional || config.conventionalCommits,
-          preferredProvider: mergedOptions.provider || config.defaultProvider,
-        });
+      // eslint-disable-next-line no-constant-condition -- loop exits via return; regenerate re-enters
+      while (true) {
+        // Advanced analysis and generation with intelligent merging
+        if (!messages || messages.length === 0) {
+          // Analyze repository context
+          spinner.text = chalk.blue('🧩 Analyzing repository context...');
+          const context = await this.analysisEngine.analyzeRepository();
 
-        // Cache results
-        if (mergedOptions.cache !== false) {
-          await this.cacheManager.setValidated(diff, messages);
+          // Generate commit messages via the pipeline (sequential fallback inside)
+          spinner.text = chalk.blue('🤖 Generating commit messages with AI...');
+          messages = await this.generationPipeline.generate(diff, {
+            context,
+            count: parseInt(mergedOptions.count) || 1,
+            type: mergedOptions.type,
+            language: mergedOptions.language || 'en',
+            conventional: mergedOptions.conventional || config.conventionalCommits,
+            preferredProvider: mergedOptions.provider || config.defaultProvider,
+          });
+
+          // Cache results
+          if (mergedOptions.cache !== false) {
+            await this.cacheManager.setValidated(diff, messages);
+          }
         }
-      }
 
-      spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
+        spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
-      // Format messages
-      const formattedMessages = messages.map(msg =>
-        this.messageFormatter.format(msg, mergedOptions)
-      );
+        // Format messages
+        const formattedMessages = messages.map(msg =>
+          this.messageFormatter.format(msg, mergedOptions)
+        );
 
-      // Show interactive selection
-      if (mergedOptions.dryRun) {
-        console.log(chalk.yellow('\n🔍 Dry run - Generated messages:'));
-        formattedMessages.forEach((msg, index) => {
-          console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
+        // Show interactive selection
+        if (mergedOptions.dryRun) {
+          console.log(chalk.yellow('\n🔍 Dry run - Generated messages:'));
+          formattedMessages.forEach((msg, index) => {
+            console.log(chalk.cyan(`\n${index + 1}. ${msg}`));
+          });
+          await this.activityLogger.info('dry_run_completed', {
+            messagesCount: formattedMessages.length,
+          });
+          return;
+        }
+
+        const selection = await this.cliPresenter.selectMessage(formattedMessages, {
+          ...mergedOptions,
+          diff,
         });
-        await this.activityLogger.info('dry_run_completed', {
-          messagesCount: formattedMessages.length,
-        });
-        return;
-      }
 
-      const selectedMessage = await this.cliPresenter.selectMessage(formattedMessages, {
-        ...mergedOptions,
-        diff,
-      });
+        if (selection.action === 'regenerate') {
+          if (regenerateCount >= MAX_REGENERATE_ATTEMPTS) {
+            console.log(chalk.yellow('\n⚠️  Maximum regenerate attempts reached. Commit cancelled.'));
+            await this.activityLogger.info('generate_cancelled', {
+              reason: 'regenerate_limit_reached',
+            });
+            return;
+          }
+          regenerateCount++;
+          // Clear messages to force re-generation (bypasses cache)
+          messages = [];
+          continue;
+        }
 
-      if (selectedMessage) {
-        await this.gitManager.commit(selectedMessage);
+        if (selection.action === 'cancel') {
+          await this.activityLogger.info('generate_cancelled', { reason: 'user_cancelled' });
+          return;
+        }
+
+        // action === 'commit'
+        await this.gitManager.commit(selection.message);
         console.log(chalk.green('\n✅ Commit created successfully!'));
 
         // Log successful commit
         await this.activityLogger.logGitOperation('commit', {
-          message: selectedMessage,
+          message: selection.message,
           success: true,
           duration: Date.now() - startTime,
         });
 
         // Update commit generation log with selected message
         await this.activityLogger.info('commit_completed', {
-          selectedMessage,
+          selectedMessage: selection.message,
           messagesGenerated: messages.length,
         });
+        return;
       }
     } catch (error) {
       spinner.fail(chalk.red(`❌ Failed to generate commit message: ${error.message}`));

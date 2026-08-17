@@ -177,7 +177,8 @@ Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
 Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
 
       // Add file-pattern hints only when they agree with the actual changed lines.
-      const typeHint = this.diffShaper.getCompatibleTypeHint(context?.files?.type, changeAnalysis);
+      // Pre-computed by the pipeline; falls back for direct construction.
+      const typeHint = options.typeHint || this.diffShaper.getCompatibleTypeHint(context?.files?.type, changeAnalysis);
       if (typeHint) {
         prompt += `\n\nDetected type hint: ${typeHint} (confirmed by changed lines)`;
       }
