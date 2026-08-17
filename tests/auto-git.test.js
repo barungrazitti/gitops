@@ -574,7 +574,6 @@ describe('AutoGit', () => {
     beforeEach(() => {
       mockGit.revparse.mockResolvedValue('/repo/root');
       mockGit.show.mockImplementation(args => {
-        if (args[0] === 'HEAD:test.js') return Promise.resolve('original');
         if (args[0] === '--theirs') return Promise.resolve('current');
         if (args[0] === '--ours') return Promise.resolve('incoming');
       });
@@ -586,19 +585,23 @@ describe('AutoGit', () => {
     it('should resolve conflicts successfully', async () => {
       await autoGit.resolveFileConflictsWithAI('test.js');
 
-      expect(mockGit.show).toHaveBeenCalledWith(['HEAD:test.js']);
       expect(mockGit.show).toHaveBeenCalledWith(['--theirs', ':test.js']);
       expect(mockGit.show).toHaveBeenCalledWith(['--ours', ':test.js']);
-      expect(fs.readFile).toHaveBeenCalledWith('/repo/root/test.js', 'utf8');
       expect(mockAiCommit.conflictResolver.resolveConflictWithAI).toHaveBeenCalledWith({
         filePath: 'test.js',
-        originalContent: 'original',
-        currentChanges: 'current',
-        incomingChanges: 'incoming',
-        conflictedContent: 'conflicted content',
-        timestamp: expect.any(Number),
+        currentVersion: 'current',
+        incomingVersion: 'incoming',
+        language: 'javascript',
       });
       expect(fs.writeFile).toHaveBeenCalledWith('/repo/root/test.js', 'resolved content', 'utf8');
+    });
+
+    it('should pass php language hint for php files', async () => {
+      await autoGit.resolveFileConflictsWithAI('theme/functions.php');
+
+      expect(mockAiCommit.conflictResolver.resolveConflictWithAI).toHaveBeenCalledWith(
+        expect.objectContaining({ language: 'php' })
+      );
     });
 
     it('should handle resolution errors', async () => {

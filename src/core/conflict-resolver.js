@@ -78,7 +78,9 @@ class ConflictResolver {
    * @param {string} [conflictCtx.language] - Language hint for the prompt.
    * @returns {Promise<string>} Resolved content (falls back to currentVersion on failure).
    */
-  async resolveConflictWithAI({ filePath, currentVersion, incomingVersion, language = 'javascript' }) {
+  async resolveConflictWithAI(conflictCtx) {
+    const { filePath, currentVersion, incomingVersion, language = 'javascript' } = conflictCtx || {};
+
     if (!filePath || typeof currentVersion !== 'string' || typeof incomingVersion !== 'string') {
       throw new Error(
         'resolveConflictWithAI requires { filePath, currentVersion, incomingVersion }'
@@ -87,8 +89,8 @@ class ConflictResolver {
 
     // SECURITY: Redact secrets/PII before sending file content to AI
     const secretScanner = new SecretScanner();
-    currentVersion = secretScanner.scanAndRedact(String(currentVersion || ''), true);
-    incomingVersion = secretScanner.scanAndRedact(String(incomingVersion || ''), true);
+    const redactedCurrent = secretScanner.scanAndRedact(currentVersion, true);
+    const redactedIncoming = secretScanner.scanAndRedact(incomingVersion, true);
     const redactionSummary = secretScanner.getRedactionSummary();
     if (redactionSummary.found) {
       await this.activityLogger.warn('sensitive_data_redacted', {
@@ -116,12 +118,12 @@ INSTRUCTIONS:
 
 CURRENT VERSION (HEAD):
 \`\`\`
-${currentVersion}
+${redactedCurrent}
 \`\`\`
 
 INCOMING VERSION:
 \`\`\`
-${incomingVersion}
+${redactedIncoming}
 \`\`\`
 
 RESOLVED CODE (output only):
@@ -160,7 +162,7 @@ RESOLVED CODE (output only):
       console.warn(chalk.yellow(`AI resolution failed, using current version: ${error.message}`));
     }
 
-    // Fallback: keep current version
+    // Fallback: keep original current version
     return currentVersion;
   }
 
