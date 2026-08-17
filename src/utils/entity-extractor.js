@@ -137,23 +137,6 @@ class EntityExtractor {
     return Array.from(variables).sort();
   }
 
-  formatEntityListByType(entities) {
-    const parts = [];
-
-    if (entities.functions.length > 0) {
-      parts.push(`Functions: ${entities.functions.join(', ')}`);
-    }
-
-    if (entities.classes.length > 0) {
-      parts.push(`Classes: ${entities.classes.join(', ')}`);
-    }
-
-    if (entities.variables.length > 0) {
-      parts.push(`Variables: ${entities.variables.join(', ')}`);
-    }
-
-    return parts.join('; ');
-  }
 }
 
 module.exports = EntityExtractor;

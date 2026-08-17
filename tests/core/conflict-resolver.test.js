@@ -118,11 +118,18 @@ describe('ConflictResolver', () => {
   describe('parseConflictBlocks — real line indices', () => {
     it('reports exact line positions even with duplicate lines', () => {
       const content = `const a = 1;
+<<<<<<< HEAD
 const kept = 'first';
-const keptIncoming = 'incoming';
+=======
+const kept = 'incoming';
+>>>>>>> branch
 const a = 1;
+<<<<<<< HEAD
 const second = 2;
-const secondIncoming = 3;
+=======
+const second = 3;
+>>>>>>> branch`;
+
       const conflicts = resolver.parseConflictBlocks(content);
 
       expect(conflicts).toHaveLength(2);
@@ -135,23 +142,67 @@ const secondIncoming = 3;
       expect(conflicts[1].currentVersion).toBe('const second = 2;');
       expect(conflicts[1].incomingVersion).toBe('const second = 3;');
     });
+
+    it('returns an empty array when content has no markers', () => {
+      expect(resolver.parseConflictBlocks('const a = 1;\nconst b = 2;')).toEqual([]);
+    });
   });
 
   describe('_replaceConflictBlock', () => {
-    it('replaces only the first remaining block', () => {
-      const content = `const a = 1;
+    const contentWithTwoBlocks = `const a = 1;
+<<<<<<< HEAD
 old
+=======
 new
+>>>>>>> branch
 const b = 2;
+<<<<<<< HEAD
 old2
+=======
 new2
-      const result = resolver._replaceConflictBlock(content, 'resolved');
+>>>>>>> branch`;
+
+    it('replaces only the first remaining block', () => {
+      const result = resolver._replaceConflictBlock(contentWithTwoBlocks, 'resolved');
 
       expect(result.replaced).toBe(true);
-      expect(result.content).toContain('resolved');
-      expect(result.content).toContain('const kept = ['first', 'incoming'];
+      expect(result.content).toBe(`const a = 1;
+resolved
+const b = 2;
+<<<<<<< HEAD
+old2
+=======
+new2
+>>>>>>> branch`);
+    });
+
+    it('reports not replaced when no markers remain', () => {
+      const result = resolver._replaceConflictBlock('const a = 1;', 'resolved');
+
+      expect(result.replaced).toBe(false);
+      expect(result.content).toBe('const a = 1;');
+    });
+  });
+
+  describe('detectAndCleanupConflictMarkers', () => {
+    const conflictedDiff = `diff --git a/src/conflicted.js b/src/conflicted.js
+index 0000000..1111111
+--- a/src/conflicted.js
++++ b/src/conflicted.js
+@@ -1,3 +1,6 @@
  const a = 1;
++<<<<<<< HEAD
++const kept = 'first';
++=======
++const kept = 'incoming';
++>>>>>>> branch
+ const a = 1;
++<<<<<<< HEAD
++const second = 2;
++=======
 +const second = 3;
++>>>>>>> branch`;
+
     const conflictedContent = `const a = 1;
 <<<<<<< HEAD
 const kept = 'first';

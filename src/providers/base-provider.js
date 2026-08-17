@@ -67,7 +67,6 @@ class BaseProvider {
    * Retry logic for API calls
    */
   async withRetry(fn, maxRetries = 3, delay = 1000) {
-    let lastError;
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await fn();
@@ -90,7 +89,6 @@ class BaseProvider {
         }
       }
     }
-    throw lastError;
   }
 
   /**

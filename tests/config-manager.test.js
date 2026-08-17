@@ -81,15 +81,6 @@ describe('ConfigManager', () => {
     });
   });
 
-  describe('getConfigPath', () => {
-    it('should return configuration file path', () => {
-      const path = configManager.getConfigPath();
-
-      expect(path).toBeDefined();
-      expect(typeof path).toBe('string');
-    });
-  });
-
   describe('load', () => {
     it('should load configuration', async () => {
       const result = await configManager.load();
@@ -145,57 +136,6 @@ describe('ConfigManager', () => {
       expect(config).toBeDefined();
       expect(config.model).toBe('qwen2.5-coder:latest');
       expect(config.baseURL).toBe('http://localhost:11434');
-    });
-  });
-
-  describe('validateApiKey', () => {
-    it('should validate ollama provider without API key', async () => {
-      const result = await configManager.validateApiKey('ollama');
-      expect(result).toBe(true);
-    });
-
-    it('should validate groq provider with API key', async () => {
-      await configManager.set('apiKey', 'test-key');
-
-      const result = await configManager.validateApiKey('groq');
-      expect(result).toBe(true);
-    });
-
-    it('should throw error for groq provider without API key', async () => {
-      await configManager.set('apiKey', null);
-
-      // Simulate absence of .env / environment key overrides
-      const savedKey = process.env.GROQ_API_KEY;
-      delete process.env.GROQ_API_KEY;
-
-      try {
-        await expect(configManager.validateApiKey('groq')).rejects.toThrow(
-          'API key not configured'
-        );
-      } finally {
-        if (savedKey !== undefined) process.env.GROQ_API_KEY = savedKey;
-      }
-    });
-  });
-
-  describe('validateProviderConfig', () => {
-    it('should validate groq provider', async () => {
-      const result = await configManager.validateProviderConfig('groq', { apiKey: 'test' });
-
-      expect(result.valid).toBe(true);
-    });
-
-    it('should validate ollama provider', async () => {
-      const result = await configManager.validateProviderConfig('ollama', {});
-
-      expect(result.valid).toBe(true);
-    });
-
-    it('should reject unknown provider', async () => {
-      const result = await configManager.validateProviderConfig('unknown', {});
-
-      expect(result.valid).toBe(false);
-      expect(result.errors.length).toBeGreaterThan(0);
     });
   });
 

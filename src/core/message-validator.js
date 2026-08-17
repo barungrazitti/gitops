@@ -315,44 +315,6 @@ class MessageValidator {
   }
 
   /**
-   * Generate suggestions for improving a message
-   * @param {string[]} issues - List of issues found
-   * @returns {string[]} Suggestions for improvement
-   */
-  generateSuggestions(issues) {
-    const suggestions = [];
-
-    if (issues.includes('generic')) {
-      suggestions.push('Be more specific: mention function/class names changed');
-      suggestions.push('Example: "fix AuthService token validation" instead of "fix bug"');
-    }
-
-    if (issues.includes('no-reasoning')) {
-      suggestions.push('Add why: "to fix X bug", "enables Y feature", "improves Z performance"');
-      suggestions.push('Example: "add caching to reduce API calls" instead of "add caching"');
-    }
-
-    if (issues.includes('no-scope')) {
-      suggestions.push('Consider adding scope: "feat(auth): add login validation"');
-    }
-
-    if (issues.includes('too-short')) {
-      suggestions.push('Provide more detail: what changed and why it matters');
-    }
-
-    if (issues.includes('too-long')) {
-      suggestions.push('Move details to commit body, keep title under 72 chars');
-    }
-
-    if (issues.includes('banned-pattern')) {
-      suggestions.push('Use conventional commit format: type(scope): description');
-      suggestions.push('Example: "feat(api): add user authentication endpoint"');
-    }
-
-    return suggestions;
-  }
-
-  /**
    * Check if message is relevant to the actual diff facts
    * @param {string} message - Commit message
    * @param {Object} diffFacts - Output from DiffFactAnalyzer.analyze()

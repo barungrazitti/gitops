@@ -56,46 +56,4 @@ describe('SecretScanner', () => {
       expect(result).toBe('');
     });
   });
-
-  describe('scan', () => {
-    it('should return empty array for non-string', () => {
-      expect(scanner.scan(null)).toEqual([]);
-      expect(scanner.scan(123)).toEqual([]);
-    });
-
-    it('should return empty array for no secrets', () => {
-      const result = scanner.scan('normal content');
-      expect(result).toEqual([]);
-    });
-
-    it('should detect secrets', () => {
-      const content = 'API Key: sk-test1234567890';
-      const result = scanner.scan(content);
-      expect(result.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('getPatternInfo', () => {
-    it('should return pattern info by name', () => {
-      const patternInfo = scanner.getPatternInfo('jwt_token');
-      expect(patternInfo).toBeDefined();
-    });
-
-    it('should return undefined for unknown pattern', () => {
-      const patternInfo = scanner.getPatternInfo('unknown');
-      expect(patternInfo).toBeUndefined();
-    });
-  });
-
-  describe('addCustomPattern', () => {
-    it('should add custom pattern', () => {
-      const initialLength = scanner.secretPatterns.length;
-      scanner.addCustomPattern({
-        name: 'custom',
-        pattern: /CUSTOM/g,
-        replacement: '[REDACTED]',
-      });
-      expect(scanner.secretPatterns.length).toBe(initialLength + 1);
-    });
-  });
 });

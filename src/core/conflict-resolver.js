@@ -326,47 +326,7 @@ RESOLVED CODE (output only):
     };
   }
 
-  /**
-   * Clean conflict markers from content string (simple version - keeps HEAD)
-   */
-  cleanConflictMarkers(content) {
-    const lines = content.split('\n');
-    const result = [];
-    let inConflict = false;
-    let collectingHead = true;
-    let headLines = [];
-
-    for (const line of lines) {
-      if (line.startsWith('<<<<<<<')) {
-        inConflict = true;
-        collectingHead = true;
-        continue;
-      }
-
-      if (line.startsWith('=======')) {
-        collectingHead = false;
-        continue;
-      }
-
-      if (line.startsWith('>>>>>>>')) {
-        inConflict = false;
-        result.push(...headLines);
-        headLines = [];
-        continue;
-      }
-
-      if (inConflict) {
-        if (collectingHead) {
-          headLines.push(line);
-        }
-      } else {
-        result.push(line);
-      }
-    }
-    return result.join('\n').trim();
-  }
 }
 
 module.exports = ConflictResolver;
-module.exports.CONFLICT_MARKER_REGEX = CONFLICT_MARKER_REGEX;
 module.exports.DIFF_MARKER_REGEX = DIFF_MARKER_REGEX;

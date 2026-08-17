@@ -13,7 +13,6 @@ const DiffShaper = require('../core/diff-shaper');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
-    this.preserveContext = options.preserveContext !== false;
     this.diffCategorizer = new DiffCategorizer();
     this.entityExtractor = new EntityExtractor();
     this.diffSummarizer = new DiffSummarizer();

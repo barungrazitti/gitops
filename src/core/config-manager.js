@@ -298,43 +298,6 @@ class ConfigManager {
   }
 
   /**
-   * Get configuration file path
-   */
-  getConfigPath() {
-    return this.config.path;
-  }
-
-  /**
-   * Export configuration to file
-   */
-  async export(filePath) {
-    try {
-      const config = this.config.store;
-      await fs.writeJson(filePath, config, { spaces: 2 });
-    } catch (error) {
-      throw new Error(`Failed to export configuration: ${error.message}`);
-    }
-  }
-
-  /**
-   * Import configuration from file
-   */
-  async import(filePath) {
-    try {
-      const config = await fs.readJson(filePath);
-      const { error } = this.schema.validate(config);
-
-      if (error) {
-        throw new Error(`Invalid configuration file: ${error.message}`);
-      }
-
-      this.config.store = config;
-    } catch (error) {
-      throw new Error(`Failed to import configuration: ${error.message}`);
-    }
-  }
-
-  /**
    * Get provider-specific configuration
    */
   async getProviderConfig(provider) {
@@ -399,61 +362,6 @@ class ConfigManager {
     } catch (error) {
       throw new Error(`Failed to get all configuration: ${error.message}`);
     }
-  }
-
-  /**
-   * Validate API key for provider
-   */
-  async validateApiKey(provider) {
-    const config = await this.load();
-
-    if (provider === 'ollama') {
-      return true; // Ollama doesn't require API key
-    }
-
-    if (!config.apiKey) {
-      throw new Error(`API key not configured for ${provider}. Run 'aicommit setup' to configure.`);
-    }
-
-    return true;
-  }
-
-  /**
-   * Validate provider configuration
-   */
-  async validateProviderConfig(provider, config = {}) {
-    if (!provider) {
-      throw new Error('Provider name is required');
-    }
-
-    const availableProviders = ['groq', 'ollama'];
-    if (!availableProviders.includes(provider.toLowerCase())) {
-      return {
-        valid: false,
-        errors: [`Unknown provider: ${provider}`],
-      };
-    }
-
-    const errors = [];
-
-    switch (provider.toLowerCase()) {
-      case 'groq':
-        if (!config.apiKey) {
-          errors.push('API key is required');
-        }
-        break;
-      case 'ollama':
-        // Ollama doesn't require API key but may need other validations
-        if (config.url && !this.isValidUrl(config.url)) {
-          errors.push('Invalid URL format for Ollama');
-        }
-        break;
-    }
-
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
   }
 
   /**

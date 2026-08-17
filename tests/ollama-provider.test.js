@@ -141,39 +141,6 @@ describe('OllamaProvider', () => {
     });
   });
 
-  describe('getAvailableModels', () => {
-    it('should return models from API', async () => {
-      const axios = require('axios');
-      axios.get.mockResolvedValue({
-        data: { models: [{ name: 'deepseek-v3.1:671b-cloud', size: 1000 }] },
-      });
-
-      const models = await provider.getAvailableModels();
-      expect(Array.isArray(models)).toBe(true);
-      expect(models[0]).toHaveProperty('id');
-    });
-
-    it('should return fallback models when API fails', async () => {
-      const axios = require('axios');
-      axios.get.mockRejectedValue(new Error('API failed'));
-
-      const models = await provider.getAvailableModels();
-      expect(models.length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('getModelDescription', () => {
-    it('should return description for known model', () => {
-      const desc = provider.getModelDescription('deepseek-v3.1:671b-cloud');
-      expect(desc).toContain('Large language model');
-    });
-
-    it('should return generic description for unknown model', () => {
-      const desc = provider.getModelDescription('unknown-model:latest');
-      expect(desc).toContain('AI model');
-    });
-  });
-
   describe('cleanup', () => {
     it('should cleanup resources', () => {
       provider.client = {};

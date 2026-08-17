@@ -337,47 +337,6 @@ describe('MessageValidator', () => {
     });
   });
 
-  describe('generateSuggestions()', () => {
-    it('should generate suggestions for generic messages', () => {
-      const suggestions = validator.generateSuggestions(['generic']);
-      expect(suggestions).toContain('Be more specific: mention function/class names changed');
-      expect(suggestions).toContain(
-        'Example: "fix AuthService token validation" instead of "fix bug"'
-      );
-    });
-
-    it('should generate suggestions for missing reasoning', () => {
-      const suggestions = validator.generateSuggestions(['no-reasoning']);
-      expect(suggestions).toContain(
-        'Add why: "to fix X bug", "enables Y feature", "improves Z performance"'
-      );
-      expect(suggestions).toContain(
-        'Example: "add caching to reduce API calls" instead of "add caching"'
-      );
-    });
-
-    it('should generate suggestions for missing scope', () => {
-      const suggestions = validator.generateSuggestions(['no-scope']);
-      expect(suggestions).toContain('Consider adding scope: "feat(auth): add login validation"');
-    });
-
-    it('should generate suggestions for banned patterns', () => {
-      const suggestions = validator.generateSuggestions(['banned-pattern']);
-      expect(suggestions).toContain('Use conventional commit format: type(scope): description');
-      expect(suggestions).toContain('Example: "feat(api): add user authentication endpoint"');
-    });
-
-    it('should return empty array for no issues', () => {
-      const suggestions = validator.generateSuggestions([]);
-      expect(suggestions.length).toBe(0);
-    });
-
-    it('should generate multiple suggestions for multiple issues', () => {
-      const suggestions = validator.generateSuggestions(['generic', 'no-reasoning']);
-      expect(suggestions.length).toBeGreaterThan(2);
-    });
-  });
-
   describe('checkRelevance()', () => {
     const deletionOnlyFacts = {
       patterns: {

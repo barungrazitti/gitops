@@ -449,29 +449,6 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
     });
   });
 
-  describe('cleanConflictMarkers (via conflictResolver)', () => {
-    it('should clean conflict markers keeping current version', () => {
-      const content = `<<<<<<<
-old line
-=======
-new line
->>>>>>> branch`;
-
-      const result = generator.conflictResolver.cleanConflictMarkers(content);
-
-      expect(result).not.toContain('<<<<<<< ');
-      expect(result).not.toContain('=======');
-      expect(result).not.toContain('>>>>>>> ');
-    });
-
-    it('should handle content without conflicts', () => {
-      const content = 'normal content\nline 2\nline 3';
-      const result = generator.conflictResolver.cleanConflictMarkers(content);
-
-      expect(result).toBe('normal content\nline 2\nline 3');
-    });
-  });
-
   describe('parseConflictBlocks (via conflictResolver)', () => {
     it('should parse conflict blocks from content', () => {
       const content = `<<<<<<<

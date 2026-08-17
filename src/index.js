@@ -181,7 +181,7 @@ Do not explain the error, just provide the solution.`;
     }).start();
     const startTime = Date.now();
     let mergedOptions = {};
-    const diff = '';
+    let diff = '';
 
     try {
       await this.activityLogger.info('generate_started', { options });

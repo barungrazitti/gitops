@@ -724,12 +724,6 @@ class AnalysisEngine {
    * Check if project has test files
    */
   async hasTestFiles(repoRoot) {
-    // Test patterns for future use
-    // const _testPatterns = [
-    //   '*.test.*',
-    //   '*.spec.*',
-    // ];
-
     // Simple check for common test directories
     const testDirs = ['test', 'tests', 'spec', '__tests__'];
     for (const dir of testDirs) {

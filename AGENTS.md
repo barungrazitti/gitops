@@ -4,7 +4,7 @@
 
 ### Testing
 
-- `npm test` - Run full Jest test suite (501 tests, 26 suites)
+- `npm test` - Run full Jest test suite (472 tests, 26 suites)
 - `npx jest tests/auto-git.test.js` - Run single test file
 - `npm run test:coverage` - Jest with coverage report
 - `npm run test:watch` - Jest in watch mode
@@ -105,12 +105,15 @@
 - `src/utils/performance-utils.js` (291 lines) — zero callers
 - Dead cache/stats surface: `findSimilar*`, `quickHash`, `recordCacheHit/Miss/Error`, duplicate `isSafe`, `sanitizeDiffContent`, `TokenCounter.estimateCost/clearCache`, unused prompt-template builders, `DiffCategorizer.getDefaults/validateThresholds`
 - Dead provider-factory statics: `getDefaultProvider`, `getProviderConfig`, `isProviderAvailable`, `testProvider`, `getProviderModels`, `setProviderConfig`, `getAllAvailableModels`, `getBestAvailableModel`, `autoConfigureProvider`, `getAvailableProviders` (only `create(name, deps)` + `validateProvider` remain)
+- Dead methods removed (2026-08-17): HookManager (`isInstalled`, `getHookPath`, `generateAdvancedHookScript`, `updateHookConfig`, `getStatus`, `parseHookConfig`), StatsManager (`getDetailedStats`, `calculateTrends`, `export`, `getStatsPath`), ConfigManager (`getConfigPath`, `export`, `import`, `validateApiKey`, `validateProviderConfig`), SecretScanner (`scan`, `isSafe`, `containsSecrets`, `scanDiffContent`, `getPatternInfo`, `addCustomPattern`, `getKnownPatterns`, `getDescriptionForPattern`, `enableEnterpriseMode`, `isContentSafe`, `getSecurityReport`, `_generateRecommendations`), GroqProvider (`test`, `getAvailableModels`), OllamaProvider (`getAvailableModels`, `getModelDescription`, `formatSize`, `pullModel`), MessageValidator (`generateSuggestions`), ConflictResolver (`cleanConflictMarkers`), EntityExtractor (`formatEntityListByType`)
+- Dead exports: `CONFLICT_MARKER_REGEX` (conflict-resolver.js), `ALLOWED_TYPES` (metrics-scorer.js)
+- Dead code fixes: unreachable `throw lastError` (base-provider.js), unused `preserveContext` property (efficient-prompt-builder.js), dead `const diff` shadow (index.js), `const` → `let` bug fix (project-type-detector.js), commented-out code (analysis-engine.js)
 
 ## Project Status
 
 | Metric | Status |
 |--------|--------|
-| Tests | 501 tests, 26 suites ✅ |
+| Tests | 472 tests, 26 suites ✅ |
 | Lint | 0 errors, 0 warnings ✅ |
 | Default model | `openai/gpt-oss-20b` (Groq) |
 | Entry point | `bin/aic` (single command) |

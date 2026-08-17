@@ -13,7 +13,7 @@ class ProjectTypeDetector {
     try {
       // First, check for WordPress-specific indicators with high priority
       const wordpressInfo = await this.detectWordPress(repoRoot);
-      const hasWordPress = wordpressInfo.isWordPress;
+      let hasWordPress = wordpressInfo.isWordPress;
 
       // Check for other project indicators
       const indicators = {

@@ -67,28 +67,4 @@ describe('EntityExtractor', () => {
       expect(result.all[0]).toHaveProperty('type');
     });
   });
-
-  describe('formatEntityListByType', () => {
-    test('formats entity list by type', () => {
-      const entities = {
-        functions: ['calculateTotal', 'updateUser'],
-        classes: ['UserManager'],
-        variables: ['userCount'],
-      };
-      const formatted = extractor.formatEntityListByType(entities);
-      expect(formatted).toContain('Functions: calculateTotal, updateUser');
-      expect(formatted).toContain('Classes: UserManager');
-      expect(formatted).toContain('Variables: userCount');
-    });
-
-    test('handles empty entity types', () => {
-      const entities = {
-        functions: [],
-        classes: [],
-        variables: [],
-      };
-      const formatted = extractor.formatEntityListByType(entities);
-      expect(formatted).toBe('');
-    });
-  });
 });

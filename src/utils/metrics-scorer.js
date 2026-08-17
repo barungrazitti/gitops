@@ -148,4 +148,3 @@ class MetricsScorer {
 }
 
 module.exports = MetricsScorer;
-module.exports.ALLOWED_TYPES = ALLOWED_TYPES;
