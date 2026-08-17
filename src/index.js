@@ -18,7 +18,8 @@ const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
 const SecretScanner = require('./utils/secret-scanner');
 const EfficientPromptBuilder = require('./utils/efficient-prompt-builder');
-const OptimizedDiffProcessor = require('./utils/optimized-diff-processor');
+const CLIPresenter = require('./cli-presenter');
+const ErrorHandler = require('./utils/error-handler');
 const MetricsScorer = require('./utils/metrics-scorer');
 const DiffShaper = require('./core/diff-shaper');
 
@@ -33,8 +34,8 @@ class AICommitGenerator {
     this.hookManager = new HookManager();
     this.activityLogger = new ActivityLogger();
     this.efficientPromptBuilder = new EfficientPromptBuilder();
-    this.diffProcessor = new OptimizedDiffProcessor();
     this.metricsScorer = new MetricsScorer();
+    this.errorHandler = new ErrorHandler();
     this.diffShaper = new DiffShaper();
     this.messageRanker = new MessageRanker();
     this.messageValidator = new MessageValidator();
@@ -43,6 +44,7 @@ class AICommitGenerator {
       gitManager: this.gitManager,
       activityLogger: this.activityLogger,
     });
+    this.cliPresenter = new CLIPresenter(this);
   }
 
   /**
@@ -120,6 +122,18 @@ Do not explain the error, just provide the solution.`;
       });
       return null;
     }
+  }
+
+  identifyErrorType(error) {
+    return this.errorHandler.identifyErrorType(error);
+  }
+
+  getLocalSuggestion(type) {
+    return this.errorHandler.getLocalSuggestion(type);
+  }
+
+  async provideErrorSuggestions(error, options = {}) {
+    return this.errorHandler.provideErrorSuggestions(error, options);
   }
 
   /**
@@ -271,8 +285,7 @@ Do not explain the error, just provide the solution.`;
         await this.gitManager.commit(selectedMessage);
         console.log(chalk.green('\n✅ Commit created successfully!'));
 
-        // Update statistics
-        await this.statsManager.recordCommit(mergedOptions.provider || config.defaultProvider);
+
 
         // Log successful commit
         await this.activityLogger.logGitOperation('commit', {
@@ -308,99 +321,6 @@ Do not explain the error, just provide the solution.`;
   /**
    * Identify the type of error to provide better suggestions
    */
-  identifyErrorType(error) {
-    const message = error.message.toLowerCase();
-
-    if (message.includes('no staged changes')) {
-      return 'git_no_changes';
-    }
-
-    if (message.includes('not a git repository')) {
-      return 'git_not_repo';
-    }
-
-    if (
-      message.includes('401') ||
-      message.includes('unauthorized') ||
-      message.includes('api key')
-    ) {
-      return 'ai_auth_error';
-    }
-
-    if (
-      message.includes('429') ||
-      message.includes('too many requests') ||
-      message.includes('rate limit')
-    ) {
-      return 'ai_rate_limit';
-    }
-
-    if (message.includes('econnrefused') || message.includes('enotfound')) {
-      return 'ai_connection_error';
-    }
-
-    if (message.includes('context length exceeded') || message.includes('too large')) {
-      return 'ai_context_limit';
-    }
-
-    return 'unknown';
-  }
-
-  /**
-   * Get a local fallback suggestion for an error type
-   */
-  getLocalSuggestion(type) {
-    const suggestions = {
-      git_no_changes:
-        'No changes are staged. Use "git add <file>" to stage changes before running aic.',
-      git_not_repo: 'This directory is not a git repository. Run "git init" to initialize one.',
-      ai_auth_error:
-        'AI provider authentication failed. Run "aic setup" to configure your API key.',
-      ai_rate_limit:
-        'AI provider rate limit reached. Please wait a moment or switch providers with "aic setup".',
-      ai_connection_error:
-        'Could not connect to AI provider. Check your internet connection or ensure Ollama is running.',
-      ai_context_limit:
-        'The diff is too large for the AI provider. Try staging fewer files or smaller changes.',
-      unknown: 'An unexpected error occurred. Check your internet connection and try again.',
-    };
-
-    return suggestions[type] || suggestions.unknown;
-  }
-
-  /**
-   * Provide helpful suggestions based on error type
-   */
-  async provideErrorSuggestions(error, options = {}) {
-    try {
-      // 1. Identify error type
-      const errorType = this.identifyErrorType(error);
-
-      // 2. Try AI-powered suggestion if possible
-      if (this.isAIAvailable(options)) {
-        try {
-          const suggestion = await this.getAISuggestion(error, options);
-          if (suggestion) {
-            console.log(chalk.yellow(`\n💡 AI Suggestion: ${suggestion}`));
-            return;
-          }
-        } catch (aiError) {
-          // Silently fall back to local suggestions
-          await this.activityLogger.debug('ai_suggestion_failed_in_provide', {
-            error: aiError.message,
-          });
-        }
-      }
-
-      // 3. Fallback to local suggestions
-      const localSuggestion = this.getLocalSuggestion(errorType);
-      if (localSuggestion) {
-        console.log(chalk.yellow(`\n💡 Suggestion: ${localSuggestion}`));
-      }
-    } catch (fallbackError) {
-      // Fail silently to avoid crashing the error handler itself
-    }
-  }
 
   /**
    * Interactive message selection
@@ -491,7 +411,9 @@ Do not explain the error, just provide the solution.`;
       const config = await this.configManager.load();
       console.log(chalk.cyan('Current configuration:'));
       Object.entries(config).forEach(([key, value]) => {
-        console.log(`  ${key}: ${value}`);
+        // Never print secrets in plaintext
+        const display = key === 'apiKey' && value ? '***configured***' : value;
+        console.log(`  ${key}: ${display}`);
       });
     } else if (options.reset) {
       await this.configManager.reset();

@@ -53,8 +53,18 @@ class GroqProvider extends BaseProvider {
       async () =>
         await this.circuitBreaker.execute(
           async () => {
+            const model = options.model || config.model || 'openai/gpt-oss-20b';
+
+            // Reasoning models (gpt-oss) spend tokens on internal reasoning
+            // before emitting content - a low max_tokens yields an empty
+            // message.content ("No message content in Groq response").
+            const isReasoningModel = model.includes('gpt-oss');
+            const maxTokens = isReasoningModel
+              ? Math.max(config.maxTokens || 0, 2000)
+              : config.maxTokens || 150;
+
             const response = await this.client.chat.completions.create({
-              model: options.model || config.model || 'openai/gpt-oss-20b',
+              model,
               messages: [
                 {
                   role: 'system',
@@ -66,7 +76,7 @@ class GroqProvider extends BaseProvider {
                   content: prompt,
                 },
               ],
-              max_tokens: config.maxTokens || 150,
+              max_tokens: maxTokens,
               temperature: config.temperature || 0.3,
             });
 
@@ -284,33 +294,6 @@ class GroqProvider extends BaseProvider {
       .filter(msg => msg.length > 0);
 
     return messages;
-  }
-
-  /**
-   * Make direct API request to Groq
-   */
-  async makeDirectAPIRequest(endpoint, params = {}) {
-    try {
-      const config = await this.getConfig();
-      const response = await this.sendHTTPRequest(`${this.baseURL}${endpoint}`, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        ...params,
-      });
-      return response;
-    } catch (error) {
-      throw new Error(`Groq direct API request failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Cleanup resources
-   */
-  cleanup() {
-    this.client = null;
   }
 }
 

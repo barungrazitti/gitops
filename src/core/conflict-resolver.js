@@ -127,19 +127,31 @@ RESOLVED CODE (output only):
       const config = await this.configManager.getAll();
       const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
 
-      const messages = await provider.generateCommitMessages(
-        `RESOLVE CONFLICT IN ${filePath}:\n\n${prompt}`,
-        { count: 1 }
-      );
+      // Use the general-purpose completion path - NOT generateCommitMessages,
+      // which wraps the prompt in commit-message instructions and causes
+      // contradictory output ("OUTPUT ONLY COMMIT MESSAGE" vs "output resolved code")
+      const response = await provider.generateResponse(prompt, {
+        maxTokens: 2000,
+        temperature: 0.2,
+      });
 
-      if (messages && messages.length > 0) {
-        let resolved = messages[0].trim();
+      const resolved = Array.isArray(response) ? response[0] : response;
+
+      if (resolved && resolved.trim()) {
+        let cleaned = resolved.trim();
 
         // Clean up any markdown code blocks if present
-        resolved = resolved.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
+        cleaned = cleaned.replace(/^```[a-zA-Z]*\n/, '').replace(/\n```$/, '');
 
-        return resolved;
+        // Reject non-resolutions (apologies, explanations, empty code blocks)
+        if (cleaned.length > 0 && !/^```\s*$/.test(cleaned)) {
+          return cleaned;
+        }
       }
+
+      await this.activityLogger.warn('conflict_resolution_empty_response', {
+        file: filePath,
+      });
     } catch (error) {
       console.warn(chalk.yellow(`AI resolution failed, using current version: ${error.message}`));
     }
@@ -154,7 +166,7 @@ RESOLVED CODE (output only):
   async detectAndCleanupConflictMarkers() {
     const diff = await this.gitManager.getStagedDiff();
 
-    if (!diff || !/<<<<<<<|=======|>>>>>>>/.test(diff)) {
+    if (!diff || !/^<{7}|^={7}\s*$|^>{7}/m.test(diff)) {
       return { cleaned: false, filesFixed: 0, diff };
     }
 
@@ -183,7 +195,7 @@ RESOLVED CODE (output only):
 
       for (const fileMatch of fileMatches) {
         const fileDiff = fileMatch[0];
-        if (/<<<<<<<|=======|>>>>>>>/.test(fileDiff)) {
+        if (/^<{7}|^={7}\s*$|^>{7}/m.test(fileDiff)) {
           // Check if file exists and read it
           const fullPath = path.isAbsolute(file.fileB)
             ? file.fileB
@@ -191,7 +203,7 @@ RESOLVED CODE (output only):
 
           try {
             const content = await fs.readFile(fullPath, 'utf8');
-            if (/<<<<<<<|=======|>>>>>>>/.test(content)) {
+            if (/^<{7}|^={7}\s*$|^>{7}/m.test(content)) {
               // Parse and resolve conflicts using AI
               const conflicts = this.parseConflictBlocks(content);
               let cleanedContent = content;
@@ -214,6 +226,11 @@ RESOLVED CODE (output only):
                 };
                 const language = langMap[ext] || 'javascript';
 
+                // Locate this conflict block in the working copy (sequential,
+                // so earlier resolutions are preserved)
+                const blockStart = cleanedContent.indexOf('<<<<<<<');
+                const markerEnd = cleanedContent.indexOf('>>>>>>>', blockStart);
+
                 try {
                   const resolved = await this.resolveConflictWithAI(
                     file.fileB,
@@ -222,20 +239,13 @@ RESOLVED CODE (output only):
                     language
                   );
 
-                  // Replace the conflict block
-                  const conflictBlockStart = content.indexOf(
-                    '<<<<<<<',
-                    conflict.startLine > 0 ? content.lastIndexOf('\n', conflict.startLine) : 0
-                  );
-                  const conflictBlockEnd =
-                    content.indexOf('>>>>>>>', conflictBlockStart) +
-                    content
-                      .substring(content.indexOf('>>>>>>>', conflictBlockStart))
-                      .indexOf('\n') +
-                    1;
+                  if (blockStart >= 0 && markerEnd >= blockStart) {
+                    // Include the rest of the '>>>>>>>' line (branch label + newline)
+                    let endOfBlock = markerEnd + '>>>>>>>'.length;
+                    if (cleanedContent[endOfBlock] === '\n') endOfBlock += 1;
 
-                  if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
-                    cleanedContent = `${content.substring(0, conflictBlockStart) + resolved}\n${content.substring(conflictBlockEnd)}`;
+                    cleanedContent =
+                      cleanedContent.slice(0, blockStart) + resolved + cleanedContent.slice(endOfBlock);
                   } else {
                     cleanedContent = cleanedContent.replace(
                       `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
@@ -247,10 +257,14 @@ RESOLVED CODE (output only):
                   fileAiUsed = true;
                 } catch (e) {
                   // Fallback: use current version
-                  cleanedContent = cleanedContent.replace(
-                    `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                    `${conflict.currentVersion}\n`
-                  );
+                  if (blockStart >= 0 && markerEnd >= blockStart) {
+                    let endOfBlock = markerEnd + '>>>>>>>'.length;
+                    if (cleanedContent[endOfBlock] === '\n') endOfBlock += 1;
+                    cleanedContent =
+                      cleanedContent.slice(0, blockStart) +
+                      conflict.currentVersion +
+                      cleanedContent.slice(endOfBlock);
+                  }
                 }
               }
 

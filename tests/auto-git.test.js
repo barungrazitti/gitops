@@ -10,6 +10,8 @@ jest.mock('inquirer');
 jest.mock('fs-extra');
 jest.mock('path', () => ({
   join: jest.fn((...args) => args.join('/')),
+  resolve: jest.fn((...args) => args.join('/')),
+  isAbsolute: jest.fn(p => String(p).startsWith('/')),
 }));
 
 const simpleGit = require('simple-git');
@@ -42,7 +44,7 @@ describe('AutoGit', () => {
     };
     simpleGit.mockReturnValue(mockGit);
 
-    // Setup mock AI commit generator
+    // Setup mock AI commit generator and collaborators
     mockAiCommit = {
       activityLogger: {
         info: jest.fn().mockResolvedValue(),
@@ -56,8 +58,11 @@ describe('AutoGit', () => {
       configManager: {
         getAll: jest.fn().mockResolvedValue({}),
       },
-      generateWithSequentialFallback: jest.fn(),
-      resolveConflictWithAI: jest.fn(),
+      generateMessages: jest.fn(),
+      conflictResolver: {
+        detectAndCleanupConflictMarkers: jest.fn().mockResolvedValue({ cleaned: false }),
+        resolveConflictWithAI: jest.fn(),
+      },
     };
     AICommitGenerator.mockImplementation(() => mockAiCommit);
 
@@ -70,16 +75,23 @@ describe('AutoGit', () => {
     };
     ora.mockReturnValue(mockSpinner);
 
-    autoGit = new AutoGit();
+    autoGit = new AutoGit({
+      gitManager: {},
+      analysisEngine: mockAiCommit.analysisEngine,
+      configManager: mockAiCommit.configManager,
+      generateMessages: mockAiCommit.generateMessages,
+      conflictResolver: mockAiCommit.conflictResolver,
+      activityLogger: mockAiCommit.activityLogger,
+    });
   });
 
   describe('constructor', () => {
-    it('should initialize with git and AI commit instances', () => {
+    it('should initialize with git and injected collaborators', () => {
       expect(simpleGit).toHaveBeenCalled();
-      expect(AICommitGenerator).toHaveBeenCalled();
       expect(autoGit.git).toBe(mockGit);
-      expect(autoGit.aiCommit).toBe(mockAiCommit);
       expect(autoGit.activityLogger).toBe(mockAiCommit.activityLogger);
+      expect(autoGit.analysisEngine).toBe(mockAiCommit.analysisEngine);
+      expect(autoGit.conflictResolver).toBe(mockAiCommit.conflictResolver);
     });
 
     it('should configure git to prefer merge over rebase', () => {
@@ -331,7 +343,7 @@ describe('AutoGit', () => {
     });
 
     it('should generate commit message successfully', async () => {
-      mockAiCommit.generateWithSequentialFallback.mockResolvedValue(['feat: add test']);
+      mockAiCommit.generateMessages.mockResolvedValue(['feat: add test']);
 
       const message = await autoGit.generateCommitMessage({});
 
@@ -348,7 +360,7 @@ describe('AutoGit', () => {
 
     it('should handle generation errors', async () => {
       const error = new Error('Generation error');
-      mockAiCommit.generateWithSequentialFallback.mockRejectedValue(error);
+      mockAiCommit.generateMessages.mockRejectedValue(error);
 
       await expect(autoGit.generateCommitMessage()).rejects.toThrow('Generation error');
       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to generate commit message');
@@ -356,11 +368,11 @@ describe('AutoGit', () => {
 
     it('should pass options to AI generator', async () => {
       const options = { provider: 'ollama' };
-      mockAiCommit.generateWithSequentialFallback.mockResolvedValue(['test message']);
+      mockAiCommit.generateMessages.mockResolvedValue(['test message']);
 
       await autoGit.generateCommitMessage(options);
 
-      expect(mockAiCommit.generateWithSequentialFallback).toHaveBeenCalledWith('test diff', {
+      expect(mockAiCommit.generateMessages).toHaveBeenCalledWith('test diff', {
         context: {},
         count: 1,
         conventional: true,
@@ -568,7 +580,7 @@ describe('AutoGit', () => {
       });
       fs.readFile.mockResolvedValue('conflicted content');
       fs.writeFile.mockResolvedValue();
-      mockAiCommit.resolveConflictWithAI.mockResolvedValue('resolved content');
+      mockAiCommit.conflictResolver.resolveConflictWithAI.mockResolvedValue('resolved content');
     });
 
     it('should resolve conflicts successfully', async () => {
@@ -578,7 +590,7 @@ describe('AutoGit', () => {
       expect(mockGit.show).toHaveBeenCalledWith(['--theirs', ':test.js']);
       expect(mockGit.show).toHaveBeenCalledWith(['--ours', ':test.js']);
       expect(fs.readFile).toHaveBeenCalledWith('/repo/root/test.js', 'utf8');
-      expect(mockAiCommit.resolveConflictWithAI).toHaveBeenCalledWith({
+      expect(mockAiCommit.conflictResolver.resolveConflictWithAI).toHaveBeenCalledWith({
         filePath: 'test.js',
         originalContent: 'original',
         currentChanges: 'current',
@@ -591,7 +603,7 @@ describe('AutoGit', () => {
 
     it('should handle resolution errors', async () => {
       const error = new Error('Resolution failed');
-      mockAiCommit.resolveConflictWithAI.mockRejectedValue(error);
+      mockAiCommit.conflictResolver.resolveConflictWithAI.mockRejectedValue(error);
 
       await expect(autoGit.resolveFileConflictsWithAI('test.js')).rejects.toThrow(
         'Failed to resolve conflicts in test.js: Resolution failed'

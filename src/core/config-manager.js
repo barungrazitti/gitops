@@ -4,6 +4,8 @@
 
 const Conf = require('conf');
 
+require('dotenv').config();
+
 const fs = require('fs-extra');
 const Joi = require('joi');
 
@@ -164,6 +166,22 @@ class ConfigManager {
   }
 
   /**
+   * Apply .env / environment overrides to a config object
+   */
+  _applyEnvOverrides(config) {
+    if (process.env.GROQ_API_KEY) {
+      config.apiKey = process.env.GROQ_API_KEY;
+    }
+    if (process.env.AIC_MODEL) {
+      config.model = process.env.AIC_MODEL;
+    }
+    if (process.env.AIC_PROVIDER) {
+      config.defaultProvider = process.env.AIC_PROVIDER;
+    }
+    return config;
+  }
+
+  /**
    * Load configuration
    */
   async load() {
@@ -180,12 +198,8 @@ class ConfigManager {
         throw new Error(`Invalid configuration: ${error.message}`);
       }
 
-      // Update the stored config with new defaults if needed
-      if (JSON.stringify(config) !== JSON.stringify(value)) {
-        Object.entries(value).forEach(([key, val]) => {
-          this.config.set(key, val);
-        });
-      }
+      // .env / environment overrides (do not persist to the conf store)
+      this._applyEnvOverrides(value);
 
       return value;
     } catch (error) {
@@ -380,7 +394,8 @@ class ConfigManager {
    */
   async getAll() {
     try {
-      return this.config.store;
+      const config = await this.load();
+      return config;
     } catch (error) {
       throw new Error(`Failed to get all configuration: ${error.message}`);
     }

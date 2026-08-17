@@ -7,7 +7,6 @@ const DiffCategorizer = require('./diff-categorizer');
 const EntityExtractor = require('./entity-extractor');
 const PromptTemplates = require('./prompt-templates');
 const DiffSummarizer = require('./diff-summarizer');
-const OptimizedDiffProcessor = require('./optimized-diff-processor');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
@@ -18,7 +17,6 @@ class EfficientPromptBuilder {
     this.diffCategorizer = new DiffCategorizer();
     this.entityExtractor = new EntityExtractor();
     this.diffSummarizer = new DiffSummarizer();
-    this.diffProcessor = new OptimizedDiffProcessor();
   }
 
   /**
@@ -78,12 +76,6 @@ class EfficientPromptBuilder {
 
     // Handle large diffs with hierarchical summarization
     if (diffCategory.category === 'large') {
-      // Reuse existing chunking logic
-      const chunks = this.diffProcessor.processDiffWithStrategy(diff);
-      const processingAnalysis = this.diffProcessor.analyzeDiff(diff);
-
-      console.log(`Chunking strategy: ${processingAnalysis.processingStrategy}`);
-
       // Extract file chunks and summarize
       const fileChunks = this.diffSummarizer.extractFileChunks(diff);
       const summaries = fileChunks.map((chunk, index) =>
@@ -102,7 +94,7 @@ class EfficientPromptBuilder {
       });
 
       prompt += '\n\n' + largeDiffPrompt;
-      console.log(`Processing ${fileChunks.length} chunks in parallel...`);
+      console.log(`Processing ${fileChunks.length} chunks summary...`);
     }
 
     // Log category for debugging
@@ -276,10 +268,7 @@ Single best commit message:`;
     }
 
     // Compress if still too long
-    if (this.tokenCounter.countTokens(prompt) > this.maxPromptLength) {
-      prompt = this.compressPrompt(prompt, diff, count, conventional, isWordPressFile);
-    }
-
+    // Note: Diff is already budget-fitted by DiffShaper
     return prompt;
   }
 

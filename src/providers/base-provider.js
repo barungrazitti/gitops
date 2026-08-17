@@ -5,11 +5,14 @@
 const fs = require('fs');
 const path = require('path');
 const ConfigManager = require('../core/config-manager');
+const ActivityLogger = require('../core/activity-logger');
 
 class BaseProvider {
   constructor() {
     this.configManager = new ConfigManager();
+    this.activityLogger = new ActivityLogger();
     this.name = 'base';
+    this.client = null;
   }
 
   /**
@@ -33,7 +36,6 @@ class BaseProvider {
     throw new Error('validate must be implemented by subclass');
   }
 
-
   /**
    * Build enhanced prompt for commit message generation using improved approach
    */
@@ -48,227 +50,26 @@ class BaseProvider {
   }
 
   /**
-   * Analyze diff content for better context
-   */
-  analyzeDiffContent(diff) {
-    const analysis = {
-      hasInsights: false,
-      keyChanges: [],
-      likelyPurpose: null,
-      affectedAreas: [],
-      semanticChanges: {
-        newFunctions: [],
-        modifiedFunctions: [],
-        newClasses: [],
-        newComponents: [],
-        apiChanges: [],
-        databaseChanges: [],
-        configChanges: [],
-        wordpress_hooks: [],
-      },
-    };
-
-    const lines = diff.split('\n');
-    const addedLines = lines.filter(line => line.startsWith('+')).join('\n');
-    const removedLines = lines.filter(line => line.startsWith('-')).join('\n');
-
-    // Enhanced semantic change detection
-    const semanticPatterns = {
-      newFunctions:
-        /^\+.*(?:function\s+(\w+)|const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>|(\w+)\s*:\s*\([^)]*\)\s*=>)/gm,
-      newClasses: /^\+.*class\s+(\w+)/gm,
-      newComponents:
-        /^\+.*(?:function\s+(\w+)\s*\([^)]*\)\s*\{|const\s+(\w+)\s*=\s*(?:React\.)?(?:forwardRef\s*\()?\([^)]*\)\s*=>\s*{)/gm,
-      apiChanges:
-        /^\+.*(?:app\.(get|post|put|delete|patch)|router\.(get|post|put|delete|patch))\s*\(\s*['"]([^'"]+)['"]/gm,
-      databaseChanges: /^\+.*(?:CREATE|ALTER|DROP|INSERT|UPDATE|DELETE)\s+(TABLE|INDEX|DATABASE)/gm,
-      configChanges: /^\+.*(?:process\.env|config\.|\.env|ENV\[)/gm,
-      wordpress_hooks:
-        /^\+.*add_action\s*\(\s*['"]([^'"]+)['"]|^\+.*add_filter\s*\(\s*['"]([^'"]+)['"]|^\+.*add_shortcode\s*\(\s*['"]([^'"]+)['"]/gm,
-    };
-
-    // Extract semantic changes
-    for (const [changeType, pattern] of Object.entries(semanticPatterns)) {
-      let match;
-      while ((match = pattern.exec(diff)) !== null) {
-        if (
-          changeType === 'newFunctions' ||
-          changeType === 'newClasses' ||
-          changeType === 'newComponents'
-        ) {
-          const name = match[1] || match[2] || match[3];
-          if (name) analysis.semanticChanges[changeType].push(name);
-        } else if (changeType === 'apiChanges') {
-          const method = match[1];
-          const endpoint = match[2];
-          analysis.semanticChanges[changeType].push(`${method.toUpperCase()} ${endpoint}`);
-        } else if (changeType === 'configChanges') {
-          analysis.semanticChanges[changeType].push(match[0].substring(1).trim());
-        } else {
-          analysis.semanticChanges[changeType].push(match[0].substring(1).trim());
-        }
-      }
-    }
-
-    // Enhanced area patterns with more comprehensive WordPress detection
-    const patterns = {
-      authentication: /auth|login|user|session|jwt|passport|password|token/i,
-      'api endpoints': /api|endpoint|route|controller|handler|service|express|router/i,
-      database: /database|db|model|schema|migration|sql|query|sequelize|mongoose|prisma/i,
-      'ui components': /component|view|template|render|jsx|tsx|html|react|vue|angular/i,
-      configuration: /config|env|setting|constant|environment|dotenv/i,
-      testing: /test|spec|mock|fixture|describe|it\(|expect|jest|mocha|cypress/i,
-      dependencies: /package|npm|yarn|require|import|dependency|node_modules/i,
-      'error handling': /error|exception|try|catch|throw|validation|sanitize/i,
-      performance: /performance|optimize|cache|lazy|memo|async|await|promise/i,
-      security: /security|sanitize|validate|escape|encrypt|hash|bcrypt|crypto/i,
-      wordpress:
-        /wordpress|wp_config|wp-|add_action|add_filter|add_shortcode|wp_enqueue|wp_localize|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php|style\.css|index\.php|single\.php|page\.php|category\.php|tag\.php|archive\.php|search\.php|404\.php|comments\.php|header\.php|footer\.php|sidebar\.php/i,
-      typescript: /interface|type\s+\w+|enum|namespace|declare/i,
-    };
-
-    for (const [area, pattern] of Object.entries(patterns)) {
-      if (pattern.test(diff)) {
-        analysis.affectedAreas.push(area);
-      }
-    }
-
-    // Enhanced likely purpose detection with more comprehensive WordPress detection
-    const purposeDetection = [
-      {
-        patterns: [/authentication|login|user|session|jwt/i],
-        purpose: 'authentication/security enhancement',
-      },
-      {
-        patterns: [/api.*endpoint|route.*controller|handler/i],
-        purpose: 'API functionality change',
-      },
-      {
-        patterns: [/database.*schema|migration.*table|model.*change/i],
-        purpose: 'database schema or query modification',
-      },
-      {
-        patterns: [/component.*render|template.*update|ui.*change/i],
-        purpose: 'user interface update',
-      },
-      {
-        patterns: [/test.*coverage|spec.*add|mock.*create/i],
-        purpose: 'test coverage or test logic change',
-      },
-      {
-        patterns: [
-          /wordpress.*hook|wp.*filter|add_action|add_filter|add_shortcode|wp_enqueue|get_template_part|wp_head|wp_footer|the_content|the_title|functions\.php/i,
-        ],
-        purpose: 'WordPress functionality modification',
-      },
-      {
-        patterns: [/typescript.*interface|type.*definition/i],
-        purpose: 'TypeScript type system update',
-      },
-    ];
-
-    for (const { patterns, purpose } of purposeDetection) {
-      if (patterns.some(p => p.test(diff))) {
-        analysis.likelyPurpose = purpose;
-        break;
-      }
-    }
-
-    // Detect key changes with semantic context
-    if (analysis.semanticChanges.newFunctions.length > 0) {
-      analysis.keyChanges.push(
-        `new functions: ${analysis.semanticChanges.newFunctions.slice(0, 3).join(', ')}`
-      );
-    }
-    if (analysis.semanticChanges.newClasses.length > 0) {
-      analysis.keyChanges.push(
-        `new classes: ${analysis.semanticChanges.newClasses.slice(0, 3).join(', ')}`
-      );
-    }
-    if (analysis.semanticChanges.apiChanges.length > 0) {
-      analysis.keyChanges.push(
-        `API changes: ${analysis.semanticChanges.apiChanges.slice(0, 3).join(', ')}`
-      );
-    }
-    if (analysis.semanticChanges.configChanges.length > 0) {
-      analysis.keyChanges.push('configuration updates');
-    }
-
-    // Traditional detection
-    if (
-      /function|class|const|let|var/.test(addedLines) &&
-      !/function|class|const|let|var/.test(removedLines)
-    ) {
-      if (!analysis.keyChanges.some(k => k.includes('new functions'))) {
-        analysis.keyChanges.push('new functions/classes added');
-      }
-    }
-    if (/export|module\.exports/.test(addedLines)) {
-      if (!analysis.keyChanges.some(k => k.includes('export'))) {
-        analysis.keyChanges.push('new exports added');
-      }
-    }
-
-    analysis.hasInsights = [
-      analysis.affectedAreas.length > 0,
-      analysis.likelyPurpose !== null,
-      analysis.keyChanges.length > 0,
-      Object.values(analysis.semanticChanges).some(changes => changes.length > 0),
-    ].some(Boolean);
-
-    return analysis;
-  }
-
-  /**
-   * Get language name from code
-   */
-  getLanguageName(code) {
-    const languages = {
-      en: 'English',
-      es: 'Spanish',
-      fr: 'French',
-      de: 'German',
-      zh: 'Chinese',
-      ja: 'Japanese',
-    };
-    return languages[code] || 'English';
-  }
-
-  /**
    * Handle API errors consistently
    */
   handleError(error, providerName) {
-    // Log the original error for debugging
     console.warn(`Original error from ${providerName}:`, error);
-
     if (error.response) {
-      // HTTP error response
       const { status } = error.response;
       const message = error.response.data?.error?.message || error.response.statusText;
-
       switch (status) {
-        case 401:
-          throw new Error(`Authentication failed for ${providerName}. Please check your API key.`);
-        case 403:
-          throw new Error(`Access forbidden for ${providerName}. Please check your permissions.`);
-        case 429:
-          throw new Error(`Rate limit exceeded for ${providerName}. Please try again later.`);
-        case 500:
-        case 502:
-        case 503:
-        case 504:
-          throw new Error(
-            `${providerName} service is temporarily unavailable. Please try again later.`
-          );
-        default:
-          throw new Error(`${providerName} API error (${status}): ${message}`);
+        case 401: throw new Error(`Authentication failed for ${providerName}. Please check your API key.`);
+        case 403: throw new Error(`Access forbidden for ${providerName}. Please check your permissions.`);
+        case 429: throw new Error(`Rate limit exceeded for ${providerName}. Please try again later.`);
+        case 500: case 502: case 503: case 504:
+          throw new Error(`${providerName} service is temporarily unavailable. Please try again later.`);
+        default: throw new Error(`${providerName} API error (${status}): ${message}`);
       }
     } else if (error.code === 'ECONNREFUSED') {
       throw new Error(`Cannot connect to ${providerName}. Please check your internet connection.`);
     } else if (error.code === 'ETIMEDOUT') {
       throw new Error(`Request to ${providerName} timed out. Please try again.`);
     } else {
-      // Handle undefined error message safely
       const errorMessage = error?.message || 'Unknown error occurred';
       throw new Error(`${providerName} error: ${errorMessage}`);
     }
@@ -280,278 +81,24 @@ class BaseProvider {
   parseResponse(response) {
     let content;
 
-    // Handle different response formats
     if (typeof response === 'string') {
-      // Direct string response
       content = response;
     } else if (response && typeof response === 'object') {
-      // Handle Groq response format (with choices)
-      if (response.choices && Array.isArray(response.choices) && response.choices.length > 0) {
-        content = response.choices[0]?.message?.content;
-      } else {
-        // If it's an object but not expected Groq format
-        content = response.content || JSON.stringify(response);
-      }
-    } else {
-      throw new Error('Invalid response from AI provider');
+      content =
+        response.choices?.[0]?.message?.content ??
+        response.response ??
+        response.content ??
+        null;
     }
 
-    if (typeof content !== 'string') {
-      throw new Error('Invalid response content from AI provider');
+    if (!content) {
+      throw new Error('No content in AI response');
     }
 
-    // Split by lines and clean up
-    const messages = content
+    return content
       .split('\n')
-      .map(
-        line =>
-          line
-            .trim()
-            .replace(/^\d+\.?\s*/, '') // Strip numbering
-            .replace(/^- \s*/, '') // Strip dashes
-            .replace(/^\* \s*/, '') // Strip asterisks
-            .replace(/^["']|["']$/g, '') // Strip surrounding quotes
-      )
-      .filter(line => line.length > 0)
-      .slice(0, 1); // Only take first message (best one)
-
-    if (messages.length === 0) {
-      throw new Error('No valid commit messages found in AI response');
-    }
-
-    return messages;
-  }
-
-  /**
-   * Generate commit messages with intelligent retry and validation
-   */
-  async generateCommitMessagesWithValidation(diff, options = {}) {
-    const MessageFormatter = require('../core/message-formatter');
-    const messageFormatter = new MessageFormatter();
-
-    let lastError;
-    const maxRetries = options.maxRetries || 2;
-    const enableFallback = options.enableFallback !== false;
-
-    // Try with current provider first
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        // Generate messages
-        const messages = await this.generateCommitMessages(diff, {
-          ...options,
-          attempt,
-        });
-
-        // Validate each message and score relevance
-        const validMessages = [];
-        const invalidMessages = [];
-        const messageScores = [];
-
-        for (const message of messages) {
-          const validation = messageFormatter.getCommitMessageValidation(message);
-          const relevanceScore = messageFormatter.calculateRelevanceScore(message);
-
-          messageScores.push({
-            message,
-            validation,
-            relevanceScore,
-          });
-
-          if (validation.isValid && relevanceScore >= 60) {
-            validMessages.push(message);
-          } else {
-            invalidMessages.push({
-              message,
-              issues: validation.issues,
-              isExplanatory: validation.isExplanatory,
-              isGeneric: validation.isGeneric,
-              relevanceScore,
-            });
-          }
-        }
-
-        // Sort messages by relevance score (highest first)
-        messageScores.sort((a, b) => b.relevanceScore - a.relevanceScore);
-
-        // If no valid messages, try to improve the best ones
-        if (validMessages.length === 0 && messageScores.length > 0) {
-          const bestMessage = messageScores[0];
-          if (bestMessage.relevanceScore >= 40) {
-            // Try to get suggestions for improvement
-            const suggestions = messageFormatter.getImprovedMessageSuggestions(
-              bestMessage.message,
-              options.context
-            );
-            if (suggestions.length > 0) {
-              validMessages.push(suggestions[0]); // Use the best suggestion
-            }
-          }
-        }
-
-        // If we have valid messages, return them
-        if (validMessages.length > 0) {
-          // Log successful validation
-          if (this.activityLogger) {
-            await this.activityLogger.info('commit_message_validation', {
-              provider: this.name,
-              attempt,
-              validMessages: validMessages.length,
-              invalidMessages: invalidMessages.length,
-              totalMessages: messages.length,
-            });
-          }
-
-          return validMessages;
-        }
-
-        // If all messages are invalid, log and prepare for retry
-        const errorDetails = {
-          provider: this.name,
-          attempt,
-          invalidMessages,
-          allExplanatory: invalidMessages.every(m => m.isExplanatory),
-          allGeneric: invalidMessages.every(m => m.isGeneric),
-        };
-
-        // Log validation failure
-        if (this.activityLogger) {
-          await this.activityLogger.warn('commit_message_validation_failed', errorDetails);
-        }
-
-        // Create error for retry logic
-        const error = new Error(
-          `All generated commit messages are invalid: ${invalidMessages.map(m => m.issues.join('; ')).join(' | ')}`
-        );
-        error.validationDetails = errorDetails;
-        throw error;
-      } catch (error) {
-        lastError = error;
-
-        // Don't retry on authentication or permission errors
-        if (
-          error.message.includes('Authentication') ||
-          error.message.includes('permission') ||
-          error.message.includes('401') ||
-          error.message.includes('403')
-        ) {
-          throw error;
-        }
-
-        // Log retry attempt
-        if (this.activityLogger) {
-          await this.activityLogger.debug('commit_generation_retry', {
-            provider: this.name,
-            attempt,
-            maxRetries,
-            error: error.message,
-            willRetry: attempt < maxRetries,
-          });
-        }
-
-        // If this is the last attempt for this provider, break
-        if (attempt === maxRetries) {
-          break;
-        }
-
-        // Wait before retry with exponential backoff
-        const delay = Math.min(1000 * 2 ** (attempt - 1), 5000);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-
-    // If we get here, all retries failed
-    if (enableFallback && this.name !== 'groq') {
-      // Try fallback to Groq
-      try {
-        if (this.activityLogger) {
-          await this.activityLogger.info('fallback_to_groq', {
-            originalProvider: this.name,
-            originalError: lastError.message,
-            attempts: maxRetries,
-          });
-        }
-
-        const GroqProvider = require('./groq-provider');
-        const groqProvider = new GroqProvider();
-
-        // Copy activity logger if available
-        if (this.activityLogger) {
-          groqProvider.activityLogger = this.activityLogger;
-        }
-
-        // Try with Groq (single attempt to avoid infinite loops)
-        return await groqProvider.generateCommitMessagesWithValidation(diff, {
-          ...options,
-          maxRetries: 1,
-          enableFallback: false, // Prevent infinite fallback loops
-          isFallback: true,
-        });
-      } catch (fallbackError) {
-        if (this.activityLogger) {
-          await this.activityLogger.error('fallback_to_groq_failed', {
-            originalProvider: this.name,
-            originalError: lastError.message,
-            fallbackError: fallbackError.message,
-          });
-        }
-
-        // Combine errors for better context
-        const combinedError = new Error(
-          `Primary provider (${this.name}) failed after ${maxRetries} attempts: ${lastError.message}. Fallback to Groq also failed: ${fallbackError.message}`
-        );
-        combinedError.originalError = lastError;
-        combinedError.fallbackError = fallbackError;
-        throw combinedError;
-      }
-    }
-
-    // No fallback or fallback failed, throw the last error
-    throw lastError;
-  }
-
-  /**
-   * Generate commit messages with enhanced prompt for problematic cases
-   */
-  async generateCommitMessagesWithEnhancedPrompt(diff, options = {}) {
-    // If this is a retry or fallback, use enhanced prompt
-    if (options.attempt > 1 || options.isFallback) {
-      options.enhancedPrompt = true;
-      options.strictValidation = true;
-
-      // Add specific instructions for problematic cases
-      if (options.validationDetails?.allExplanatory) {
-        options.promptInstructions = `
-CRITICAL: Generate ONLY commit messages, not explanations.
-DO NOT start with "Here's", "This is", "The following", etc.
-DO NOT provide breakdowns or explanations.
-Output ONLY the commit message itself.
-
-Examples of GOOD responses:
-- fix(auth): resolve login timeout issue
-- refactor(theme): improve topbar shortcode structure
-- feat(api): add user authentication endpoint
-
-Examples of BAD responses:
-- Here's a breakdown of what the code does:
-- The JavaScript code has been modularized...
-- This change updates the following:
-`;
-      } else if (options.validationDetails?.allGeneric) {
-        options.promptInstructions = `
-CRITICAL: Be SPECIFIC about what changed.
-Avoid generic terms like "modularized", "updated", "changed".
-Use concrete, actionable descriptions.
-
-Instead of: "The code has been modularized"
-Use: "refactor(utils): extract validation logic into separate functions"
-
-Instead of: "Update the configuration"
-Use: "config: update database connection settings for production"
-`;
-      }
-    }
-
-    return await this.generateCommitMessages(diff, options);
+      .map(msg => msg.trim())
+      .filter(msg => msg.length > 0);
   }
 
   /**
@@ -559,44 +106,29 @@ Use: "config: update database connection settings for production"
    */
   async withRetry(fn, maxRetries = 3, delay = 1000) {
     let lastError;
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
         return await fn();
       } catch (error) {
-        lastError = error;
-
-        // Do not retry on client-side errors (e.g., 401, 403), but retry on rate limits (429, 413)
         const status = error.response?.status;
         if (status && status >= 400 && status < 500 && status !== 413 && status !== 429) {
           throw error;
         }
-
-        // Log retryable errors but don't show them to user
-        this.logError(error, `Attempt ${attempt}/${maxRetries} failed`);
-
-        if (attempt < maxRetries) {
-          // Use exponential backoff
-          await new Promise(resolve => setTimeout(resolve, delay * 2 ** (attempt - 1)));
+        await this.activityLogger.debug('provider_api_retry', {
+          provider: this.name,
+          error: error.message,
+          status,
+          attempt,
+          willRetry: attempt < maxRetries - 1,
+        });
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, delay * 2 ** attempt));
+        } else {
+          throw error;
         }
       }
     }
     throw lastError;
-  }
-
-  /**
-   * Simple validation for commit messages (for backward compatibility)
-   */
-  validateMessage(message) {
-    if (!message || typeof message !== 'string') return false;
-    const trimmed = message.trim();
-    return trimmed.length >= 10 && trimmed.length <= 200;
-  }
-
-  /**
-   * Validate commit message format (alias for backward compatibility)
-   */
-  validateCommitMessage(message) {
-    return this.validateMessage(message);
   }
 
   /**
@@ -613,258 +145,16 @@ Use: "config: update database connection settings for production"
   }
 
   /**
-   * Log error to file for debugging
-   */
-  logError(error, context = '') {
-    try {
-      const logDir = path.join(process.cwd(), '.aic-logs');
-      if (!fs.existsSync(logDir)) {
-        fs.mkdirSync(logDir, { recursive: true });
-      }
-
-      const logFile = path.join(logDir, 'errors.log');
-      const timestamp = new Date().toISOString();
-      const logEntry = `[${timestamp}] ${context}\n${error.stack || error.message}\n\n`;
-
-      fs.appendFileSync(logFile, logEntry);
-    } catch (logError) {
-      // Silently fail if logging fails
-    }
-  }
-
-  /**
-   * Estimate token count in text (uses PerformanceUtils)
-   */
-  estimateTokens(text) {
-    const PerformanceUtils = require('../utils/performance-utils');
-    return PerformanceUtils.estimateTokens(text);
-  }
-
-  /**
-   * Analyze diff for semantic changes
-   */
-  analyzeDiff(diff) {
-    const lines = diff.split('\n');
-    const changes = [];
-    let currentFile = null;
-
-    lines.forEach(line => {
-      // Look for file headers
-      const fileMatch = line.match(/diff --git a\/(.+) b\/(.+)/);
-      if (fileMatch) {
-        currentFile = {
-          file: fileMatch[2],
-          additions: 0,
-          deletions: 0,
-          changes: [],
-        };
-        changes.push(currentFile);
-      }
-
-      // Count additions and deletions
-      if (currentFile) {
-        if (line.startsWith('+') && !line.startsWith('+++')) {
-          currentFile.additions++;
-          currentFile.changes.push({
-            type: 'addition',
-            content: line.substring(1),
-          });
-        } else if (line.startsWith('-') && !line.startsWith('---')) {
-          currentFile.deletions++;
-          currentFile.changes.push({
-            type: 'deletion',
-            content: line.substring(1),
-          });
-        }
-      }
-    });
-
-    // Calculate overall summary
-    const summary = {
-      files: changes.length,
-      additions: changes.reduce((sum, file) => sum + file.additions, 0),
-      deletions: changes.reduce((sum, file) => sum + file.deletions, 0),
-    };
-
-    return {
-      summary,
-      changes,
-      keyChanges: this.extractKeyChanges(changes),
-      semanticChanges: this.extractSemanticChanges(diff),
-      likelyPurpose: this.inferLikelyPurpose(changes),
-    };
-  }
-
-  /**
-   * Extract key changes from diff
-   */
-  extractKeyChanges(changes) {
-    const keyChanges = [];
-
-    changes.forEach(change => {
-      if (change.additions > 0 && change.deletions === 0) {
-        keyChanges.push(`new file: ${change.file}`);
-      } else if (change.additions > 0 && change.deletions > 0) {
-        keyChanges.push(`modifications in: ${change.file}`);
-      } else if (change.additions === 0 && change.deletions > 0) {
-        keyChanges.push(`deletions in: ${change.file}`);
-      }
-    });
-
-    return keyChanges;
-  }
-
-  /**
-   * Extract semantic changes from diff (functions, classes, etc.)
-   */
-  extractSemanticChanges(diff) {
-    const semanticChanges = {
-      newFunctions: [],
-      modifiedFunctions: [],
-      newClasses: [],
-      apiChanges: [],
-      testChanges: [],
-      configChanges: [],
-      breakingChanges: [],
-      wordpressHooks: [],
-      wordpressChanges: [],
-      wordpressTemplateChanges: [],
-    };
-
-    const lines = diff.split('\n');
-
-    for (const line of lines) {
-      if (line.startsWith('+')) {
-        const content = line.substring(1);
-
-        // Match new functions
-        const funcMatch = content.match(/\b(?:function|const|let|var)\s+(\w+)/);
-        if (funcMatch) {
-          semanticChanges.newFunctions.push(funcMatch[1]);
-        }
-
-        // Match new classes
-        const classMatch = content.match(/\bclass\s+(\w+)/);
-        if (classMatch) {
-          semanticChanges.newClasses.push(classMatch[1]);
-        }
-
-        // Match API changes
-        const apiMatch = content.match(/app\.(get|post|put|delete|patch)\(['"`](.+?)['"`]/);
-        if (apiMatch) {
-          semanticChanges.apiChanges.push(`${apiMatch[1].toUpperCase()} ${apiMatch[2]}`);
-        }
-
-        // Match config changes
-        if (/require\(['"`]config|import.*config|process\.env/.test(content)) {
-          semanticChanges.configChanges.push(content.trim());
-        }
-
-        // Match test changes
-        if (/\b(describe|it|test|expect|assert)\b/.test(content)) {
-          semanticChanges.testChanges.push(content.trim());
-        }
-
-        // Match potential breaking changes
-        if (/\b(?:removed|deleted|breaking|BREAKING)\b/.test(content)) {
-          semanticChanges.breakingChanges.push(content.trim());
-        }
-
-        // Match WordPress-specific changes
-        if (
-          content.includes('add_action') ||
-          content.includes('add_filter') ||
-          content.includes('add_shortcode')
-        ) {
-          const wpHookMatch = content.match(
-            /(?:add_action|add_filter|add_shortcode)\s*\(\s*['"`]([^'"`]+)['"`]/
-          );
-          if (wpHookMatch) {
-            semanticChanges.wordpressHooks = semanticChanges.wordpressHooks || [];
-            semanticChanges.wordpressHooks.push(wpHookMatch[1]);
-          }
-        }
-
-        if (
-          content.includes('wp_enqueue') ||
-          content.includes('wp_localize_script') ||
-          content.includes('wp_localize')
-        ) {
-          semanticChanges.wordpressChanges = semanticChanges.wordpressChanges || [];
-          semanticChanges.wordpressChanges.push(content.trim());
-        }
-
-        if (
-          content.includes('get_template_part') ||
-          content.includes('get_header') ||
-          content.includes('get_footer') ||
-          content.includes('get_sidebar')
-        ) {
-          semanticChanges.wordpressTemplateChanges = semanticChanges.wordpressTemplateChanges || [];
-          semanticChanges.wordpressTemplateChanges.push(content.trim());
-        }
-      }
-    }
-
-    return semanticChanges;
-  }
-
-  /**
-   * Infer likely purpose of changes
-   */
-  inferLikelyPurpose(changes) {
-    if (changes.some(change => change.file && change.file.includes('test'))) {
-      return 'test-related changes';
-    }
-    if (changes.some(change => change.file && /\.(js|ts|jsx|tsx)$/.test(change.file))) {
-      return 'javascript/typescript changes';
-    }
-    if (changes.some(change => change.file && /\.(py)$/.test(change.file))) {
-      return 'python changes';
-    }
-    if (changes.some(change => change.file && /\.(php)$/.test(change.file))) {
-      return 'php changes';
-    }
-    if (
-      changes.some(
-        change =>
-          change.changes &&
-          change.changes.some(
-            c => c.content && /\b(bug|fix|error|issue|resolve|correct)\b/i.test(c.content)
-          )
-      )
-    ) {
-      return 'bug fix';
-    }
-    if (
-      changes.some(
-        change =>
-          change.changes &&
-          change.changes.some(
-            c => c.content && /\b(feature|add|implement|create|new)\b/i.test(c.content)
-          )
-      )
-    ) {
-      return 'feature addition';
-    }
-    return 'general modification';
-  }
-
-
-  /**
    * Send HTTP request with error handling
    */
   async sendHTTPRequest(url, options = {}) {
     try {
       const config = await this.getConfig();
       const axios = require('axios');
-
-      // Set default timeout and merge with user options
       const requestOptions = {
         timeout: config.timeout || 120000,
         ...options,
       };
-
       const response = await axios(url, requestOptions);
       return response.data;
     } catch (error) {
@@ -873,22 +163,9 @@ Use: "config: update database connection settings for production"
   }
 
   /**
-   * Make direct API request for provider-specific operations
-   */
-  async makeDirectAPIRequest(endpoint, params = {}) {
-    try {
-      await this.getConfig();
-      return await this.sendHTTPRequest(`${this.baseURL}${endpoint}`, params);
-    } catch (error) {
-      throw new Error(`Direct API request failed: ${error.message}`);
-    }
-  }
-
-  /**
    * Cleanup method for resource release
    */
   cleanup() {
-    // Base cleanup method - can be extended by subclasses
     this.client = null;
   }
 }

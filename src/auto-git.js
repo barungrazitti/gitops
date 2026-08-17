@@ -10,10 +10,14 @@ const ora = require('ora');
 const AICommitGenerator = require('./index');
 
 class AutoGit {
-  constructor() {
+  constructor({ gitManager, analysisEngine, configManager, generateMessages, conflictResolver, activityLogger } = {}) {
     this.git = simpleGit();
-    this.aiCommit = new AICommitGenerator();
-    this.activityLogger = this.aiCommit.activityLogger;
+    this.gitManager = gitManager;
+    this.analysisEngine = analysisEngine;
+    this.configManager = configManager;
+    this.generateMessages = generateMessages;
+    this.conflictResolver = conflictResolver;
+    this.activityLogger = activityLogger;
     this.spinner = ora();
     // Configure git to prefer merge over rebase for safety
     this.git.raw(['config', 'pull.rebase', 'false']);
@@ -183,7 +187,7 @@ class AutoGit {
     this.spinner.start('Generating AI commit message...');
     try {
       // Get repository context for better AI generation
-      const context = await this.aiCommit.analysisEngine.analyzeRepository();
+      const context = await this.analysisEngine.analyzeRepository();
 
       // Get the staged diff
       const diff = await this.git.diff(['--staged']);
@@ -194,9 +198,9 @@ class AutoGit {
       }
 
       // Check for and clean up conflict markers before generating commit
-      if (/<<<<<<<|=======|>>>>>>>/.test(diff)) {
+      if (/^<{7}|^={7}\s*$|^>{7}/m.test(diff)) {
         this.spinner.text = chalk.yellow('Conflict markers detected, cleaning up...');
-        const cleanupResult = await this.aiCommit.detectAndCleanupConflictMarkers();
+        const cleanupResult = await this.conflictResolver.detectAndCleanupConflictMarkers();
 
         if (cleanupResult.cleaned) {
           // Re-stage the cleaned files
@@ -207,8 +211,8 @@ class AutoGit {
 
           if (newDiff && newDiff.trim().length > 0) {
             // Generate commit message from cleaned diff
-            const config = await this.aiCommit.configManager.getAll();
-            const messages = await this.aiCommit.generateWithSequentialFallback(newDiff, {
+            const config = await this.configManager.getAll();
+            const messages = await this.generateMessages(newDiff, {
               context,
               count: 1,
               conventional: true,
@@ -221,8 +225,8 @@ class AutoGit {
       }
 
       // Use the main AI commit generator with sequential fallback
-      const config = await this.aiCommit.configManager.getAll();
-      const messages = await this.aiCommit.generateWithSequentialFallback(diff, {
+      const config = await this.configManager.getAll();
+      const messages = await this.generateMessages(diff, {
         context,
         count: 1, // Only need one message for auto-commit
         conventional: true,
@@ -460,7 +464,7 @@ class AutoGit {
       };
 
       // Use AI to resolve conflicts
-      const resolvedContent = await this.aiCommit.resolveConflictWithAI(conflictContext);
+      const resolvedContent = await this.conflictResolver.resolveConflictWithAI(conflictContext);
 
       // Write the resolved content back to the file
       await fs.writeFile(fullPath, resolvedContent, 'utf8');

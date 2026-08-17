@@ -164,7 +164,17 @@ describe('ConfigManager', () => {
     it('should throw error for groq provider without API key', async () => {
       await configManager.set('apiKey', null);
 
-      await expect(configManager.validateApiKey('groq')).rejects.toThrow('API key not configured');
+      // Simulate absence of .env / environment key overrides
+      const savedKey = process.env.GROQ_API_KEY;
+      delete process.env.GROQ_API_KEY;
+
+      try {
+        await expect(configManager.validateApiKey('groq')).rejects.toThrow(
+          'API key not configured'
+        );
+      } finally {
+        if (savedKey !== undefined) process.env.GROQ_API_KEY = savedKey;
+      }
     });
   });
 
