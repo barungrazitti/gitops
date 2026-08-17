@@ -136,7 +136,7 @@ describe('ConfigManager', () => {
       const config = await configManager.getProviderConfig('groq');
 
       expect(config).toBeDefined();
-      expect(config.model).toBe('llama-3.1-8b-instant');
+      expect(config.model).toBe('openai/gpt-oss-20b');
     });
 
     it('should return ollama provider configuration', async () => {

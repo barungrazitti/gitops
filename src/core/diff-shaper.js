@@ -1,99 +1,66 @@
+const chalk = require('chalk');
+
 /**
- * Manages diff processing for AI commit generation
+ * A deep module for intelligently shaping and truncating diffs for AI processing.
+ * Consolidates diff filtering, chunking, scoring, and summarizing logic.
  */
-
-const BINARY_EXTENSIONS = [
-  '.svg',
-  '.png',
-  '.jpg',
-  '.jpeg',
-  '.gif',
-  '.ico',
-  '.webp',
-  '.avif',
-  '.pdf',
-  '.zip',
-  '.tar',
-  '.gz',
-  '.rar',
-  '.7z',
-  '.mp3',
-  '.mp4',
-  '.wav',
-  '.ogg',
-  '.webm',
-  '.avi',
-  '.woff',
-  '.woff2',
-  '.ttf',
-  '.eot',
-  '.otf',
-  '.exe',
-  '.dll',
-  '.so',
-  '.dylib',
-  '.db',
-  '.sqlite',
-  '.mdb',
-  '.bin',
-  '.dat',
-];
-
-class DiffManager {
+class DiffShaper {
   /**
-   * Check if a file is a binary/media file based on extension
-   */
-  isBinaryFile(filePath) {
-    const ext = filePath.toLowerCase().match(/\.[^.]+$/);
-    return ext && BINARY_EXTENSIONS.includes(ext[0]);
-  }
-
-  /**
-   * Filter out binary/media file changes from diff
+   * Filter out binary/media files from a diff.
    */
   filterBinaryFiles(diff) {
-    if (!diff || !diff.includes('diff --git')) return diff;
+    if (!diff) return '';
+
+    const BINARY_EXTENSIONS = [
+      'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4',
+      'mp3', 'pdf', 'zip', 'tar', 'gz', 'log', 'lock' // Add common lock/log files
+    ];
 
     const lines = diff.split('\n');
     const filteredLines = [];
-    let inBinaryFile = false;
-    let currentFile = '';
+    let skipUntilNextDiff = false;
 
-    for (const line of lines) {
-      const fileMatch = line.match(/^diff --git a\/(.+?) b\/(.+)/);
-      if (fileMatch) {
-        currentFile = fileMatch[2];
-        inBinaryFile = this.isBinaryFile(currentFile);
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      if (line.startsWith('diff --git')) {
+        skipUntilNextDiff = false; // Reset for new file
+        const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
+        if (fileMatch) {
+          const filePath = fileMatch[2];
+          const ext = filePath.split('.').pop().toLowerCase();
+
+          // Check for binary files by extension or explicit marker
+          if (BINARY_EXTENSIONS.includes(ext) || lines[i + 1]?.startsWith('Binary files')) {
+            console.log(chalk.gray(`🗑️  Skipping binary/asset file: ${filePath}`));
+            skipUntilNextDiff = true;
+            continue; // Skip the diff --git line itself
+          }
+        }
       }
 
-      if (!inBinaryFile) {
-        filteredLines.push(line);
-      } else if (
-        line.startsWith('diff --git') ||
-        line.startsWith('index') ||
-        line.startsWith('---') ||
-        line.startsWith('+++')
-      ) {
-        // Include header lines for context but skip content
-        filteredLines.push(line);
-      } else if (!line.startsWith('+') && !line.startsWith('-')) {
-        // Include non-changed lines (@@, etc)
-        filteredLines.push(line);
+      if (skipUntilNextDiff) {
+        continue; // Skip all lines for the current binary file
       }
-      // Skip actual content lines (+/-) for binary files
+
+      filteredLines.push(line);
     }
 
     return filteredLines.join('\n');
   }
 
   /**
-   * Intelligently manage diff for optimal AI processing
+   * Intelligent diff management for optimal AI generation.
+   * Smart truncation that preserves file headers and prioritizes significant changes.
+   * @param {string} diff - The full git diff content.
+   * @param {object} options - Options object, including context for semantic analysis.
+   * @returns {object} - Shaped diff data and info about the strategy used.
    */
   manageDiffForAI(diff, options = {}) {
     // Filter out binary/media files first
     const filteredDiff = this.filterBinaryFiles(diff);
     const diffSize = filteredDiff.length;
-    const MAX_SAFE_SIZE = 60000; // ~20K tokens, safe for modern Groq (131K context) and Ollama
+    const MAX_SAFE_SIZE = 18000; // ~4.5K tokens, safe for Groq free-tier TPM (6K) with system prompt overhead
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {
@@ -110,6 +77,12 @@ class DiffManager {
         },
       };
     }
+
+    console.log(
+      chalk.yellow(
+        `⚠️  Very large diff (${Math.round(diffSize / 1024)}KB), applying smart truncation`
+      )
+    );
 
     const smartTruncated = this.smartTruncateDiff(filteredDiff, MAX_SAFE_SIZE, context);
     return {
@@ -147,9 +120,9 @@ class DiffManager {
       '.map',
     ];
 
-    const filteredChunks = fileChunks.filter(fc => {
-      return !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern));
-    });
+    const filteredChunks = fileChunks.filter(
+      fc => !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern))
+    );
 
     const scoredChunks = filteredChunks.map(fc => {
       const score = this.scoreFileChunk(fc, semanticContext);
@@ -160,9 +133,9 @@ class DiffManager {
 
     const selectedContent = [];
     const preservedFiles = [];
+    const truncatedFiles = [];
     const skippedFiles = [];
     let currentSize = 0;
-    const HEADER_BUDGET = Math.min(2000, maxSize * 0.05);
 
     for (const chunk of scoredChunks) {
       const headerSize = chunk.header.length;
@@ -177,7 +150,17 @@ class DiffManager {
         currentSize += totalSize;
         preservedFiles.push(chunk.fileName);
       } else {
-        skippedFiles.push(chunk);
+        const remainingSize = Math.max(0, maxSize - currentSize);
+        const excerpt = this.buildOversizedChunkExcerpt(chunk, remainingSize);
+
+        if (excerpt) {
+          selectedContent.push(excerpt);
+          currentSize += excerpt.length;
+          preservedFiles.push(chunk.fileName);
+          truncatedFiles.push(chunk.fileName);
+        } else {
+          skippedFiles.push(chunk);
+        }
       }
 
       if (currentSize >= maxSize * 0.9) {
@@ -187,30 +170,21 @@ class DiffManager {
 
     let remainingHeaderSpace = Math.max(0, maxSize - currentSize);
     const skippedHeaders = [];
-    // Track which files were added from skipped files to preserved files to avoid duplicates
-    const additionalPreservedFiles = [];
 
     for (const chunk of skippedFiles) {
       if (remainingHeaderSpace <= 0) break;
       if (chunk.header.length <= remainingHeaderSpace) {
         skippedHeaders.push(chunk.header);
         remainingHeaderSpace -= chunk.header.length;
-        // Only add to preservedFiles if it's not already there to avoid duplicates
-        if (!preservedFiles.includes(chunk.fileName)) {
-          preservedFiles.push(chunk.fileName);
-        }
-        additionalPreservedFiles.push(chunk.fileName);
       }
     }
 
     // Build summary of skipped files for context
-    const trulySkipped = skippedFiles
-      .filter(f => !additionalPreservedFiles.includes(f.fileName))
-      .map(f => f.fileName);
+    const trulySkipped = skippedFiles.map(f => f.fileName);
 
     const skippedFileSummary = this.buildSkippedFileSummary(trulySkipped);
 
-    let reasoning = `Preserved ${preservedFiles.length} files with full content, ${trulySkipped.length} skipped (node_modules ignored)`;
+    let reasoning = `Preserved ${preservedFiles.length} files, ${truncatedFiles.length} truncated, ${trulySkipped.length} skipped (node_modules ignored)`;
     if (preservedFiles.length === 0 && filteredChunks.length > 0) {
       reasoning = 'No files fit within token limits - diff too large';
     }
@@ -221,6 +195,50 @@ class DiffManager {
       preservedFiles,
       skippedFiles: trulySkipped,
     };
+  }
+
+  /**
+   * Build a compact excerpt for a single file that is larger than the prompt budget.
+   */
+  buildOversizedChunkExcerpt(chunk, maxSize) {
+    const marker = `# NOTE: ${chunk.fileName} was too large; showing changed lines only`;
+    const minBudget = chunk.header.length + marker.length + 300;
+
+    if (maxSize < minBudget || !chunk.content.trim()) {
+      return null;
+    }
+
+    const result = [chunk.header, marker];
+    let currentSize = result.join('\n').length;
+    let keptChanges = 0;
+
+    for (const line of chunk.content.split('\n')) {
+      const isActualChange =
+        (line.startsWith('+') && !line.startsWith('+++')) ||
+        (line.startsWith('-') && !line.startsWith('---'));
+      const isDiffContext = line.startsWith('@@') || line.startsWith('---') || line.startsWith('+++');
+
+      if (!isActualChange && !isDiffContext) {
+        continue;
+      }
+
+      const nextSize = currentSize + line.length + 1;
+      if (nextSize > maxSize) {
+        break;
+      }
+
+      result.push(line);
+      currentSize = nextSize;
+      if (isActualChange) {
+        keptChanges++;
+      }
+    }
+
+    if (keptChanges === 0) {
+      return null;
+    }
+
+    return result.join('\n');
   }
 
   /**
@@ -375,7 +393,7 @@ class DiffManager {
   }
 
   /**
-   * Score file chunk based on semantic importance (higher = more important)
+   * Score a file chunk by significance (higher = more important)
    */
   scoreFileChunk(chunk, semanticContext) {
     let score = 0;
@@ -427,111 +445,6 @@ class DiffManager {
 
     return score;
   }
-
-  /**
-   * Chunk large diffs into smaller pieces for AI processing
-   */
-  chunkDiff(diff, maxTokens = 6000) {
-    const lines = diff.split('\n');
-    const chunks = [];
-    let currentChunk = [];
-    let currentTokens = 0;
-
-    // Rough estimation: 1 token ≈ 4 characters
-    const estimateTokens = text => Math.ceil(text.length / 4);
-
-    // Helper to detect semantic boundaries
-    const isSemanticBoundary = line => {
-      return (
-        line.startsWith('diff --git') ||
-        line.startsWith('index ') ||
-        line.startsWith('---') ||
-        line.startsWith('+++') ||
-        (line.startsWith('@@') && currentChunk.length > 10) ||
-        (/^(function|class|def|const|let|var)\s+\w+/.test(line) && currentChunk.length > 5)
-      );
-    };
-
-    // Helper to find good break point near token limit
-    const findBreakPoint = (startIdx, maxTokens) => {
-      let tokenCount = 0;
-      let bestBreakIdx = startIdx;
-
-      for (let i = startIdx; i < lines.length; i++) {
-        tokenCount += estimateTokens(lines[i]);
-
-        if (tokenCount > maxTokens) {
-          break;
-        }
-
-        // Prefer breaking at semantic boundaries
-        if (isSemanticBoundary(lines[i])) {
-          bestBreakIdx = i;
-        }
-      }
-
-      return bestBreakIdx;
-    };
-
-    let i = 0;
-    while (i < lines.length) {
-      const line = lines[i];
-      const lineTokens = estimateTokens(line);
-
-      // If single line is extremely large, split it
-      if (lineTokens > maxTokens) {
-        // Flush current chunk if it has content
-        if (currentChunk.length > 0) {
-          chunks.push(currentChunk.join('\n'));
-          currentChunk = [];
-          currentTokens = 0;
-        }
-
-        // Split large line into smaller pieces
-        const chunksNeeded = Math.ceil(lineTokens / maxTokens);
-        const chunkSize = Math.ceil(line.length / chunksNeeded);
-
-        for (let j = 0; j < chunksNeeded; j++) {
-          const start = j * chunkSize;
-          const end = Math.min(start + chunkSize, line.length);
-          chunks.push(line.substring(start, end));
-        }
-        i++;
-        continue;
-      }
-
-      // Check if we need to start a new chunk
-      if (currentTokens + lineTokens > maxTokens && currentChunk.length > 0) {
-        // Find a good break point if possible
-        const breakIdx = findBreakPoint(i, maxTokens - currentTokens);
-
-        if (breakIdx > i) {
-          // Add lines up to break point
-          for (; i <= breakIdx && i < lines.length; i++) {
-            currentChunk.push(lines[i]);
-            currentTokens += estimateTokens(lines[i]);
-          }
-        }
-
-        chunks.push(currentChunk.join('\n'));
-        currentChunk = [];
-        currentTokens = 0;
-        continue;
-      }
-
-      // Add line to current chunk
-      currentChunk.push(line);
-      currentTokens += lineTokens;
-      i++;
-    }
-
-    // Add last chunk if it has content
-    if (currentChunk.length > 0) {
-      chunks.push(currentChunk.join('\n'));
-    }
-
-    return chunks;
-  }
 }
 
-module.exports = DiffManager;
+module.exports = DiffShaper;

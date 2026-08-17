@@ -10,6 +10,7 @@ class GroqProvider extends BaseProvider {
   constructor() {
     super();
     this.name = 'groq';
+    this.model = 'openai/gpt-oss-20b';
     this.client = null;
 
     // Initialize circuit breaker for Groq
@@ -53,7 +54,7 @@ class GroqProvider extends BaseProvider {
         await this.circuitBreaker.execute(
           async () => {
             const response = await this.client.chat.completions.create({
-              model: options.model || config.model || 'llama-3.1-8b-instant',
+              model: options.model || config.model || 'openai/gpt-oss-20b',
               messages: [
                 {
                   role: 'system',
@@ -121,7 +122,7 @@ class GroqProvider extends BaseProvider {
         await this.circuitBreaker.execute(
           async () => {
             const response = await this.client.chat.completions.create({
-              model: config.model || 'llama-3.1-8b-instant',
+              model: config.model || 'openai/gpt-oss-20b',
               messages: [
                 {
                   role: 'system',
@@ -171,7 +172,7 @@ class GroqProvider extends BaseProvider {
       });
 
       const response = await client.chat.completions.create({
-        model: config.model || 'llama-3.1-8b-instant',
+        model: config.model || 'openai/gpt-oss-20b',
         messages: [
           {
             role: 'user',
@@ -190,7 +191,7 @@ class GroqProvider extends BaseProvider {
       return {
         success: true,
         message: 'Groq connection successful',
-        model: config.model || 'llama-3.1-8b-instant',
+        model: config.model || 'openai/gpt-oss-20b',
         response: content.trim(),
       };
     } catch (error) {
@@ -208,9 +209,14 @@ class GroqProvider extends BaseProvider {
   async getAvailableModels() {
     return [
       {
+        id: 'openai/gpt-oss-20b',
+        name: 'GPT-OSS 20B',
+        description: "OpenAI's open-weight model, fast with reasoning (recommended)",
+      },
+      {
         id: 'llama-3.1-8b-instant',
         name: 'Llama 3.1 8B Instant',
-        description: 'Fast and efficient model by Meta (recommended)',
+        description: 'Fast and efficient model by Meta',
       },
       {
         id: 'llama-3.3-70b-versatile',

@@ -39,9 +39,9 @@ class AIProviderFactory {
         description: 'Fast inference models',
         requiresApiKey: true,
         models: [
+          'openai/gpt-oss-20b',
           'llama-3.1-8b-instant',
           'llama-3.3-70b-versatile',
-          'openai/gpt-oss-20b',
           'qwen/qwen3-32b',
           'meta-llama/llama-4-scout-17b-16e-instruct',
         ],

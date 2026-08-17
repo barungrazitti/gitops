@@ -99,6 +99,14 @@ describe('AnalysisEngine', () => {
     });
   });
 
+  describe('detectCommitType', () => {
+    it('should not treat WordPress theme PHP files as style-only changes', () => {
+      const files = ['wp-content/themes/seoinux-child/inc/su-rest-functions.php'];
+
+      expect(engine.detectCommitType(files)).not.toBe('style');
+    });
+  });
+
   describe('detectWordPressContext', () => {
     it('should detect WordPress files', async () => {
       const files = ['wp-content/themes/my-theme/index.php'];

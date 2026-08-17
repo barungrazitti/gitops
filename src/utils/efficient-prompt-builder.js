@@ -191,9 +191,10 @@ For BINARY FILES with no code changes:
 Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
 Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
 
-      // Add type hint if detected from file patterns
-      if (context && context.files && context.files.type) {
-        prompt += `\n\nDetected type hint: ${context.files.type} (based on changed files)`;
+      // Add file-pattern hints only when they agree with the actual changed lines.
+      const typeHint = this.getCompatibleTypeHint(context?.files?.type, changeAnalysis);
+      if (typeHint) {
+        prompt += `\n\nDetected type hint: ${typeHint} (confirmed by changed lines)`;
       }
     }
 
@@ -217,9 +218,14 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
     }
 
     // Add recent commit history for style reference
-    if (context && context.recentCommits && context.recentCommits.length > 0) {
+    if (
+      context &&
+      context.recentCommits &&
+      context.recentCommits.length > 0 &&
+      this.countActualChangeLines(diff) > 0
+    ) {
       const recentExamples = context.recentCommits.slice(0, 5).join('\n');
-      prompt += `\n\nRecent commit style:\n${recentExamples}`;
+      prompt += `\n\nRecent commit style (format reference only - never copy wording):\n${recentExamples}`;
     }
 
     // Add chunking context if applicable
@@ -359,6 +365,22 @@ Single best commit message:`;
     }
 
     return changeCount === 1;
+  }
+
+  /**
+   * Count actual added/removed lines, excluding diff metadata headers.
+   */
+  countActualChangeLines(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return 0;
+    }
+
+    return diff.split('\n').filter(line => {
+      return (
+        (line.startsWith('+') && !line.startsWith('+++')) ||
+        (line.startsWith('-') && !line.startsWith('---'))
+      );
+    }).length;
   }
 
   /**
@@ -839,7 +861,10 @@ ${this.buildPrompt(diff, options)}`;
         guidance += 'what documentation was added or updated';
         break;
       case 'style':
-        guidance += 'formatting or linting corrections only';
+        guidance += 'CSS, layout, or formatting changes without new behavior';
+        break;
+      case 'build':
+        guidance += 'dependency, package, or build configuration changes';
         break;
       default:
         guidance += 'primary purpose and key changes';
@@ -879,7 +904,7 @@ ${this.buildPrompt(diff, options)}`;
       const keyInfo = [];
 
       if (semantic.functions?.length > 0) {
-        keyInfo.push(`new: ${semantic.functions.slice(0, 2).join(', ')}`);
+        keyInfo.push(`symbols: ${semantic.functions.slice(0, 2).join(', ')}`);
       }
       if (semantic.components?.length > 0) {
         keyInfo.push(`components: ${semantic.components.slice(0, 2).join(', ')}`);
@@ -909,8 +934,9 @@ ${this.buildPrompt(diff, options)}`;
       test: ['test.js', 'test.ts', 'spec.js', 'spec.ts'],
       docs: ['md', 'txt', 'rst'],
       style: ['css', 'scss', 'less', 'vue'],
-      perf: ['js', 'ts', 'py', 'java'],
+      perf: ['js', 'ts', 'py', 'php', 'java'],
       refactor: ['js', 'ts', 'py', 'php', 'java'],
+      build: ['json', 'lock', 'yaml', 'yml', 'toml', 'xml'],
     };
 
     const priorities = typePriorities[changeAnalysis.type] || Object.keys(fileTypes);
@@ -948,7 +974,7 @@ ${this.buildPrompt(diff, options)}`;
       case 'perf':
         examples.push('perf(database): optimize query with index');
         if (context?.project?.primary === 'wordpress') {
-          examples.push('perf(theme): change sort order for better performance');
+          examples.push('perf(api): cache REST query results');
         }
         break;
       case 'refactor':
@@ -956,6 +982,15 @@ ${this.buildPrompt(diff, options)}`;
         break;
       case 'test':
         examples.push('test(auth): add unit tests for login flow');
+        break;
+      case 'docs':
+        examples.push('docs(readme): document setup options');
+        break;
+      case 'style':
+        examples.push('style(ui): adjust responsive button spacing');
+        break;
+      case 'build':
+        examples.push('build(deps): update package dependencies');
         break;
       default:
         examples.push('chore(config): update environment variables');
@@ -992,9 +1027,13 @@ ${this.buildPrompt(diff, options)}`;
       return analysis;
     }
 
+    const actualChangeText = this.extractActualChangeText(diff);
+    const filePaths = this.extractChangedFilePaths(diff);
+    const fileTypeFallback = this.inferTypeFromChangedFiles(filePaths, actualChangeText);
+
     // Detect binary files: file headers present but no +/- changes
     const hasFileHeaders = /^diff --git/m.test(diff);
-    const hasChanges = /^[\+\-][^\+\-]/m.test(diff);
+    const hasChanges = actualChangeText.trim().length > 0;
     if (hasFileHeaders && !hasChanges) {
       const isNew =
         /new file mode|mode:/m.test(diff) && !/deleted file mode|mode: 000000/m.test(diff);
@@ -1005,40 +1044,50 @@ ${this.buildPrompt(diff, options)}`;
       return analysis;
     }
 
-    // Look for specific patterns that indicate change type
+    // Look for specific patterns in actual changed lines only.
     const patterns = {
-      test: {
-        keywords: ['test', 'spec', 'describe', 'it', 'expect', 'assert', 'jest', 'mocha'],
-        regex: /test|spec|describe|it\(|expect|assert|coverage/i,
-      },
       perf: {
-        keywords: ['perf', 'performance', 'optimize', 'cache', 'memo', 'speed', 'fast'],
-        regex: /performance|optimize|cache|lazy|memo|speed|fast|efficien|bottleneck/i,
+        keywords: ['cache', 'cached', 'transient', 'performance', 'optimize', 'memo', 'speed'],
+        regex:
+          /\b(perf|performance|optimi[sz]e|cache|cached|memo|speed|lazy|efficient|bottleneck|transient)\b|wp_cache_get_last_changed|get_transient|set_transient/gi,
+      },
+      test: {
+        keywords: ['test', 'spec', 'describe', 'expect', 'assert', 'jest', 'mocha'],
+        regex:
+          /\b(tests?|testing|tested|spec|coverage|jest|mocha|cypress|mock|fixture)\b|describe\s*\(|\bit\s*\(|expect\s*\(|assert\s*\(/gi,
       },
       fix: {
-        keywords: ['fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'correct'],
-        regex: /fix|bug|error|issue|problem|resolve|correct|patch|resolve/i,
+        keywords: ['fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'correct', 'security'],
+        regex:
+          /\b(fix|bug|error|issue|problem|resolve|correct|patch|prevent|guard|sanitize|validate|escape|hash_equals|csrf|xss|token)\b/gi,
       },
       feat: {
         keywords: ['add', 'new', 'implement', 'feature', 'create', 'introduce'],
-        regex: /add|new|implement|feature|create|introduce|enhance/i,
+        regex:
+          /\b(add|new|implement|feature|create|introduce|enable|support)\b|^\+\s*(public|private|protected)?\s*function\s+\w+/gim,
       },
       refactor: {
         keywords: ['refactor', 'restructure', 'reorganize', 'clean', 'improve', 'move'],
-        regex: /refactor|restructure|reorganize|clean|improve|reorganize|restructure/i,
+        regex: /\b(refactor|restructure|reorganize|cleanup|clean|move|extract)\b/gi,
       },
       docs: {
         keywords: ['doc', 'readme', 'comment', 'documentation', 'guide'],
-        regex: /doc|readme|comment|documentation|guide/i,
+        regex: /\b(docs?|readme|comment|documentation|guide)\b/gi,
       },
       style: {
         keywords: ['style', 'format', 'lint', 'prettier', 'beautify'],
-        regex: /style|format|lint|prettier|beautify|indent|whitespace/i,
+        regex:
+          /\b(style|format|lint|prettier|beautify|indent|whitespace|css|margin|padding|color|background|font|width|height|display|flex|grid)\b/gi,
+      },
+      build: {
+        keywords: ['dependency', 'package', 'version', 'build', 'lockfile'],
+        regex:
+          /\b(dependencies|devdependencies|package|version|build|lockfile|composer|npm|yarn|pnpm)\b/gi,
       },
     };
 
     // Count occurrences of pattern keywords in the diff
-    const lowerDiff = diff.toLowerCase();
+    const lowerDiff = actualChangeText.toLowerCase();
     let maxScore = 0;
 
     for (const [type, pattern] of Object.entries(patterns)) {
@@ -1047,7 +1096,7 @@ ${this.buildPrompt(diff, options)}`;
       // Score based on regex matches
       const matches = lowerDiff.match(pattern.regex);
       if (matches) {
-        score += matches.length * 2;
+        score += matches.length * (type === 'perf' ? 4 : 2);
       }
 
       // Score based on keyword occurrences
@@ -1066,7 +1115,124 @@ ${this.buildPrompt(diff, options)}`;
       }
     }
 
+    if (fileTypeFallback && (maxScore === 0 || this.shouldPreferFileTypeFallback(fileTypeFallback, analysis))) {
+      analysis.type = fileTypeFallback;
+      analysis.confidence = Math.max(analysis.confidence, 0.75);
+      analysis.keywords = [fileTypeFallback];
+    }
+
     return analysis;
+  }
+
+  /**
+   * Extract only real added/removed diff lines for change classification.
+   */
+  extractActualChangeText(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return '';
+    }
+
+    return diff
+      .split('\n')
+      .filter(line => {
+        return (
+          (line.startsWith('+') && !line.startsWith('+++')) ||
+          (line.startsWith('-') && !line.startsWith('---'))
+        );
+      })
+      .join('\n');
+  }
+
+  /**
+   * Keep path-derived type hints only when they support the diff-derived type.
+   */
+  getCompatibleTypeHint(typeHint, changeAnalysis) {
+    if (!typeHint || !changeAnalysis?.type || changeAnalysis.type === 'chore') {
+      return null;
+    }
+
+    return typeHint === changeAnalysis.type ? typeHint : null;
+  }
+
+  /**
+   * Extract changed file paths from diff headers.
+   */
+  extractChangedFilePaths(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return [];
+    }
+
+    return diff
+      .split('\n')
+      .map(line => line.match(/^diff --git a\/(.+?) b\/(.+)$/))
+      .filter(Boolean)
+      .map(match => match[2]);
+  }
+
+  /**
+   * Infer a conservative type from changed file paths when content is neutral.
+   */
+  inferTypeFromChangedFiles(filePaths, actualChangeText = '') {
+    if (!filePaths.length) {
+      return null;
+    }
+
+    const normalized = filePaths.map(file => file.toLowerCase());
+
+    if (normalized.every(file => this.isTestFile(file))) {
+      return 'test';
+    }
+
+    if (normalized.every(file => this.isDocsFile(file))) {
+      return 'docs';
+    }
+
+    if (normalized.every(file => this.isStyleFile(file))) {
+      return 'style';
+    }
+
+    if (normalized.every(file => this.isDependencyFile(file))) {
+      return 'build';
+    }
+
+    if (normalized.every(file => this.isConfigFile(file))) {
+      return 'chore';
+    }
+
+    if (normalized.every(file => this.isMarkupFile(file)) && /[<>]|class=|id=|aria-|data-/.test(actualChangeText)) {
+      return 'feat';
+    }
+
+    return null;
+  }
+
+  shouldPreferFileTypeFallback(fileTypeFallback, analysis) {
+    const fileSpecificTypes = new Set(['test', 'docs', 'style', 'build']);
+    return fileSpecificTypes.has(fileTypeFallback) && analysis.confidence < 0.75;
+  }
+
+  isTestFile(file) {
+    return /(^|\/)(__tests__|tests?|specs?|mocks?|fixtures?)\//.test(file) || /\.(test|spec)\./.test(file);
+  }
+
+  isDocsFile(file) {
+    return /(^|\/)(readme|changelog|license|contributing)(\.|$)/.test(file) || /\.(md|txt|rst|adoc)$/.test(file) || /(^|\/)docs?\//.test(file);
+  }
+
+  isStyleFile(file) {
+    return /\.(css|scss|sass|less|styl)$/.test(file) || /(^|\/)styles?\//.test(file);
+  }
+
+  isDependencyFile(file) {
+    return /(^|\/)(package-lock\.json|package\.json|yarn\.lock|pnpm-lock\.yaml|composer\.json|composer\.lock|requirements\.txt|poetry\.lock|pom\.xml|build\.gradle)$/.test(file);
+  }
+
+  isConfigFile(file) {
+    return /(^|\/)(dockerfile|makefile|tsconfig.*\.json|webpack\.config\.\w+|vite\.config\.\w+|rollup\.config\.\w+|\.env|\.gitignore|\.editorconfig)$/.test(file) || /\.(json|ya?ml|toml|ini|conf|config)$/.test(file);
+  }
+
+  isMarkupFile(file) {
+    return /\.(html|htm|vue|svelte|hbs|ejs|twig|blade\.php)$/.test(file) || /\/templates?\//.test(file);
   }
 }
 

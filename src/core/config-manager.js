@@ -348,7 +348,7 @@ class ConfigManager {
               config.model.includes('gpt-oss') ||
               config.model.includes('qwen'))
               ? config.model
-              : 'llama-3.1-8b-instant';
+              : 'openai/gpt-oss-20b';
           break;
         case 'ollama': {
           const ollamaModels = [

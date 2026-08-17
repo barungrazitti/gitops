@@ -1,22 +1,100 @@
 /**
- * Handles AI-powered conflict resolution and cleanup
+ * Conflict Resolver - AI-powered git merge conflict resolution
+ *
+ * Parses conflict markers, resolves blocks via AI (with secret redaction),
+ * and cleans conflict markers from content.
  */
 
 const path = require('path');
 const chalk = require('chalk');
 const fs = require('fs-extra');
 const AIProviderFactory = require('../providers/ai-provider-factory');
+const SecretScanner = require('../utils/secret-scanner');
 
 class ConflictResolver {
-  constructor(activityLogger, configManager) {
-    this.activityLogger = activityLogger;
+  /**
+   * @param {Object} deps
+   * @param {Object} deps.configManager - Config manager instance
+   * @param {Object} deps.gitManager - Git manager instance
+   * @param {Object} deps.activityLogger - Activity logger instance
+   */
+  constructor({ configManager, gitManager, activityLogger }) {
     this.configManager = configManager;
+    this.gitManager = gitManager;
+    this.activityLogger = activityLogger;
+  }
+
+  /**
+   * Parse conflict markers from content and extract both versions
+   */
+  parseConflictBlocks(content) {
+    const conflicts = [];
+    const lines = content.split('\n');
+    let currentConflict = null;
+    let collectingCurrent = false;
+    let collectingIncoming = false;
+
+    for (const line of lines) {
+      if (line.startsWith('<<<<<<<')) {
+        currentConflict = {
+          startLine: lines.indexOf(line),
+          currentVersion: [],
+          incomingVersion: [],
+        };
+        collectingCurrent = true;
+        collectingIncoming = false;
+      } else if (line.startsWith('=======')) {
+        collectingCurrent = false;
+        collectingIncoming = true;
+      } else if (line.startsWith('>>>>>>>')) {
+        if (currentConflict) {
+          currentConflict.endLine = lines.indexOf(line);
+          currentConflict.currentVersion = currentConflict.currentVersion.join('\n');
+          currentConflict.incomingVersion = currentConflict.incomingVersion.join('\n');
+          conflicts.push(currentConflict);
+        }
+        currentConflict = null;
+        collectingCurrent = false;
+        collectingIncoming = false;
+      } else if (currentConflict) {
+        if (collectingCurrent) {
+          currentConflict.currentVersion.push(line);
+        } else if (collectingIncoming) {
+          currentConflict.incomingVersion.push(line);
+        }
+      }
+    }
+
+    return conflicts;
   }
 
   /**
    * Resolve a single conflict block using AI
    */
   async resolveConflictWithAI(filePath, currentVersion, incomingVersion, language = 'javascript') {
+    // Normalize object-form calls (e.g. from AutoGit)
+    if (filePath && typeof filePath === 'object') {
+      const ctx = filePath;
+      filePath = ctx.filePath;
+      currentVersion = ctx.currentChanges || ctx.currentVersion || ctx.originalContent;
+      incomingVersion = ctx.incomingChanges || ctx.incomingVersion;
+      language = ctx.language || language;
+    }
+
+    // SECURITY: Redact secrets/PII before sending file content to AI
+    const secretScanner = new SecretScanner();
+    currentVersion = secretScanner.scanAndRedact(String(currentVersion || ''), true);
+    incomingVersion = secretScanner.scanAndRedact(String(incomingVersion || ''), true);
+    const redactionSummary = secretScanner.getRedactionSummary();
+    if (redactionSummary.found) {
+      await this.activityLogger.warn('sensitive_data_redacted', {
+        source: 'conflict_resolution',
+        redacted: redactionSummary.redacted,
+        byCategory: redactionSummary.byCategory,
+      });
+    }
+    secretScanner.clearRedactionLog();
+
     const prompt = `You are an expert software developer. Resolve a git merge conflict intelligently.
 
 CONTEXT:
@@ -68,86 +146,6 @@ RESOLVED CODE (output only):
 
     // Fallback: keep current version
     return currentVersion;
-  }
-
-  /**
-   * Handle conflict markers in a diff using AI-powered resolution
-   */
-  async handleConflictMarkers(diff, filePath) {
-    const conflictPattern = /<<<<<<< HEAD\r?\n([\s\S]*?)=======\r?\n([\s\S]*?)>>>>>>> .+/g;
-    const matches = [...diff.matchAll(conflictPattern)];
-
-    if (matches.length === 0) {
-      return { cleanedDiff: diff, hasConflicts: false, resolved: [] };
-    }
-
-    console.log(chalk.yellow(`⚠️  Found ${matches.length} conflict(s) in ${filePath}`));
-    console.log(chalk.blue(`🧠 Using AI to intelligently resolve conflicts...`));
-
-    let cleanedDiff = diff;
-    const resolved = [];
-    let aiUsed = false;
-
-    for (const match of matches) {
-      const currentVersion = match[1].trim();
-      const incomingVersion = match[2].trim();
-      const conflictBlock = match[0];
-
-      // Detect language from file extension
-      const ext = filePath.split('.').pop();
-      const langMap = {
-        js: 'javascript',
-        ts: 'typescript',
-        py: 'python',
-        php: 'php',
-        html: 'html',
-        css: 'css',
-        json: 'json',
-        md: 'markdown',
-        sql: 'sql',
-        java: 'java',
-        go: 'go',
-        rs: 'rust',
-      };
-      const language = langMap[ext] || 'javascript';
-
-      // Use AI to resolve the conflict
-      let resolvedVersion;
-      try {
-        resolvedVersion = await this.resolveConflictWithAI(
-          filePath,
-          currentVersion,
-          incomingVersion,
-          language
-        );
-        aiUsed = true;
-      } catch (error) {
-        console.warn(chalk.yellow(`AI resolution failed: ${error.message}`));
-        // Fallback to current version
-        resolvedVersion = currentVersion;
-      }
-
-      // Replace the conflict block with resolved version
-      cleanedDiff = cleanedDiff.replace(conflictBlock, resolvedVersion);
-
-      resolved.push({
-        file: filePath,
-        resolutionType: aiUsed ? 'ai-merged' : 'kept-current',
-        linesKept: resolvedVersion.split('\n').length,
-      });
-    }
-
-    const successType = aiUsed ? 'AI-merged' : 'fallback';
-    console.log(
-      chalk.green(`✅ Resolved ${resolved.length} conflict(s) in ${filePath} (${successType})`)
-    );
-
-    return {
-      cleanedDiff,
-      hasConflicts: true,
-      resolved,
-      aiUsed,
-    };
   }
 
   /**
@@ -237,15 +235,11 @@ RESOLVED CODE (output only):
                     1;
 
                   if (conflictBlockStart >= 0 && conflictBlockEnd > conflictBlockStart) {
-                    cleanedContent =
-                      content.substring(0, conflictBlockStart) +
-                      resolved +
-                      '\n' +
-                      content.substring(conflictBlockEnd);
+                    cleanedContent = `${content.substring(0, conflictBlockStart) + resolved}\n${content.substring(conflictBlockEnd)}`;
                   } else {
                     cleanedContent = cleanedContent.replace(
                       `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                      resolved + '\n'
+                      `${resolved}\n`
                     );
                   }
 
@@ -255,7 +249,7 @@ RESOLVED CODE (output only):
                   // Fallback: use current version
                   cleanedContent = cleanedContent.replace(
                     `<<<<<<< HEAD\n${conflict.currentVersion}\n=======\n${conflict.incomingVersion}\n>>>>>>> `,
-                    conflict.currentVersion + '\n'
+                    `${conflict.currentVersion}\n`
                   );
                 }
               }
@@ -322,50 +316,6 @@ RESOLVED CODE (output only):
       }
     }
     return result.join('\n').trim();
-  }
-
-  /**
-   * Parse conflict blocks from content
-   */
-  parseConflictBlocks(content) {
-    const conflicts = [];
-    const lines = content.split('\n');
-    let currentConflict = null;
-    let collectingCurrent = false;
-    let collectingIncoming = false;
-
-    for (const line of lines) {
-      if (line.startsWith('<<<<<<<')) {
-        currentConflict = {
-          startLine: lines.indexOf(line),
-          currentVersion: [],
-          incomingVersion: [],
-        };
-        collectingCurrent = true;
-        collectingIncoming = false;
-      } else if (line.startsWith('=======')) {
-        collectingCurrent = false;
-        collectingIncoming = true;
-      } else if (line.startsWith('>>>>>>>')) {
-        if (currentConflict) {
-          currentConflict.endLine = lines.indexOf(line);
-          currentConflict.currentVersion = currentConflict.currentVersion.join('\n');
-          currentConflict.incomingVersion = currentConflict.incomingVersion.join('\n');
-          conflicts.push(currentConflict);
-        }
-        currentConflict = null;
-        collectingCurrent = false;
-        collectingIncoming = false;
-      } else if (currentConflict) {
-        if (collectingCurrent) {
-          currentConflict.currentVersion.push(line);
-        } else if (collectingIncoming) {
-          currentConflict.incomingVersion.push(line);
-        }
-      }
-    }
-
-    return conflicts;
   }
 }
 

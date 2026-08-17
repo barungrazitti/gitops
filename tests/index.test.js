@@ -180,32 +180,6 @@ describe('AICommitGenerator', () => {
     });
   });
 
-  describe('chunkDiff', () => {
-    it('should handle small diffs without chunking', () => {
-      const smallDiff = 'diff --git a/test.js b/test.js\n+ small change';
-      const result = generator.chunkDiff(smallDiff, 10000);
-
-      expect(result).toEqual([smallDiff]);
-    });
-
-    it('should handle very large diffs', () => {
-      const largeDiff = `diff --git a/file1.js b/file1.js\n${'line 1\n'.repeat(2000)}`;
-      const result = generator.chunkDiff(largeDiff, 6000);
-
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBeGreaterThanOrEqual(1);
-    });
-
-    it('should handle single very large lines', () => {
-      const largeLine = 'a'.repeat(10000);
-      const diff = `diff --git a/test.js b/test.js\n+${largeLine}`;
-      const result = generator.chunkDiff(diff, 2000);
-
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBeGreaterThanOrEqual(1);
-    });
-  });
-
   describe('selectBestMessages', () => {
     it('should select best messages from array', () => {
       const messages = [
@@ -278,6 +252,32 @@ describe('AICommitGenerator', () => {
       expect(result.info.truncated).toBe(true);
       expect(result.info.preservedFiles).toBeDefined();
       expect(result.info.reasoning).toBeDefined();
+    });
+
+    it('should keep actual changed lines for oversized single-file diffs', () => {
+      const largeWordPressDiff = `diff --git a/wp-content/themes/theme/inc/su-rest-functions.php b/wp-content/themes/theme/inc/su-rest-functions.php
+--- a/wp-content/themes/theme/inc/su-rest-functions.php
++++ b/wp-content/themes/theme/inc/su-rest-functions.php
+@@ -1,3 +1,900 @@
+ <?php
++add_action('rest_api_init', 'register_routes');
++function register_routes() {
++  register_rest_route('theme/v1', '/suggestions', []);
++}
+${Array(900)
+  .fill(0)
+  .map((_, i) => `+// generated filler ${i} ${'x'.repeat(80)}`)
+  .join('\n')}`;
+
+      const result = generator.manageDiffForAI(largeWordPressDiff);
+
+      expect(result.strategy).toBe('smart-truncated');
+      expect(result.info.preservedFiles).toContain(
+        'wp-content/themes/theme/inc/su-rest-functions.php'
+      );
+      expect(result.info.reasoning).toContain('truncated');
+      expect(result.data).toContain("+add_action('rest_api_init', 'register_routes');");
+      expect(result.data).toContain('+function register_routes()');
     });
 
     it('should preserve new files with higher priority', () => {
