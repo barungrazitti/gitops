@@ -442,31 +442,21 @@ class AutoGit {
    */
   async resolveFileConflictsWithAI(filePath) {
     try {
-      // Get the conflicted file content
-      const fileContent = await this.git.show([`HEAD:${filePath}`]);
+      // Both sides of the conflict (theirs = current/HEAD, ours = incoming)
       const currentContent = await this.git.show([`--theirs`, `:${filePath}`]);
       const incomingContent = await this.git.show([`--ours`, `:${filePath}`]);
 
-      // Get the current conflicted file to see conflict markers
+      // Resolve via AI and write the result back to the working copy
+      const resolvedContent = await this.conflictResolver.resolveConflictWithAI({
+        filePath,
+        currentVersion: currentContent,
+        incomingVersion: incomingContent,
+        language: filePath.split('.').pop() === 'php' ? 'php' : 'javascript',
+      });
+
       const repoRoot = await this.git.revparse(['--show-toplevel']);
       const fullPath = require('path').join(repoRoot, filePath);
       const fs = require('fs-extra');
-      const conflictedContent = await fs.readFile(fullPath, 'utf8');
-
-      // Create conflict context for AI
-      const conflictContext = {
-        filePath,
-        originalContent: fileContent,
-        currentChanges: currentContent,
-        incomingChanges: incomingContent,
-        conflictedContent,
-        timestamp: Date.now(),
-      };
-
-      // Use AI to resolve conflicts
-      const resolvedContent = await this.conflictResolver.resolveConflictWithAI(conflictContext);
-
-      // Write the resolved content back to the file
       await fs.writeFile(fullPath, resolvedContent, 'utf8');
     } catch (error) {
       throw new Error(`Failed to resolve conflicts in ${filePath}: ${error.message}`);

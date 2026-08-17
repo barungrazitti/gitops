@@ -69,16 +69,20 @@ class ConflictResolver {
   }
 
   /**
-   * Resolve a single conflict block using AI
+   * Resolve a single conflict block using AI.
+   * Single interface shape: one object in, resolved content out.
+   * @param {Object} conflictCtx
+   * @param {string} conflictCtx.filePath - Path of the conflicted file.
+   * @param {string} conflictCtx.currentVersion - HEAD/current side of the conflict.
+   * @param {string} conflictCtx.incomingVersion - Incoming side of the conflict.
+   * @param {string} [conflictCtx.language] - Language hint for the prompt.
+   * @returns {Promise<string>} Resolved content (falls back to currentVersion on failure).
    */
-  async resolveConflictWithAI(filePath, currentVersion, incomingVersion, language = 'javascript') {
-    // Normalize object-form calls (e.g. from AutoGit)
-    if (filePath && typeof filePath === 'object') {
-      const ctx = filePath;
-      filePath = ctx.filePath;
-      currentVersion = ctx.currentChanges || ctx.currentVersion || ctx.originalContent;
-      incomingVersion = ctx.incomingChanges || ctx.incomingVersion;
-      language = ctx.language || language;
+  async resolveConflictWithAI({ filePath, currentVersion, incomingVersion, language = 'javascript' }) {
+    if (!filePath || typeof currentVersion !== 'string' || typeof incomingVersion !== 'string') {
+      throw new Error(
+        'resolveConflictWithAI requires { filePath, currentVersion, incomingVersion }'
+      );
     }
 
     // SECURITY: Redact secrets/PII before sending file content to AI
@@ -232,12 +236,12 @@ RESOLVED CODE (output only):
                 const markerEnd = cleanedContent.indexOf('>>>>>>>', blockStart);
 
                 try {
-                  const resolved = await this.resolveConflictWithAI(
-                    file.fileB,
-                    conflict.currentVersion,
-                    conflict.incomingVersion,
-                    language
-                  );
+                  const resolved = await this.resolveConflictWithAI({
+                    filePath: file.fileB,
+                    currentVersion: conflict.currentVersion,
+                    incomingVersion: conflict.incomingVersion,
+                    language,
+                  });
 
                   if (blockStart >= 0 && markerEnd >= blockStart) {
                     // Include the rest of the '>>>>>>>' line (branch label + newline)

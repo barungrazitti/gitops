@@ -38,7 +38,7 @@ program
         gitManager: generator.gitManager,
         analysisEngine: generator.analysisEngine,
         configManager: generator.configManager,
-        generateMessages: generator.generateWithSequentialFallback.bind(generator),
+        generateMessages: (diff, options) => generator.generationPipeline.generate(diff, options),
         conflictResolver: generator.conflictResolver,
         activityLogger: generator.activityLogger,
       });

@@ -8,14 +8,13 @@ const fs = require('fs-extra');
 jest.mock('simple-git');
 jest.mock('fs-extra');
 jest.mock('ora');
-jest.mock('chalk', () => ({
-  blue: jest.fn(text => text),
-  green: jest.fn(text => text),
-  red: jest.fn(text => text),
-  yellow: jest.fn(text => text),
-  cyan: jest.fn(text => text),
-  dim: jest.fn(text => text),
-}));
+jest.mock('chalk', () => {
+  const identity = jest.fn(text => text);
+  return new Proxy(
+    { blue: identity, green: identity, red: identity, yellow: identity, cyan: identity, dim: identity, gray: identity },
+    { get: (target, prop) => (prop in target ? target[prop] : identity) }
+  );
+});
 
 const simpleGit = require('simple-git');
 const ora = require('ora');
@@ -91,7 +90,7 @@ describe('AICommitGenerator', () => {
         defaultProvider: 'groq',
         conventionalCommits: true,
       });
-      generator.selectMessage = jest.fn().mockResolvedValue(mockMessages[0]);
+      generator.cliPresenter.selectMessage = jest.fn().mockResolvedValue(mockMessages[0]);
       generator.gitManager.commit = jest.fn().mockResolvedValue({});
     });
 
@@ -180,7 +179,7 @@ describe('AICommitGenerator', () => {
     });
   });
 
-  describe('selectBestMessages', () => {
+  describe('selectBestMessages (via messageRanker)', () => {
     it('should select best messages from array', () => {
       const messages = [
         'feat: add new feature',
@@ -189,29 +188,29 @@ describe('AICommitGenerator', () => {
         'update functionality', // generic - should be ranked lower
       ];
 
-      const result = generator.selectBestMessages(messages, 3);
+      const result = generator.messageRanker.selectBestMessages(messages, 3);
 
       expect(result.length).toBeLessThanOrEqual(3);
     });
 
     it('should handle empty input', () => {
-      const result = generator.selectBestMessages([]);
+      const result = generator.messageRanker.selectBestMessages([]);
       expect(result).toEqual([]);
     });
 
     it('should handle null input', () => {
-      const result = generator.selectBestMessages(null);
+      const result = generator.messageRanker.selectBestMessages(null);
       expect(result).toEqual([]);
     });
   });
 
-  describe('scoreCommitMessage', () => {
+  describe('scoreCommitMessage (via messageRanker)', () => {
     it('should score conventional commit format higher', () => {
       const conventional = 'feat: add new feature';
       const nonConventional = 'add new feature';
 
-      const conventionalScore = generator.scoreCommitMessage(conventional);
-      const nonConventionalScore = generator.scoreCommitMessage(nonConventional);
+      const conventionalScore = generator.messageRanker.scoreCommitMessage(conventional);
+      const nonConventionalScore = generator.messageRanker.scoreCommitMessage(nonConventional);
 
       expect(conventionalScore).toBeGreaterThan(nonConventionalScore);
     });
@@ -220,8 +219,8 @@ describe('AICommitGenerator', () => {
       const generic = 'update functionality';
       const specific = 'feat: add UserAuthentication class';
 
-      const genericScore = generator.scoreCommitMessage(generic);
-      const specificScore = generator.scoreCommitMessage(specific);
+      const genericScore = generator.messageRanker.scoreCommitMessage(generic);
+      const specificScore = generator.messageRanker.scoreCommitMessage(specific);
 
       expect(specificScore).toBeGreaterThan(genericScore);
     });
@@ -229,23 +228,23 @@ describe('AICommitGenerator', () => {
     it('should return low score for very short messages', () => {
       const short = 'ab';
 
-      const score = generator.scoreCommitMessage(short);
+      const score = generator.messageRanker.scoreCommitMessage(short);
 
       expect(score).toBeLessThan(0);
     });
   });
 
-  describe('manageDiffForAI', () => {
+  describe('manageDiffForAI (via diffShaper)', () => {
     it('should use full strategy for small diffs', () => {
       const smallDiff = 'diff --git a/test.js b/test.js\n+ small change';
-      const result = generator.manageDiffForAI(smallDiff);
+      const result = generator.diffShaper.manageDiffForAI(smallDiff);
 
       expect(result.strategy).toBe('full');
     });
 
     it('should truncate very large diffs', () => {
       const largeDiff = `diff --git a/test.js b/test.js\n${'a'.repeat(500000)}`;
-      const result = generator.manageDiffForAI(largeDiff);
+      const result = generator.diffShaper.manageDiffForAI(largeDiff);
 
       expect(result.strategy).toBe('smart-truncated');
       expect(result.data.length).toBeLessThan(largeDiff.length);
@@ -269,7 +268,7 @@ ${Array(900)
   .map((_, i) => `+// generated filler ${i} ${'x'.repeat(80)}`)
   .join('\n')}`;
 
-      const result = generator.manageDiffForAI(largeWordPressDiff);
+      const result = generator.diffShaper.manageDiffForAI(largeWordPressDiff);
 
       expect(result.strategy).toBe('smart-truncated');
       expect(result.info.preservedFiles).toContain(
@@ -302,7 +301,7 @@ diff --git a/old-file.js b/old-file.js
         .map((_, i) => `+const y${i} = ${i};`)
         .join('\n')}
  const y = 2;`;
-      const result = generator.manageDiffForAI(newFileDiff);
+      const result = generator.diffShaper.manageDiffForAI(newFileDiff);
       expect(result.info.strategy).toBe('smart-truncated');
       expect(result.info.preservedFiles).toContain('new-feature/new-file.js');
     });
@@ -323,7 +322,7 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 @@ -1,2 +1,3 @@
  module.exports = {};
 +const x = 1;`;
-      const result = generator.manageDiffForAI(diffWithNodeModules);
+      const result = generator.diffShaper.manageDiffForAI(diffWithNodeModules);
       expect(result.info.strategy).toBe('smart-truncated');
       expect(result.info.preservedFiles).toContain('src/main.js');
       expect(result.info.preservedFiles).not.toContain('node_modules/some-lib/index.js');
@@ -372,7 +371,7 @@ ${largeFileContent}
 diff --git a/vendor/composer/installed.json b/vendor/composer/installed.json
 --- a/vendor/composer/installed.json
 +++ b/vendor/composer/installed.json
-@@ -1,2 +1,1000 @@
+ @@ -1,2 +1,1000 @@
 {}
 ${Array(1000)
   .fill(0)
@@ -388,7 +387,7 @@ ${Array(1000)
   .map((_, i) => `+"key${i}": "value${i}"`)
   .join('\n')}`;
 
-      const result = generator.manageDiffForAI(largeDiff);
+      const result = generator.diffShaper.manageDiffForAI(largeDiff);
       expect(result.info.strategy).toBe('smart-truncated');
 
       // With 30+ files, some should be truly skipped (beyond header budget)
@@ -426,7 +425,7 @@ diff --git a/src/utils.js b/src/utils.js
           },
         },
       };
-      const result = generator.manageDiffForAI(multiFileDiff, { context: semanticContext });
+      const result = generator.diffShaper.manageDiffForAI(multiFileDiff, { context: semanticContext });
       expect(result.data).toContain('src/main.js');
     });
 
@@ -446,7 +445,7 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
 @@ -1,2 +1,3 @@
  module.exports = {};
 +const x = 1;`;
-      const result = generator.manageDiffForAI(diffWithNodeModules);
+      const result = generator.diffShaper.manageDiffForAI(diffWithNodeModules);
       expect(result.info.strategy).toBe('smart-truncated');
       expect(result.info.preservedFiles).toContain('src/main.js');
       expect(result.info.preservedFiles).not.toContain('node_modules/some-lib/index.js');
@@ -454,7 +453,7 @@ diff --git a/node_modules/some-lib/index.js b/node_modules/some-lib/index.js
     });
   });
 
-  describe('cleanConflictMarkers', () => {
+  describe('cleanConflictMarkers (via conflictResolver)', () => {
     it('should clean conflict markers keeping current version', () => {
       const content = `<<<<<<<
 old line
@@ -462,7 +461,7 @@ old line
 new line
 >>>>>>> branch`;
 
-      const result = generator.cleanConflictMarkers(content);
+      const result = generator.conflictResolver.cleanConflictMarkers(content);
 
       expect(result).not.toContain('<<<<<<< ');
       expect(result).not.toContain('=======');
@@ -471,13 +470,13 @@ new line
 
     it('should handle content without conflicts', () => {
       const content = 'normal content\nline 2\nline 3';
-      const result = generator.cleanConflictMarkers(content);
+      const result = generator.conflictResolver.cleanConflictMarkers(content);
 
       expect(result).toBe('normal content\nline 2\nline 3');
     });
   });
 
-  describe('parseConflictBlocks', () => {
+  describe('parseConflictBlocks (via conflictResolver)', () => {
     it('should parse conflict blocks from content', () => {
       const content = `<<<<<<<
 const a = 1;
@@ -485,7 +484,7 @@ const a = 1;
 const a = 2;
 >>>>>>> branch`;
 
-      const result = generator.parseConflictBlocks(content);
+      const result = generator.conflictResolver.parseConflictBlocks(content);
 
       expect(result.length).toBe(1);
       expect(result[0].currentVersion).toBe('const a = 1;');
@@ -507,7 +506,7 @@ second conflict
 second incoming
 >>>>>>> branch`;
 
-      const result = generator.parseConflictBlocks(content);
+      const result = generator.conflictResolver.parseConflictBlocks(content);
 
       expect(result.length).toBe(2);
     });

@@ -1,163 +1,312 @@
 /**
- * CLI Presenter - Handles all console interaction for aic
+ * CLI Presenter - owns all console interaction for aic: prompts, menus,
+ * readline, chalk/styling, setup wizard, config and stats display.
+ * Dependencies are injected explicitly - it never reaches through to
+ * other modules' internals.
  */
 
 const chalk = require('chalk');
-const ora = require('ora');
-const inquirer = require('inquirer');
-const fs = require('fs-extra');
-const path = require('path');
+const readline = require('readline');
 
 class CLIPresenter {
-  constructor(aiCommitGenerator) {
-    this.generator = aiCommitGenerator;
-    this.spinner = ora();
+  /**
+   * @param {Object} deps
+   * @param {Object} deps.configManager - Config store (apiKey masked in output).
+   * @param {Object} deps.statsManager - Usage statistics.
+   * @param {Object} deps.activityLogger - Activity log analysis/export.
+   * @param {Object} deps.hookManager - Git hook install/uninstall.
+   * @param {Object} deps.metricsScorer - Message quality scoring for display.
+   */
+  constructor({ configManager, statsManager, activityLogger, hookManager, metricsScorer }) {
+    this.configManager = configManager;
+    this.statsManager = statsManager;
+    this.activityLogger = activityLogger;
+    this.hookManager = hookManager;
+    this.metricsScorer = metricsScorer;
   }
 
   /**
-   * Identify the type of error to provide better suggestions
+   * Create a readline interface for interactive prompts
    */
-  identifyErrorType(error) {
-    const message = error.message.toLowerCase();
-    if (message.includes('no staged changes')) return 'git_no_changes';
-    if (message.includes('not a git repository')) return 'git_not_repo';
-    if (message.includes('401') || message.includes('unauthorized') || message.includes('api key')) return 'ai_auth_error';
-    if (message.includes('429') || message.includes('too many requests') || message.includes('rate limit')) return 'ai_rate_limit';
-    if (message.includes('econnrefused') || message.includes('enotfound')) return 'ai_connection_error';
-    if (message.includes('context length exceeded') || message.includes('too large')) return 'ai_context_limit';
-    return 'unknown';
-  }
-
-  /**
-   * Get a local fallback suggestion for an error type
-   */
-  getLocalSuggestion(type) {
-    const suggestions = {
-      git_no_changes: 'No changes are staged. Use "git add <file>" to stage changes.',
-      git_not_repo: 'This directory is not a git repository. Run "git init".',
-      ai_auth_error: 'AI provider authentication failed. Run "aic setup".',
-      ai_rate_limit: 'AI provider rate limit reached. Please wait or switch providers.',
-      ai_connection_error: 'Could not connect to AI provider. Check internet/Ollama.',
-      ai_context_limit: 'Diff is too large. Stage fewer files.',
-    };
-    return suggestions[type] || 'An unknown error occurred.';
-  }
-
-  /**
-   * Provide error suggestions with interactive options
-   */
-  async provideErrorSuggestions(error, options = {}) {
-    const errorType = this.identifyErrorType(error);
-    const suggestion = this.getLocalSuggestion(errorType);
-    console.log(chalk.yellow('\n⚠️  Error:') + chalk.red(` ${error.message}`));
-    console.log(chalk.dim(`\nSuggestion: ${suggestion}`));
-
-    const { runSetup = false } = await inquirer.prompt([{
-      type: 'confirm', name: 'runSetup', message: 'Run setup to fix configuration?', default: false,
-    }]);
-
-    if (runSetup) await this.setup();
+  createReadline() {
+    return readline.createInterface({
+      input: process.stdin,
+      output: process.stdout,
+    });
   }
 
   /**
    * Interactive message selection
    */
   async selectMessage(messages, options = {}) {
-    if (!messages || messages.length === 0) return null;
-    if (messages.length === 1) return messages[0];
+    const rl = this.createReadline();
 
-    const { useAISelection } = await inquirer.prompt([{
-      type: 'confirm', name: 'useAISelection', message: 'Use AI to select the best commit message?', default: true,
-    }]);
+    const question = prompt =>
+      new Promise(resolve => {
+        rl.question(prompt, resolve);
+      });
 
-    if (useAISelection) {
-      this.spinner.start('Analyzing messages...');
-      try {
-        const diff = await this.generator.gitManager.getStagedDiff();
-        const ranked = await this.generator.messageRanker.selectBestMessages(messages, options.count || 3, diff);
-        this.spinner.stop();
-        const { selected } = await inquirer.prompt([{
-          type: 'list', name: 'selected', message: 'Select message:', choices: ranked,
-        }]);
-        return selected;
-      } catch (e) {
-        this.spinner.stop();
-        console.warn(chalk.yellow('AI selection failed, showing manual selector'));
+    try {
+      console.log(chalk.cyan('\n📝 Generated commit messages:'));
+
+      const showScores = options.quiet !== true;
+      const diff = options.diff || '';
+
+      messages.forEach((msg, index) => {
+        console.log(chalk.green(`${index + 1}. ${msg}`));
+        if (showScores && this.metricsScorer) {
+          const score = this.metricsScorer.calculateOverallScore(msg, diff);
+          const { category, color } = this.metricsScorer.categorizeScore(score);
+          console.log(chalk[color](`   └─ Score: ${score}/100 (${category})`));
+        }
+      });
+
+      console.log(chalk.gray(`${messages.length + 1}. 🔄 Regenerate messages`));
+      console.log(chalk.gray(`${messages.length + 2}. ✏️  Write custom message`));
+      console.log(chalk.gray(`${messages.length + 3}. ❌ Cancel`));
+
+      const choice = await question(`\nSelect option (1-${messages.length + 3}, default: 1): `);
+      const choiceNum = parseInt(choice) || 1;
+
+      if (choiceNum === messages.length + 3) {
+        console.log(chalk.yellow('Commit cancelled.'));
+        return null;
       }
+
+      if (choiceNum === messages.length + 1) {
+        console.log(chalk.yellow('Regenerating commit messages...'));
+        rl.close();
+        // Return special value to trigger regeneration
+        return 'regenerate';
+      }
+
+      if (choiceNum === messages.length + 2) {
+        const customMessage = await question('Enter your custom commit message: ');
+        if (!customMessage.trim()) {
+          console.log(chalk.red('Message cannot be empty'));
+          return null;
+        }
+        rl.close();
+        return customMessage.trim();
+      }
+
+      if (choiceNum >= 1 && choiceNum <= messages.length) {
+        rl.close();
+        return messages[choiceNum - 1];
+      }
+
+      console.log(chalk.red('Invalid choice'));
+      rl.close();
+      return null;
+    } catch (error) {
+      rl.close();
+      throw error;
     }
-    const { selected } = await inquirer.prompt([{
-      type: 'list', name: 'selected', message: 'Select message:', choices: messages,
-    }]);
-    return selected;
   }
 
   /**
-   * Configuration management
+   * Configuration management UI
    */
   async config(options = {}) {
-    const configManager = this.generator.configManager;
-    if (options.list || (!options.set && !options.reset && !Object.keys(options).length)) {
-      const config = await configManager.getAll();
-      console.log(chalk.cyan('\n📋 Current Configuration:\n'));
-      Object.entries(config).forEach(([k, v]) => {
-        const display = k === 'apiKey' && v ? '***configured***' : v;
-        console.log(`${k}: ${display}`);
+    if (options.set) {
+      const [key, value] = options.set.split('=');
+      await this.configManager.set(key, value);
+      console.log(chalk.green(`✅ Configuration updated: ${key} = ${value}`));
+    } else if (options.get) {
+      const value = await this.configManager.get(options.get);
+      console.log(`${options.get}: ${value || 'not set'}`);
+    } else if (options.list || (!options.set && !options.get && !options.reset)) {
+      const config = await this.configManager.load();
+      console.log(chalk.cyan('Current configuration:'));
+      Object.entries(config).forEach(([key, value]) => {
+        // Never print secrets in plaintext
+        const display = key === 'apiKey' && value ? '***configured***' : value;
+        console.log(`  ${key}: ${display}`);
       });
-      return;
+    } else if (options.reset) {
+      await this.configManager.reset();
+      console.log(chalk.green('✅ Configuration reset to defaults'));
     }
-    if (options.set) { await configManager.set(options.set); console.log(chalk.green('✅ Updated')); }
-    if (options.reset) { await configManager.reset(); console.log(chalk.green('✅ Reset')); }
   }
 
   /**
    * Interactive setup wizard
    */
   async setup() {
-    console.log(chalk.cyan('\n🚀 AI Commit Setup\n'));
-    const provider = await inquirer.prompt([{
-      type: 'list', name: 'provider', message: 'Select AI provider:', choices: ['groq', 'ollama'],
-    }]);
-    let apiKey = '';
-    if (provider.provider === 'groq') {
-      apiKey = (await inquirer.prompt([{ type: 'input', name: 'apiKey', message: 'Groq API Key:' }])).apiKey;
+    console.log(chalk.cyan('🚀 AI Commit Generator Setup Wizard\n'));
+
+    const rl = this.createReadline();
+
+    const question = prompt =>
+      new Promise(resolve => {
+        rl.question(prompt, resolve);
+      });
+
+    try {
+      console.log('Select your preferred AI provider:');
+      console.log('1. Groq (Fast Cloud)');
+      console.log('2. Ollama (Local)');
+
+      const providerChoice = await question('Enter choice (1-2, default: 1): ');
+      const provider = providerChoice === '2' ? 'ollama' : 'groq';
+
+      let apiKey = '';
+      if (provider !== 'ollama') {
+        apiKey = await question('Enter your Groq API key: ');
+        if (!apiKey.trim()) {
+          console.log(chalk.red('❌ API key is required for Groq'));
+          rl.close();
+          return;
+        }
+      }
+
+      const conventionalChoice = await question(
+        'Use conventional commit format? (Y/n, default: Y): '
+      );
+      const conventionalCommits = conventionalChoice.toLowerCase() !== 'n';
+
+      console.log('Select commit message language:');
+      console.log('1. English');
+      console.log('2. Spanish');
+      console.log('3. French');
+      console.log('4. German');
+      console.log('5. Chinese');
+      console.log('6. Japanese');
+
+      const langChoice = await question('Enter choice (1-6, default: 1): ');
+      const languages = {
+        1: 'en',
+        2: 'es',
+        3: 'fr',
+        4: 'de',
+        5: 'zh',
+        6: 'ja',
+      };
+      const language = languages[langChoice] || 'en';
+
+      // Save configuration
+      await this.configManager.setMultiple({
+        defaultProvider: provider,
+        apiKey,
+        conventionalCommits,
+        language,
+      });
+
+      console.log(chalk.green('\n✅ Setup completed successfully!'));
+      console.log(chalk.cyan('You can now use "aic" to generate commit messages.'));
+    } catch (error) {
+      console.error(chalk.red('Setup failed:'), error.message);
+    } finally {
+      rl.close();
     }
-    const model = await inquirer.prompt([{
-      type: 'list', name: 'model', message: 'Select model:', choices: ['openai/gpt-oss-20b', 'llama-3.1-8b-instant'],
-    }]);
-    await this.generator.configManager.set({ provider: provider.provider, apiKey, model: model.model });
-    console.log(chalk.green('\n✅ Setup complete!'));
   }
 
   /**
-   * Git hook management
+   * Git hook management UI
    */
   async hook(options = {}) {
-    if (options.install) { await this.generator.hookManager.install(); console.log('✅ Installed'); }
-    if (options.uninstall) { await this.generator.hookManager.uninstall(); console.log('✅ Uninstalled'); }
+    if (options.install) {
+      await this.hookManager.install();
+      console.log(chalk.green('✅ Git hook installed successfully!'));
+    } else if (options.uninstall) {
+      await this.hookManager.uninstall();
+      console.log(chalk.green('✅ Git hook uninstalled successfully!'));
+    } else {
+      console.log(chalk.yellow('Please specify --install or --uninstall'));
+    }
   }
 
   /**
-   * Show usage statistics
+   * Show usage statistics UI
    */
-  async stats(options = {}) {
-    if (options.reset) { await this.generator.statsManager.reset(); console.log('✅ Reset'); return; }
-    const stats = await this.generator.statsManager.getStats();
-    if (options.analyze) { await this.displayLogAnalysis(stats); return; }
-    console.log(chalk.cyan('\n📊 Usage Statistics\n'));
-    this._displayStatsTable(stats);
+  async stats(options) {
+    if (options.reset) {
+      await this.statsManager.reset();
+      console.log(chalk.green('✅ Statistics reset successfully!'));
+      return;
+    }
+
+    if (options.analyze) {
+      const analysis = await this.activityLogger.analyzeLogs(options.days || 30);
+      this.displayLogAnalysis(analysis);
+      return;
+    }
+
+    if (options.export) {
+      const format = options.format || 'json';
+      const exportData = await this.activityLogger.exportLogs(options.days || 30, format);
+
+      if (format === 'json') {
+        console.log(JSON.stringify(JSON.parse(exportData), null, 2));
+      } else {
+        console.log(exportData);
+      }
+      return;
+    }
+
+    const stats = await this.statsManager.getStats();
+    console.log(chalk.cyan('\n📊 Usage Statistics:'));
+    console.log(`Total commits: ${stats.totalCommits}`);
+    console.log(`Most used provider: ${stats.mostUsedProvider}`);
+    console.log(`Average response time: ${stats.averageResponseTime}ms`);
+    console.log(`Cache hit rate: ${stats.cacheHitRate}%`);
   }
 
   /**
-   * Display log analysis
+   * Display log analysis results
    */
-  async displayLogAnalysis(stats) {
-    const logs = await this.generator.activityLogger.getRecentLogs(100);
-    console.log(chalk.cyan('\n📈 Recent Activity Analysis\n'));
-    console.log(`Total events: ${logs.length}`);
-  }
+  displayLogAnalysis(analysis) {
+    console.log(chalk.cyan('\n📈 Activity Analysis (Last 30 days):'));
 
-  _displayStatsTable(stats) {
-    console.log(`Generations: ${stats.totalGenerations || 0}`);
+    console.log(chalk.yellow('\n🔥 Usage Metrics:'));
+    console.log(`  Total Sessions: ${analysis.totalSessions}`);
+    console.log(`  AI Interactions: ${analysis.aiInteractions}`);
+    console.log(`  Successful Commits: ${analysis.successfulCommits}`);
+    console.log(`  Conflict Resolutions: ${analysis.conflictResolutions}`);
+
+    console.log(chalk.yellow('\n🤖 Provider Usage:'));
+    Object.entries(analysis.providerUsage).forEach(([provider, count]) => {
+      console.log(
+        `  ${provider}: ${count} (${Math.round((count / analysis.aiInteractions) * 100)}%)`
+      );
+    });
+
+    if (analysis.averageResponseTime > 0) {
+      console.log(chalk.yellow('\n⚡ Performance:'));
+      console.log(`  Average Response Time: ${analysis.averageResponseTime}ms`);
+    }
+
+    if (Object.keys(analysis.messagePatterns).length > 0) {
+      console.log(chalk.yellow('\n📝 Commit Patterns:'));
+      Object.entries(analysis.messagePatterns)
+        .sort(([, a], [, b]) => b - a)
+        .forEach(([type, count]) => {
+          const percentage = Math.round((count / analysis.successfulCommits) * 100);
+          console.log(`  ${type}: ${count} (${percentage}%)`);
+        });
+    }
+
+    if (Object.keys(analysis.commonErrors).length > 0) {
+      console.log(chalk.yellow('\n❌ Common Errors:'));
+      Object.entries(analysis.commonErrors)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .forEach(([error, count]) => {
+          console.log(`  ${error}: ${count}`);
+        });
+    }
+
+    if (Object.keys(analysis.peakUsageHours).length > 0) {
+      console.log(chalk.yellow('\n🕐 Peak Usage Hours:'));
+      Object.entries(analysis.peakUsageHours)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3)
+        .forEach(([hour, count]) => {
+          console.log(`  ${hour.toString().padStart(2, '0')}:00 - ${count} interactions`);
+        });
+    }
+
+    console.log(chalk.dim('\n💡 Tip: Use --export to get detailed data for further analysis'));
   }
 }
 
