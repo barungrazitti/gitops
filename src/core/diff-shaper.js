@@ -2,7 +2,9 @@ const chalk = require('chalk');
 
 /**
  * A deep module for intelligently shaping and truncating diffs for AI processing.
- * Consolidates diff filtering, chunking, scoring, and summarizing logic.
+ * Consolidates diff filtering, chunking, scoring, summarizing, change-type
+ * classification, and context-line limiting. DiffShaper owns the diff budget
+ * (AGENTS.md) — no other module truncates or classifies the diff.
  */
 class DiffShaper {
   /**
@@ -444,6 +446,314 @@ class DiffShaper {
     }
 
     return score;
+  }
+
+  /**
+   * Analyze diff change type and impact.
+   * Consolidates the former EfficientPromptBuilder.analyzeDiffForSpecialization()
+   * and analyzeChangeImpact(). DiffShaper is the single owner of diff classification.
+   * Returns { type, confidence, keywords, breaking, userFacing, performance,
+   *           security, dependency, scope }.
+   */
+  analyzeDiffType(diff, context) {
+    const analysis = {
+      type: 'chore', // default
+      confidence: 0.1,
+      keywords: [],
+      breaking: false,
+      userFacing: false,
+      performance: false,
+      security: false,
+      dependency: false,
+      scope: 'internal',
+    };
+
+    // Handle null/undefined/empty diff input
+    if (!diff || typeof diff !== 'string') {
+      return analysis;
+    }
+
+    const actualChangeText = this.extractActualChangeText(diff);
+    const lowerDiff = diff.toLowerCase();
+
+    // --- Impact analysis (uses the full diff for context) ---
+    analysis.breaking =
+      /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(lowerDiff);
+
+    analysis.userFacing =
+      /ui|component|view|template|style|css|user.*interface|frontend/i.test(lowerDiff) ||
+      context?.files?.fileTypes?.jsx > 0 ||
+      context?.files?.fileTypes?.tsx > 0 ||
+      context?.files?.fileTypes?.vue > 0 ||
+      context?.files?.fileTypes?.html > 0;
+
+    analysis.performance = /performance|optimize|cache|memo|lazy|async|await|promise/i.test(lowerDiff);
+    analysis.security = /security|auth|token|password|encrypt|decrypt|hash|validation|sanitize/i.test(lowerDiff);
+    analysis.dependency =
+      /package\.json|requirements\.txt|composer\.json|yarn\.lock|npm install|"react":|"express":|"lodash":/i.test(lowerDiff);
+
+    if (analysis.userFacing) analysis.scope = 'user-facing';
+    else if (analysis.security) analysis.scope = 'security';
+    else if (analysis.performance) analysis.scope = 'performance';
+    else if (analysis.breaking) analysis.scope = 'breaking';
+
+    // --- Change-type classification (uses actual changed lines only) ---
+
+    // Detect binary files: file headers present but no +/- changes
+    const hasFileHeaders = /^diff --git/m.test(diff);
+    const hasChanges = actualChangeText.trim().length > 0;
+    if (hasFileHeaders && !hasChanges) {
+      const isNew =
+        /new file mode|mode:/m.test(diff) && !/deleted file mode|mode: 000000/m.test(diff);
+      const isDeleted = /deleted file mode|mode: 000000/m.test(diff);
+      analysis.type = 'binary';
+      analysis.confidence = 0.9;
+      analysis.keywords = ['binary', isNew ? 'added' : isDeleted ? 'removed' : 'changed'];
+      return analysis;
+    }
+
+    const filePaths = this.extractChangedFilePaths(diff);
+    const fileTypeFallback = this.inferTypeFromChangedFiles(filePaths, actualChangeText);
+
+    // Weighted pattern scoring over the actual changed lines only.
+    const patterns = {
+      perf: {
+        keywords: ['cache', 'cached', 'transient', 'performance', 'optimize', 'memo', 'speed'],
+        regex:
+          /\b(perf|performance|optimi[sz]e|cache|cached|memo|speed|lazy|efficient|bottleneck|transient)\b|wp_cache_get_last_changed|get_transient|set_transient/gi,
+      },
+      test: {
+        keywords: ['test', 'spec', 'describe', 'expect', 'assert', 'jest', 'mocha'],
+        regex:
+          /\b(tests?|testing|tested|spec|coverage|jest|mocha|cypress|mock|fixture)\b|describe\s*\(|\bit\s*\(|expect\s*\(|assert\s*\(/gi,
+      },
+      fix: {
+        keywords: ['fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'correct', 'security'],
+        regex:
+          /\b(fix|bug|error|issue|problem|resolve|correct|patch|prevent|guard|sanitize|validate|escape|hash_equals|csrf|xss|token)\b/gi,
+      },
+      feat: {
+        keywords: ['add', 'new', 'implement', 'feature', 'create', 'introduce'],
+        regex:
+          /\b(add|new|implement|feature|create|introduce|enable|support)\b|^\+\s*(public|private|protected)?\s*function\s+\w+/gim,
+      },
+      refactor: {
+        keywords: ['refactor', 'restructure', 'reorganize', 'clean', 'improve', 'move'],
+        regex: /\b(refactor|restructure|reorganize|cleanup|clean|move|extract)\b/gi,
+      },
+      docs: {
+        keywords: ['doc', 'readme', 'comment', 'documentation', 'guide'],
+        regex: /\b(docs?|readme|comment|documentation|guide)\b/gi,
+      },
+      style: {
+        keywords: ['style', 'format', 'lint', 'prettier', 'beautify'],
+        regex:
+          /\b(style|format|lint|prettier|beautify|indent|whitespace|css|margin|padding|color|background|font|width|height|display|flex|grid)\b/gi,
+      },
+      build: {
+        keywords: ['dependency', 'package', 'version', 'build', 'lockfile'],
+        regex:
+          /\b(dependencies|devdependencies|package|version|build|lockfile|composer|npm|yarn|pnpm)\b/gi,
+      },
+    };
+
+    const lowerChangeText = actualChangeText.toLowerCase();
+    let maxScore = 0;
+
+    for (const [type, pattern] of Object.entries(patterns)) {
+      let score = 0;
+
+      const matches = lowerChangeText.match(pattern.regex);
+      if (matches) {
+        score += matches.length * (type === 'perf' ? 4 : 2);
+      }
+
+      for (const keyword of pattern.keywords) {
+        const keywordMatches = lowerChangeText.match(new RegExp(`\\b${keyword}\\b`, 'gi'));
+        if (keywordMatches) {
+          score += keywordMatches.length;
+        }
+      }
+
+      if (score > maxScore) {
+        maxScore = score;
+        analysis.type = type;
+        analysis.confidence = Math.min(0.9, score / (score + 2)); // Normalize confidence
+        analysis.keywords = pattern.keywords.slice(0, 3);
+      }
+    }
+
+    if (fileTypeFallback && (maxScore === 0 || this.shouldPreferFileTypeFallback(fileTypeFallback, analysis))) {
+      analysis.type = fileTypeFallback;
+      analysis.confidence = Math.max(analysis.confidence, 0.75);
+      analysis.keywords = [fileTypeFallback];
+    }
+
+    return analysis;
+  }
+
+  /**
+   * Limit surrounding context lines for small diffs (DiffShaper owns this, per AGENTS.md).
+   * Replaces EfficientPromptBuilder.limitContextLines().
+   */
+  limitContextLines(diff, maxLines = 3) {
+    if (!diff || typeof diff !== 'string') {
+      return diff;
+    }
+
+    const lines = diff.split('\n');
+    const result = [];
+    let inContextBlock = false;
+    let contextCount = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+
+      // Always keep headers
+      if (
+        line.startsWith('diff --git') ||
+        line.startsWith('index') ||
+        line.startsWith('---') ||
+        line.startsWith('+++') ||
+        line.startsWith('@@')
+      ) {
+        result.push(line);
+        contextCount = 0;
+        inContextBlock = false;
+        continue;
+      }
+
+      // Keep added/removed lines
+      if (line.startsWith('+') || line.startsWith('-')) {
+        result.push(line);
+        contextCount = 0;
+        inContextBlock = true;
+        continue;
+      }
+
+      // Keep context lines within limit
+      if (inContextBlock && contextCount < maxLines) {
+        result.push(line);
+        contextCount++;
+      } else if (!inContextBlock) {
+        // Keep context before first change
+        result.push(line);
+      }
+      // Skip extra context lines beyond maxLines
+    }
+
+    return result.join('\n');
+  }
+
+  /**
+   * Extract only real added/removed diff lines for change classification.
+   */
+  extractActualChangeText(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return '';
+    }
+
+    return diff
+      .split('\n')
+      .filter(line => {
+        return (
+          (line.startsWith('+') && !line.startsWith('+++')) ||
+          (line.startsWith('-') && !line.startsWith('---'))
+        );
+      })
+      .join('\n');
+  }
+
+  /**
+   * Keep path-derived type hints only when they support the diff-derived type.
+   */
+  getCompatibleTypeHint(typeHint, changeAnalysis) {
+    if (!typeHint || !changeAnalysis?.type || changeAnalysis.type === 'chore') {
+      return null;
+    }
+
+    return typeHint === changeAnalysis.type ? typeHint : null;
+  }
+
+  /**
+   * Extract changed file paths from diff headers.
+   */
+  extractChangedFilePaths(diff) {
+    if (!diff || typeof diff !== 'string') {
+      return [];
+    }
+
+    return diff
+      .split('\n')
+      .map(line => line.match(/^diff --git a\/(.+?) b\/(.+)$/))
+      .filter(Boolean)
+      .map(match => match[2]);
+  }
+
+  /**
+   * Infer a conservative type from changed file paths when content is neutral.
+   */
+  inferTypeFromChangedFiles(filePaths, actualChangeText = '') {
+    if (!filePaths.length) {
+      return null;
+    }
+
+    const normalized = filePaths.map(file => file.toLowerCase());
+
+    if (normalized.every(file => this.isTestFile(file))) {
+      return 'test';
+    }
+
+    if (normalized.every(file => this.isDocsFile(file))) {
+      return 'docs';
+    }
+
+    if (normalized.every(file => this.isStyleFile(file))) {
+      return 'style';
+    }
+
+    if (normalized.every(file => this.isDependencyFile(file))) {
+      return 'build';
+    }
+
+    if (normalized.every(file => this.isConfigFile(file))) {
+      return 'chore';
+    }
+
+    if (normalized.every(file => this.isMarkupFile(file)) && /[<>]|class=|id=|aria-|data-/.test(actualChangeText)) {
+      return 'feat';
+    }
+
+    return null;
+  }
+
+  shouldPreferFileTypeFallback(fileTypeFallback, analysis) {
+    const fileSpecificTypes = new Set(['test', 'docs', 'style', 'build']);
+    return fileSpecificTypes.has(fileTypeFallback) && analysis.confidence < 0.75;
+  }
+
+  isTestFile(file) {
+    return /(^|\/)(__tests__|tests?|specs?|mocks?|fixtures?)\//.test(file) || /\.(test|spec)\./.test(file);
+  }
+
+  isDocsFile(file) {
+    return /(^|\/)(readme|changelog|license|contributing)(\.|$)/.test(file) || /\.(md|txt|rst|adoc)$/.test(file) || /(^|\/)docs?\//.test(file);
+  }
+
+  isStyleFile(file) {
+    return /\.(css|scss|sass|less|styl)$/.test(file) || /(^|\/)styles?\//.test(file);
+  }
+
+  isDependencyFile(file) {
+    return /(^|\/)(package-lock\.json|package\.json|yarn\.lock|pnpm-lock\.yaml|composer\.json|composer\.lock|requirements\.txt|poetry\.lock|pom\.xml|build\.gradle)$/.test(file);
+  }
+
+  isConfigFile(file) {
+    return /(^|\/)(dockerfile|makefile|tsconfig.*\.json|webpack\.config\.\w+|vite\.config\.\w+|rollup\.config\.\w+|\.env|\.gitignore|\.editorconfig)$/.test(file) || /\.(json|ya?ml|toml|ini|conf|config)$/.test(file);
+  }
+
+  isMarkupFile(file) {
+    return /\.(html|htm|vue|svelte|hbs|ejs|twig|blade\.php)$/.test(file) || /\/templates?\//.test(file);
   }
 }
 

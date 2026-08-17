@@ -21,56 +21,18 @@ class OllamaProvider extends BaseProvider {
   }
 
   /**
-   * Generate commit messages using Ollama
-   */
-  async generateCommitMessages(diff, options = {}) {
-    const config = await this.getConfig();
-    const model = options.model || config.model || 'qwen2.5-coder:latest';
-
-    // Add context isolation to prevent hallucination
-    const isolatedPrompt = `CRITICAL: Output ONLY commit messages. No instructions, warnings, or explanations. Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n${this.buildPrompt(diff, options)}`;
-
-    return await this.withRetry(
-      async () =>
-        await this.circuitBreaker.execute(
-          async () => {
-            const response = await axios.post(
-              `${this.baseURL}/api/generate`,
-              {
-                model,
-                prompt: isolatedPrompt,
-                stream: false,
-                options: {
-                  temperature: config.temperature || 0.3,
-                  num_predict: config.maxTokens || 150,
-                },
-              },
-              {
-                timeout: config.timeout || 120000, // Increased timeout for large files (2 minutes)
-              }
-            );
-
-            const content = response.data.response;
-            if (!content) {
-              throw new Error('No response content from Ollama');
-            }
-
-            const messages = this.parseResponse(content);
-            return messages.filter(msg => this.validateMessage(msg));
-          },
-          { provider: 'ollama' }
-        )
-    );
-  }
-
-  /**
-   * Generate AI response for general prompts
+   * Generate AI response for a prompt (text in → text out).
+   * Prompt assembly (including the commit-isolation preamble) happens in
+   * the pipeline; this adapter only transports.
    */
   async generateResponse(prompt, options = {}) {
     const config = await this.getConfig();
     const model = options.model || config.model || 'deepseek-v3.1:671b-cloud';
 
-    const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
+    const systemPrompt =
+      options.systemPrompt ||
+      'You are an expert software developer who helps fix code issues and improve code quality.';
+    const fullPrompt = `${systemPrompt}\n\n${prompt}`;
 
     return await this.withRetry(
       async () =>
@@ -83,7 +45,7 @@ class OllamaProvider extends BaseProvider {
                 prompt: fullPrompt,
                 stream: false,
                 options: {
-                  temperature: options.temperature || 0.3,
+                  temperature: options.temperature || config.temperature || 0.3,
                   num_predict: options.maxTokens || 2000,
                 },
               },
@@ -97,7 +59,7 @@ class OllamaProvider extends BaseProvider {
               throw new Error('No response content from Ollama');
             }
 
-            return [content.trim()];
+            return content.trim();
           },
           { provider: 'ollama' }
         )

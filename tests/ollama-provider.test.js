@@ -98,27 +98,46 @@ describe('OllamaProvider', () => {
     });
   });
 
-  describe('generateCommitMessages', () => {
-    it('should generate commit messages', async () => {
-      const mockResponse = {
-        data: { response: 'feat: add new feature' },
-      };
-      provider.circuitBreaker.execute.mockResolvedValue(mockResponse);
-
-      const result = await provider.generateCommitMessages('test diff');
-      expect(result).toBeDefined();
-    });
-  });
-
   describe('generateResponse', () => {
-    it('should generate response', async () => {
-      const mockResponse = {
-        data: { response: 'Here is the fixed code' },
-      };
-      provider.circuitBreaker.execute.mockResolvedValue(mockResponse);
+    it('should return response text for a plain string prompt', async () => {
+      const axios = require('axios');
+      axios.post.mockResolvedValue({
+        data: { response: 'feat: add new feature' },
+      });
+      provider.circuitBreaker.execute.mockImplementation(cb => cb());
 
-      const result = await provider.generateResponse('Fix this');
-      expect(result).toBeDefined();
+      const result = await provider.generateResponse('Generate a commit message for this diff');
+      expect(result).toBe('feat: add new feature');
+    });
+
+    it('should pass systemPrompt through to the prompt body', async () => {
+      const axios = require('axios');
+      axios.post.mockResolvedValue({
+        data: { response: 'ok' },
+      });
+      provider.circuitBreaker.execute.mockImplementation(cb => cb());
+
+      await provider.generateResponse('prompt body', { systemPrompt: 'CUSTOM SYSTEM' });
+
+      expect(axios.post).toHaveBeenCalledWith(
+        expect.stringContaining('/api/generate'),
+        expect.objectContaining({
+          prompt: expect.stringContaining('CUSTOM SYSTEM'),
+        }),
+        expect.anything()
+      );
+    });
+
+    it('should throw when response has no content', async () => {
+      const axios = require('axios');
+      axios.post.mockResolvedValue({
+        data: { response: '' },
+      });
+      provider.circuitBreaker.execute.mockImplementation(cb => cb());
+
+      await expect(provider.generateResponse('Fix this')).rejects.toThrow(
+        'No response content from Ollama'
+      );
     });
   });
 

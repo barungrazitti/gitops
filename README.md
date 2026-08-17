@@ -1,16 +1,15 @@
 # 🤖 AI Commit Generator
 
-![Version](https://img.shields.io/github/package-json/v/barungrazitti/gitops)
-![License](https://img.shields.io/github/license/barungrazitti/gitops)
+![Version](https://img.shields.io/badge/version-1.5.0-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Tests](https://img.shields.io/badge/tests-723%20passing-brightgreen)
-![Security](https://img.shields.io/badge/security-20%2B%20patterns-brightgreen)
+![Tests](https://img.shields.io/badge/tests-520%20passing-brightgreen)
 
 **Automate your git workflow with AI-powered commit messages**
 
-A Node.js CLI tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). Features full git automation, quality validation, and enterprise-grade security.
+A Node.js CLI tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). One command stages, commits, pulls, resolves merge conflicts with AI, and pushes.
 
-> **One command to rule them all:** `aic` - Complete git workflow automation 🚀
+> **One command to rule them all:** `aic` 🚀
 
 ---
 
@@ -20,13 +19,19 @@ A Node.js CLI tool that generates intelligent commit messages using Groq (cloud)
 # 1. Install
 git clone https://github.com/barungrazitti/gitops.git
 cd gitops
-./install.sh
+npm install
 
-# 2. Setup AI provider
+# 2. Configure — either create a .env file:
+cat > .env << 'EOF'
+GROQ_API_KEY=your_key_from_console.groq.com
+AIC_MODEL=openai/gpt-oss-20b
+AIC_PROVIDER=groq
+EOF
+
+#    ...or run the interactive wizard:
 aic setup
 
 # 3. Use it!
-git add .
 aic
 ```
 
@@ -34,265 +39,162 @@ aic
 
 ## ✨ Features
 
-| Feature           | Description                                  |
-| ----------------- | -------------------------------------------- |
-| **🚀 Fast**       | Groq-first with Ollama fallback (~500ms)     |
-| **🧠 Smart**      | Understands your codebase context            |
-| **🔒 Secure**     | Auto-redacts 20+ secret/PII patterns         |
-| **✅ Quality**    | Enforces specific, reasoned messages         |
-| **🤖 Auto Git**   | Stage, commit, pull, resolve conflicts, push |
-| **🏢 Enterprise** | Strict security mode available               |
+| Feature           | Description                                        |
+| ----------------- | -------------------------------------------------- |
+| **🚀 Fast**       | Groq-first with Ollama fallback                    |
+| **🧠 Smart**      | Semantic analysis of your diff and repo context    |
+| **🔒 Secure**     | Auto-redacts 20+ secret/PII patterns before AI     |
+| **🤖 Auto Git**   | Stage, commit, pull, AI-resolve conflicts, push    |
+| **🏢 Enterprise** | Strict mode blocks commits with ANY sensitive data |
 
 ---
 
 ## 🚀 Usage
 
-### Full Automation
+### Full Automation (default command)
 
 ```bash
-# Complete git workflow
-aic
-
-# Preview only (dry run)
-aic --dry-run
-
-# Skip pull or push
-aic --skip-pull
-aic --no-push
-
-# Enterprise mode (block on sensitive data)
-aic --enterprise-mode
-```
-
-### Message Generation Only (aicommit)
-
-```bash
-git add .
-aicommit
-
-# With enterprise mode (strict security)
-aicommit --enterprise-mode
-```
-
-### Full Automation (aic)
-
-```bash
-aic                         # Auto commit, pull, push
-aic --enterprise-mode       # With strict security
-aic "commit message"        # Use provided message
+aic                        # Stage → AI commit message → pull → resolve → push
+aic "fix the login bug"    # Use provided message, skip AI generation
+aic --dry-run              # Preview what would happen
+aic --skip-pull            # Skip pulling before push
+aic --no-push              # Don't push after commit
+aic --enterprise-mode      # Block commits with ANY sensitive data
+aic -f                     # Force run even if no changes detected
 ```
 
 ### Configuration
 
 ```bash
-# View config
-aic config --list
-
-# Set provider
-aic config --set defaultProvider=groq
-
-# Setup wizard
-aic setup
+aic config --list                    # View config (API key masked)
+aic config --set defaultProvider=ollama
+aic config --reset
+aic setup                            # Interactive wizard
 ```
 
-### Statistics & Logs
+### .env Support
+
+Settings in `.env` override the stored config — no setup prompts needed:
 
 ```bash
-# View stats
-aic stats
+GROQ_API_KEY=gsk_...         # Groq API key
+AIC_MODEL=openai/gpt-oss-20b # Any Groq model id
+AIC_PROVIDER=groq            # groq | ollama
+```
 
-# Analyze activity
-aic stats --analyze
+### Statistics
 
-# Export logs
-aic stats --export --format csv
+```bash
+aic stats            # Usage statistics
+aic stats --analyze  # Recent activity analysis
+aic stats --reset    # Reset stats
+```
+
+### Git Hooks
+
+```bash
+aic hook --install     # Install prepare-commit-msg hook
+aic hook --uninstall
 ```
 
 ---
 
-## 📚 Documentation
+## 🤖 AI Providers
 
-Complete documentation is available in the [`docs/`](docs/INDEX.md) directory:
+### Groq (Cloud) — Default
 
-| Audience         | Documentation                                         |
-| ---------------- | ----------------------------------------------------- |
-| **Users**        | [Getting Started](docs/user-guide/GETTING_STARTED.md) |
-| **Developers**   | [Developer Guide](docs/developer-guide/MODULES.md)    |
-| **Security**     | [PII Protection](docs/security/PII_PROTECTION.md)     |
-| **Enterprise**   | [Enterprise Features](docs/enterprise/FEATURES.md)    |
-| **Architecture** | [Overview](docs/architecture/OVERVIEW.md)             |
+Fast, good quality. Default model: **`openai/gpt-oss-20b`** (reasoning model; the tool automatically raises the token budget for it).
+
+- Get an API key at [console.groq.com/keys](https://console.groq.com/keys)
+- Configure via `.env` (`GROQ_API_KEY`) or `aic setup`
+
+Other Groq models available: `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`, `qwen/qwen3-32b`.
+
+### Ollama (Local)
+
+Private, no API key. Install from [ollama.ai](https://ollama.ai/), then:
+
+```bash
+aic config --set defaultProvider=ollama
+```
 
 ---
 
 ## 🔒 Security
 
-All code is scanned and sanitized **BEFORE** sending to AI:
-
-### Protected Data Types
+All diffs are scanned and redacted **before** being sent to any AI provider:
 
 | Category       | Patterns | Examples                                     |
 | -------------- | -------- | -------------------------------------------- |
 | **🔑 Secrets** | 15+      | API keys, tokens, passwords, SSH keys        |
 | **👤 PII**     | 8        | Emails, phones, SSN, addresses, credit cards |
 
-### Enterprise Mode
-
-For organizations with strict security requirements:
-
-```bash
-aic --enterprise-mode
-```
-
-- ✅ Blocks commits with ANY sensitive data
-- ✅ Enhanced audit logging
-- ✅ Compliance-ready reports
-
-**Learn more:** [PII Protection Guide](docs/security/PII_PROTECTION.md)
+Enterprise mode (`--enterprise-mode`) blocks commits containing ANY sensitive data.
 
 ---
 
-## 🤖 AI Providers
-
-### Groq (Cloud) - Recommended
-
-**Pros:** Fast (~500ms), high quality  
-**Setup:** Get API key from [console.groq.com/keys](https://console.groq.com/keys)
-
-```bash
-aic setup
-# Select Groq, enter API key
-```
-
-### Ollama (Local)
-
-**Pros:** Private, no API key needed  
-**Setup:** Install from [ollama.ai](https://ollama.ai/)
-
-```bash
-aic setup
-# Select Ollama
-```
-
----
-
-## ✅ Quality Guarantees
-
-Every commit message is validated for:
-
-- **Specificity** - No generic "update code" messages (QUAL-01: <5% generic)
-- **Reasoning** - Explains WHY changes were made (QUAL-02: >90% with reasoning)
-- **Context** - Mentions components/files affected
-- **Format** - Conventional commit standard
-
-### Example Output
+## 🧭 How It Works
 
 ```
-feat(cli): add shebang to bin scripts for direct execution
-
-📊 Quality: 78 (Good)
-   • Specificity: ✓
-   • Format: ✓
-   • Reasoning: ✓
-
-Generated in 892ms (Groq)
+staged diff ──▶ SecretScanner (redact) ──▶ DiffShaper (18KB budget, smart truncation)
+                  │                              │
+                  ▼                              ▼
+             CacheManager ──── miss ───▶ Groq ──fail──▶ Ollama
+                                                 │
+                                                 ▼
+                                  MessageRanker (score & rank)
+                                                 │
+                                                 ▼
+                                  MessageValidator (QUAL-01/02 gates)
 ```
 
-**Actual output format:**
-- Single-line conventional commit messages (type: description)
-- Quality score shown by default (hidden with `--quiet`)
-- Processing time and provider info
-- No "What Changed" / "Why Changed" / "Impact" sections — those formatters require AI context
-
----
-
-## 📊 Project Status
-
-| Metric            | Status                              |
-| ----------------- | ----------------------------------- |
-| Latest Release    | [v1.5.0](CHANGELOG.md) (2026-05-18) |
-| Test Coverage     | 723 tests, 37 suites                 |
-| Security Patterns | 23 detection patterns               |
-| Quality Gates     | QUAL-01, QUAL-02 enforced           |
-| Documentation     | Complete with 20+ guides            |
+- **DiffShaper** owns the token budget: one module decides what the AI sees (file headers preserved, high-significance chunks prioritized)
+- **Merge conflicts** are resolved block-by-block by AI (`generateResponse` path), with a keep-HEAD fallback if AI fails
+- **QUAL-01/QUAL-02** quality gates log message quality on every generation
 
 ---
 
 ## 🛠️ Development
 
 ```bash
-# Clone and install
-git clone https://github.com/barungrazitti/gitops.git
-cd gitops
-npm install
-
-# Run tests
-npm test
-
-# Run single test file
-npx jest tests/core/message-validator.test.js
+npm install         # Install dependencies
+npm test            # Run test suite (520 tests, 25 suites)
+npm run lint        # ESLint
+npm run test:coverage
 ```
 
 ### Code Structure
 
 ```
 src/
-├── core/           # Core modules (git, config, cache, etc.)
-├── providers/      # AI providers (Groq, Ollama)
-├── detectors/      # Code analysis (components, files, dependencies)
-├── formatters/     # Message formatting (what, why, impact)
-├── utils/          # Utilities (security, validation, etc.)
-└── commands/       # CLI commands
+├── index.js           # AICommitGenerator — generation pipeline orchestrator
+├── auto-git.js        # AutoGit — full workflow (stage/commit/pull/resolve/push)
+├── cli-presenter.js   # Console UI (selection menus, config/setup/stats display)
+├── core/
+│   ├── diff-shaper.js       # THE diff budget owner (truncation, chunking)
+│   ├── message-ranker.js    # Commit message scoring & ranking
+│   ├── conflict-resolver.js # AI merge-conflict resolution
+│   ├── message-validator.js # QUAL-01/02 quality gates
+│   ├── git-manager.js       # Git operations
+│   ├── config-manager.js    # Config + .env overrides
+│   ├── cache-manager.js     # Diff-keyed message cache
+│   ├── analysis-engine.js   # Repository context analysis
+│   ├── stats-manager.js     # Usage statistics
+│   ├── activity-logger.js   # Structured activity logs (.aic-logs/)
+│   ├── hook-manager.js      # Git hook management
+│   ├── circuit-breaker.js   # Provider failure protection
+│   └── message-formatter.js # Conventional commit formatting
+├── providers/
+│   ├── base-provider.js     # Abstract provider (retry, parse, errors)
+│   ├── groq-provider.js     # Groq adapter
+│   ├── ollama-provider.js   # Ollama adapter
+│   └── ai-provider-factory.js
+├── utils/             # Secret scanner, prompt builder, sanitizers, etc.
+└── formatters/        # Message section formatters
 bin/
-├── aic                  # Auto git workflow (symlink → aic.js)
-├── aic.js               # Main CLI entry point
-├── aicommit             # Commit generator (symlink → aicommit.js)
-└── aicommit.js          # Commit generator CLI
-tests/              # Test suites
-docs/               # Documentation
-```
-
----
-
-## 🧪 Testing
-
-```bash
-# Full test suite
-npm test
-
-# Test with coverage
-npm run test:coverage
-
-# Watch mode
-npm run test:watch
-```
-
-**Current Status:** 723 passing tests across 37 test suites
-
----
-
-## 📦 Installation Options
-
-### Option 1: Install Script (Recommended)
-
-```bash
-./install.sh
-```
-
-### Option 2: Manual Install
-
-```bash
-npm install
-mkdir -p ~/.local/bin
-ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
-ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aicommit
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Option 3: Use with npx
-
-```bash
-npx aic setup
-npx aic
+├── aic                # Shell shim
+└── aic.js             # CLI entry point (all commands)
+tests/                 # Jest suites (mirrors src/ layout)
 ```
 
 ---
@@ -302,54 +204,21 @@ npx aic
 ### Command Not Found
 
 ```bash
-# Check symlink
-ls -la ~/.local/bin/aic
-
-# Recreate if missing
 mkdir -p ~/.local/bin
 ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
-ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aicommit
 export PATH="$HOME/.local/bin:$PATH"
 ```
 
-### AI Provider Issues
+### Groq returns empty responses
 
-**Groq:**
+Reasoning models (`gpt-oss`) need a larger token budget — the tool handles this automatically. If problems persist, verify your API key (`aic config --list`) or switch models via `.env` (`AIC_MODEL=llama-3.1-8b-instant`).
 
-```bash
-aic setup
-# Re-enter API key from console.groq.com/keys
-```
-
-**Ollama:**
+### Ollama issues
 
 ```bash
-# Ensure Ollama is running
-ollama serve
-
-# Test connection
-curl http://localhost:11434/api/tags
+ollama serve                          # Ensure Ollama is running
+curl http://localhost:11434/api/tags  # Test connection
 ```
-
-### Security Redaction
-
-If commits are blocked in enterprise mode:
-
-1. Review redaction summary
-2. Remove sensitive data from code
-3. Use environment variables for secrets
-4. Commit in smaller chunks
-
----
-
-## 🔗 Links
-
-- 📖 [Full Documentation](docs/INDEX.md)
-- 📋 [Changelog](CHANGELOG.md)
-- 🐛 [Issue Tracker](https://github.com/barungrazitti/gitops/issues)
-- 💬 [Discussions](https://github.com/barungrazitti/gitops/discussions)
-- 🔑 [Get Groq API Key](https://console.groq.com/keys)
-- 🦙 [Ollama](https://ollama.ai/)
 
 ---
 
@@ -359,10 +228,4 @@ MIT License - see [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-Made with ❤️ by [Barun Tayenjam](https://github.com/barungrazitti)
-
----
-
-_Last updated: 2026-05-18_
+_Made with ❤️ by [Barun Tayenjam](https://github.com/barungrazitti)_

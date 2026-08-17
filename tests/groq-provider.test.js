@@ -92,28 +92,55 @@ describe('GroqProvider', () => {
     });
   });
 
-  describe('parseResponse', () => {
-    it('should parse response successfully', () => {
-      const response = {
+  describe('generateResponse', () => {
+    it('should return response text for a plain string prompt', async () => {
+      mockGroq.chat.completions.create.mockResolvedValue({
         choices: [{ message: { content: 'feat: add new feature' } }],
-      };
+      });
+      mockCircuitBreaker.execute.mockImplementation(cb => cb());
 
-      const result = provider.parseResponse(response);
+      const result = await provider.generateResponse('Generate a commit message for this diff');
 
-      expect(result).toEqual(['feat: add new feature']);
+      expect(result).toBe('feat: add new feature');
     });
 
-    it('should handle empty response', () => {
-      const response = { choices: [] };
+    it('should pass the pipeline systemPrompt as the system message', async () => {
+      mockGroq.chat.completions.create.mockResolvedValue({
+        choices: [{ message: { content: 'ok' } }],
+      });
+      mockCircuitBreaker.execute.mockImplementation(cb => cb());
 
-      expect(() => provider.parseResponse(response)).toThrow('No choices returned from Groq API');
+      await provider.generateResponse('prompt body', { systemPrompt: 'CUSTOM SYSTEM' });
+
+      const request = mockGroq.chat.completions.create.mock.calls[0][0];
+      expect(request.messages[0]).toEqual({ role: 'system', content: 'CUSTOM SYSTEM' });
+      expect(request.messages[1]).toEqual({ role: 'user', content: 'prompt body' });
     });
 
-    it('should handle malformed response', () => {
-      const response = null;
+    it('should enforce the reasoning-model max_tokens floor', async () => {
+      mockConfigManager.getProviderConfig.mockResolvedValue({
+        apiKey: 'test-api-key',
+        model: 'openai/gpt-oss-20b',
+      });
+      mockGroq.chat.completions.create.mockResolvedValue({
+        choices: [{ message: { content: 'ok' } }],
+      });
+      mockCircuitBreaker.execute.mockImplementation(cb => cb());
 
-      expect(() => provider.parseResponse(response)).toThrow(
-        'Invalid response format from Groq API'
+      await provider.generateResponse('prompt', { maxTokens: 150 });
+
+      const request = mockGroq.chat.completions.create.mock.calls[0][0];
+      expect(request.max_tokens).toBeGreaterThanOrEqual(2000);
+    });
+
+    it('should throw when response has no content', async () => {
+      mockGroq.chat.completions.create.mockResolvedValue({
+        choices: [{ message: { content: null } }],
+      });
+      mockCircuitBreaker.execute.mockImplementation(cb => cb());
+
+      await expect(provider.generateResponse('prompt')).rejects.toThrow(
+        'No response content from Groq'
       );
     });
   });

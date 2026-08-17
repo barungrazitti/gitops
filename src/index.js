@@ -23,6 +23,20 @@ const ErrorHandler = require('./utils/error-handler');
 const MetricsScorer = require('./utils/metrics-scorer');
 const DiffShaper = require('./core/diff-shaper');
 
+// Commit-message generation lives at the pipeline layer. Providers are thin
+// adapters (generateResponse: text in → text out) and carry no prompt logic.
+const COMMIT_SYSTEM_PROMPT =
+  'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.';
+
+const OLLAMA_COMMIT_PREAMBLE =
+  'CRITICAL: Output ONLY commit messages. No instructions, warnings, or explanations. Only analyze the provided diff below. Do not reference any previous commits, external context, or unrelated changes.\n\n';
+
+const COMMIT_GENERATION_OPTIONS = {
+  systemPrompt: COMMIT_SYSTEM_PROMPT,
+  maxTokens: 150,
+  temperature: 0.3,
+};
+
 class AICommitGenerator {
   constructor() {
     this.gitManager = new GitManager();
@@ -558,6 +572,12 @@ Do not explain the error, just provide the solution.`;
     console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
 
+    // Compute diff analysis once (DiffShaper owns classification); prompt builders reuse it
+    enrichedOptions.diffAnalysis = this.diffShaper.analyzeDiffType(
+      diffManagement.data,
+      enrichedOptions.context
+    );
+
     // Step 2: Use sequential fallback mode
     return await this.generateWithSequentialProviders(diffManagement, enrichedOptions, providers);
   }
@@ -565,6 +585,29 @@ Do not explain the error, just provide the solution.`;
   /**
    * Generate commit messages with sequential provider processing (with fallback)
    */
+
+  /**
+   * Apply provider-specific prompt preamble (pipeline-owned prompt content).
+   */
+  applyProviderPreamble(providerName, prompt) {
+    return providerName === 'ollama' ? OLLAMA_COMMIT_PREAMBLE + prompt : prompt;
+  }
+
+  /**
+   * Parse a raw provider response into candidate commit messages.
+   * Replaces the former provider-side parseResponse/validateMessage pair.
+   */
+  parseCommitMessages(content) {
+    if (!content || typeof content !== 'string') {
+      return [];
+    }
+
+    return content
+      .split('\n')
+      .map(msg => msg.trim())
+      .filter(msg => msg.length >= 10 && msg.length <= 200);
+  }
+
   async generateWithSequentialProviders(diffManagement, options, providers) {
     const startTime = Date.now();
 
@@ -580,9 +623,13 @@ Do not explain the error, just provide the solution.`;
         // Handle different diff strategies
         if (diffManagement.strategy === 'full' || diffManagement.strategy === 'smart-truncated') {
           // Simple case: diff in one prompt (full or smart-truncated)
-          const prompt = provider.buildPrompt(diffManagement.data, options);
-          messages = await provider.generateCommitMessages(diffManagement.data, options);
-          actualPrompt = prompt;
+          // Prompt is assembled ONCE here; providers are thin text-in/text-out adapters.
+          actualPrompt = this.efficientPromptBuilder.buildPrompt(diffManagement.data, options);
+          const raw = await provider.generateResponse(
+            this.applyProviderPreamble(providerName, actualPrompt),
+            COMMIT_GENERATION_OPTIONS
+          );
+          messages = this.parseCommitMessages(raw);
         } else {
           // Complex case: chunked processing
           console.log(
@@ -617,8 +664,12 @@ Do not explain the error, just provide the solution.`;
             };
 
             // Generate with this chunk
-            const chunkPrompt = provider.buildPrompt(chunk.content, chunkOptions);
-            const chunkResult = await provider.generateCommitMessages(chunk.content, chunkOptions);
+            const chunkPrompt = this.efficientPromptBuilder.buildPrompt(chunk.content, chunkOptions);
+            const rawChunk = await provider.generateResponse(
+              this.applyProviderPreamble(providerName, chunkPrompt),
+              COMMIT_GENERATION_OPTIONS
+            );
+            const chunkResult = this.parseCommitMessages(rawChunk);
 
             if (chunkResult && chunkResult.length > 0) {
               chunkMessages.push(...chunkResult);

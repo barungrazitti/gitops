@@ -127,9 +127,9 @@ RESOLVED CODE (output only):
       const config = await this.configManager.getAll();
       const provider = AIProviderFactory.create(config.defaultProvider || 'groq');
 
-      // Use the general-purpose completion path - NOT generateCommitMessages,
-      // which wraps the prompt in commit-message instructions and causes
-      // contradictory output ("OUTPUT ONLY COMMIT MESSAGE" vs "output resolved code")
+      // Use the general-purpose completion path (generateResponse) - commit
+      // generation prompts are wrapped in commit-only instructions at the
+      // pipeline layer, which would contradict the resolve-code instructions.
       const response = await provider.generateResponse(prompt, {
         maxTokens: 2000,
         temperature: 0.2,

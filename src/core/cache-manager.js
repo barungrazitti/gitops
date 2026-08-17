@@ -135,7 +135,7 @@ class CacheManager {
       const cacheData = {
         messages,
         timestamp: Date.now(),
-        diff: this.truncateDiff(diff),
+        diff,
         semanticFingerprint: this.extractSemanticFingerprint(diff),
         structuralFingerprint: this.extractStructuralFingerprint(diff),
       };
@@ -149,13 +149,6 @@ class CacheManager {
     } catch (error) {
       console.warn('Validated cache set error:', error.message);
     }
-  }
-
-  /**
-   * Truncate diff for storage (keep more content for debugging)
-   */
-  truncateDiff(diff) {
-    return diff.length > 2000 ? `${diff.substring(0, 2000)}...` : diff;
   }
 
   /**

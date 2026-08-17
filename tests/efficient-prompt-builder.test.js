@@ -55,25 +55,6 @@ index acd6a14108..e1765113af 100644
 +                function_exists("error_log")
 +            ) {`;
 
-  it('classifies WordPress cache/transient changes as performance work', () => {
-    const analysis = builder.analyzeDiffForSpecialization(wordpressCacheDiff);
-
-    expect(analysis.type).toBe('perf');
-  });
-
-  it('does not classify words like latest as test changes', () => {
-    const latestDiff = `diff --git a/src/posts.js b/src/posts.js
---- a/src/posts.js
-+++ b/src/posts.js
-@@ -1,2 +1,2 @@
--const route = "/posts";
-+const route = "/latest-posts";`;
-
-    const analysis = builder.analyzeDiffForSpecialization(latestDiff);
-
-    expect(analysis.type).not.toBe('test');
-  });
-
   it('omits conflicting file-path type hints from prompts', () => {
     const prompt = builder.buildPrompt(wordpressCacheDiff, {
       conventional: true,
@@ -112,7 +93,6 @@ index acd6a14108..e1765113af 100644
 +{
 +    return UserProfile::create($payload);
 +}`,
-      'feat',
       'Focus: what new capability this adds',
     ],
     [
@@ -125,7 +105,6 @@ index acd6a14108..e1765113af 100644
 +if (hash_equals($sessionToken, $token)) {
      return true;
  }`,
-      'fix',
       'Focus: what was broken and how it was resolved',
     ],
     [
@@ -137,7 +116,6 @@ index acd6a14108..e1765113af 100644
 +<section class="pricing-card" aria-labelledby="pricing-title">
 +  <h2 id="pricing-title">Plans for every team</h2>
 +</section>`,
-      'feat',
       'Focus: what new capability this adds',
     ],
     [
@@ -150,7 +128,6 @@ index acd6a14108..e1765113af 100644
 +  padding: 0.75rem 1rem;
 +  border-radius: 8px;
 +}`,
-      'style',
       'Focus: CSS, layout, or formatting changes without new behavior',
     ],
     [
@@ -161,7 +138,6 @@ index acd6a14108..e1765113af 100644
 @@ -1,2 +1,5 @@
 +## Enterprise mode
 +Run 'aic --enterprise-mode' to block commits with sensitive data.`,
-      'docs',
       'Focus: what documentation was added or updated',
     ],
     [
@@ -173,7 +149,6 @@ index acd6a14108..e1765113af 100644
 +test('rejects invalid tokens', () => {
 +  expect(validateToken('bad')).toBe(false);
 +});`,
-      'test',
       'Focus: what is being tested and coverage improvements',
     ],
     [
@@ -184,7 +159,6 @@ index acd6a14108..e1765113af 100644
 @@ -4,7 +4,7 @@
 -    "groq-sdk": "^0.7.0"
 +    "groq-sdk": "^0.8.0"`,
-      'build',
       'Focus: dependency, package, or build configuration changes',
     ],
     [
@@ -194,11 +168,9 @@ index acd6a14108..e1765113af 100644
 +++ b/config/app.yaml
 @@ -1,2 +1,3 @@
 +enterpriseMode: true`,
-      'chore',
       'Focus: primary purpose and key changes',
     ],
-  ])('classifies %s changes with relevant focus', (_name, diff, expectedType, focusText) => {
-    const analysis = builder.analyzeDiffForSpecialization(diff);
+  ])('builds %s prompts with relevant focus', (_name, diff, focusText) => {
     const prompt = builder.buildPrompt(diff, {
       conventional: true,
       count: 1,
@@ -208,8 +180,24 @@ index acd6a14108..e1765113af 100644
       },
     });
 
-    expect(analysis.type).toBe(expectedType);
     expect(prompt).toContain(focusText);
+  });
+
+  it('reuses pre-computed diff analysis from options', () => {
+    const perfAnalysis = {
+      type: 'perf',
+      confidence: 0.9,
+      keywords: ['cache'],
+    };
+
+    const prompt = builder.buildPrompt('diff --git a/f.js b/f.js\n+cache layer', {
+      conventional: true,
+      count: 1,
+      diffAnalysis: perfAnalysis,
+      context: { files: {} },
+    });
+
+    expect(prompt).toContain('Focus: what was optimized');
   });
 
   it('uses style examples for CSS changes instead of generic config examples', () => {

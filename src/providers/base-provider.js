@@ -1,9 +1,9 @@
 /**
- * Base AI Provider - Abstract class for all AI providers
+ * Base AI Provider - Abstract class for all AI providers.
+ * Thin adapters: text in (prompt + options) → text out (generateResponse).
+ * Prompt assembly lives in the pipeline layer, not in adapters.
  */
 
-const fs = require('fs');
-const path = require('path');
 const ConfigManager = require('../core/config-manager');
 const ActivityLogger = require('../core/activity-logger');
 
@@ -16,14 +16,10 @@ class BaseProvider {
   }
 
   /**
-   * Generate commit messages - must be implemented by subclasses
-   */
-  async generateCommitMessages(diff, _options = {}) {
-    throw new Error('generateCommitMessages must be implemented by subclass');
-  }
-
-  /**
-   * Generate AI response for general prompts - must be implemented by subclasses
+   * Generate AI response for a prompt - must be implemented by subclasses.
+   * @param {string} prompt - Full prompt text (assembled by the pipeline).
+   * @param {object} options - Transport knobs: systemPrompt, maxTokens, temperature, model.
+   * @returns {Promise<string>} The response content.
    */
   async generateResponse(prompt, _options = {}) {
     throw new Error('generateResponse must be implemented by subclass');
@@ -34,19 +30,6 @@ class BaseProvider {
    */
   async validate(_config) {
     throw new Error('validate must be implemented by subclass');
-  }
-
-  /**
-   * Build enhanced prompt for commit message generation using improved approach
-   */
-  buildPrompt(diff, options = {}) {
-    const EfficientPromptBuilder = require('../utils/efficient-prompt-builder');
-    const promptBuilder = new EfficientPromptBuilder({
-      maxPromptLength: this.config?.maxPromptLength || 4500,
-      preserveContext: true,
-    });
-
-    return promptBuilder.buildPrompt(diff, options);
   }
 
   /**
@@ -73,32 +56,6 @@ class BaseProvider {
       const errorMessage = error?.message || 'Unknown error occurred';
       throw new Error(`${providerName} error: ${errorMessage}`);
     }
-  }
-
-  /**
-   * Parse AI response into commit messages
-   */
-  parseResponse(response) {
-    let content;
-
-    if (typeof response === 'string') {
-      content = response;
-    } else if (response && typeof response === 'object') {
-      content =
-        response.choices?.[0]?.message?.content ??
-        response.response ??
-        response.content ??
-        null;
-    }
-
-    if (!content) {
-      throw new Error('No content in AI response');
-    }
-
-    return content
-      .split('\n')
-      .map(msg => msg.trim())
-      .filter(msg => msg.length > 0);
   }
 
   /**

@@ -40,125 +40,72 @@ class GroqProvider extends BaseProvider {
   }
 
   /**
-   * Generate commit messages using Groq
-   */
-  async generateCommitMessages(diff, options = {}) {
-    await this.initializeClient();
-    const config = await this.getConfig();
-
-    // Send full diff without chunking for fast processing
-    const prompt = this.buildPrompt(diff, options);
-
-    return await this.withRetry(
-      async () =>
-        await this.circuitBreaker.execute(
-          async () => {
-            const model = options.model || config.model || 'openai/gpt-oss-20b';
-
-            // Reasoning models (gpt-oss) spend tokens on internal reasoning
-            // before emitting content - a low max_tokens yields an empty
-            // message.content ("No message content in Groq response").
-            const isReasoningModel = model.includes('gpt-oss');
-            const maxTokens = isReasoningModel
-              ? Math.max(config.maxTokens || 0, 2000)
-              : config.maxTokens || 150;
-
-            const response = await this.client.chat.completions.create({
-              model,
-              messages: [
-                {
-                  role: 'system',
-                  content:
-                    'You are an expert software developer who writes clear, concise commit messages. CRITICAL: Output ONLY commit messages. Never include instructions, warnings, or deployment advice. Only analyze the provided diff, do not reference any previous commits or external context.',
-                },
-                {
-                  role: 'user',
-                  content: prompt,
-                },
-              ],
-              max_tokens: maxTokens,
-              temperature: config.temperature || 0.3,
-            });
-
-            const messages = this.parseResponse(response);
-            return messages.filter(msg => this.validateMessage(msg));
-          },
-          { provider: 'groq' }
-        )
-    );
-  }
-
-  /**
-   * Simple validation for commit messages
-   */
-  validateMessage(message) {
-    if (!message || typeof message !== 'string') return false;
-    const trimmed = message.trim();
-    return trimmed.length >= 10 && trimmed.length <= 200;
-  }
-
-  /**
-   * Generate AI response for general prompts
+   * Generate AI response for a prompt (text in → text out).
+   * Prompt assembly happens in the pipeline; this adapter only transports.
    */
   async generateResponse(prompt, options = {}) {
     try {
       await this.initializeClient();
       const config = await this.getConfig();
+      const model = options.model || config.model || 'openai/gpt-oss-20b';
 
-      // Groq has 6000 TPM limit - leave margin for system prompt and response
-      const maxTokens = options.maxTokens || 2000;
-      const maxInputTokens = 4500; // Reserve for prompt overhead
-      const fullPrompt = `You are an expert software developer who helps fix code issues and improve code quality.\n\n${prompt}`;
+      // Reasoning models (gpt-oss) spend tokens on internal reasoning
+      // before emitting content - a low max_tokens yields an empty
+      // message.content ("No message content in Groq response").
+      const isReasoningModel = model.includes('gpt-oss');
+      const maxTokens = isReasoningModel
+        ? Math.max(options.maxTokens || 0, 2000)
+        : options.maxTokens || config.maxTokens || 2000;
 
-      // Check if we need to chunk the prompt
-      const estimatedTokens = this.estimateTokens(fullPrompt);
-      if (estimatedTokens > maxInputTokens) {
-        // Truncate to stay under Groq's 6000 TPM limit
-        const truncatedPrompt = fullPrompt.substring(0, maxInputTokens * 4); // ~4 chars per token
-        return await this.generateSingleResponse(truncatedPrompt, options, config);
-      }
-      return await this.generateSingleResponse(fullPrompt, options, config);
+      const systemPrompt =
+        options.systemPrompt ||
+        'You are an expert software developer who helps fix code issues and improve code quality.';
+
+      // Groq has 6000 TPM limit - leave margin for prompt overhead
+      const maxInputTokens = 4500;
+
+      // Guard against oversized input (diff is already budget-fitted by
+      // DiffShaper; this covers prose overhead on long prompts)
+      const estimatedTokens = this.estimateTokens(`${systemPrompt}\n\n${prompt}`);
+      const finalPrompt =
+        estimatedTokens > maxInputTokens
+          ? prompt.substring(0, maxInputTokens * 4) // ~4 chars per token
+          : prompt;
+
+      return await this.withRetry(
+        async () =>
+          await this.circuitBreaker.execute(
+            async () => {
+              const response = await this.client.chat.completions.create({
+                model,
+                messages: [
+                  {
+                    role: 'system',
+                    content: systemPrompt,
+                  },
+                  {
+                    role: 'user',
+                    content: finalPrompt,
+                  },
+                ],
+                max_tokens: maxTokens,
+                temperature: options.temperature || config.temperature || 0.3,
+                n: 1,
+              });
+
+              const content = response.choices[0]?.message?.content;
+              if (!content) {
+                throw new Error('No response content from Groq');
+              }
+
+              return content.trim();
+            },
+            { provider: 'groq' }
+          )
+      );
     } catch (error) {
       throw this.handleError(error, 'Groq');
     }
-  }
-
-  /**
-   * Generate single response
-   */
-  async generateSingleResponse(prompt, options, config) {
-    return await this.withRetry(
-      async () =>
-        await this.circuitBreaker.execute(
-          async () => {
-            const response = await this.client.chat.completions.create({
-              model: config.model || 'openai/gpt-oss-20b',
-              messages: [
-                {
-                  role: 'system',
-                  content:
-                    'You are an expert software developer who helps fix code issues and improve code quality.',
-                },
-                {
-                  role: 'user',
-                  content: prompt,
-                },
-              ],
-              max_tokens: options.maxTokens || 2000,
-              temperature: options.temperature || 0.3,
-              n: 1,
-            });
-
-            const content = response.choices[0]?.message?.content;
-            if (!content) {
-              throw new Error('No response content from Groq');
-            }
-
-            return [content.trim()];
-          },
-          { provider: 'groq' }
-        )
-    );
   }
 
   /**
@@ -247,53 +194,10 @@ class GroqProvider extends BaseProvider {
   }
 
   /**
-   * Build the request object for Groq API
+   * Estimate token count for TPM-limit guard
    */
-  buildRequest(prompt, options = {}, config = {}) {
-    return {
-      model: options.model || config.model || this.model,
-      messages: [
-        {
-          role: 'system',
-          content:
-            options.systemPrompt ||
-            'You are an expert software developer who helps generate concise, meaningful commit messages.',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
-      temperature: options.temperature ?? config.temperature ?? this.temperature,
-      max_tokens: options.maxTokens ?? config.maxTokens ?? this.maxTokens,
-      timeout: options.timeout ?? config.timeout ?? this.timeout,
-    };
-  }
-
-  /**
-   * Parse the response from Groq API
-   */
-  parseResponse(response) {
-    if (!response || !response.choices || !Array.isArray(response.choices)) {
-      throw new Error('Invalid response format from Groq API');
-    }
-
-    if (response.choices.length === 0) {
-      throw new Error('No choices returned from Groq API');
-    }
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error('No message content in Groq response');
-    }
-
-    // Split content by newlines and clean up
-    const messages = content
-      .split('\n')
-      .map(msg => msg.trim())
-      .filter(msg => msg.length > 0);
-
-    return messages;
+  estimateTokens(text) {
+    return Math.ceil(text.length / 4);
   }
 }
 

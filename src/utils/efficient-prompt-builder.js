@@ -1,22 +1,23 @@
 /**
- * Efficient Prompt Builder - Optimized prompt generation with semantic context
+ * Efficient Prompt Builder - prompt assembly only.
+ * Diff classification, truncation, and context limiting are owned by DiffShaper
+ * (src/core/diff-shaper.js) per AGENTS.md: "DiffShaper owns the diff budget.
+ * The prompt builder must NOT re-truncate."
  */
 
-const TokenCounter = require('./token-counter');
 const DiffCategorizer = require('./diff-categorizer');
 const EntityExtractor = require('./entity-extractor');
 const PromptTemplates = require('./prompt-templates');
 const DiffSummarizer = require('./diff-summarizer');
+const DiffShaper = require('../core/diff-shaper');
 
 class EfficientPromptBuilder {
   constructor(options = {}) {
-    // Groq has 6000 TPM limit, reserve margin for prompt overhead
-    this.maxPromptLength = options.maxPromptLength || 4500;
-    this.preserveContext = options.preserveContext || true;
-    this.tokenCounter = new TokenCounter();
+    this.preserveContext = options.preserveContext !== false;
     this.diffCategorizer = new DiffCategorizer();
     this.entityExtractor = new EntityExtractor();
     this.diffSummarizer = new DiffSummarizer();
+    this.diffShaper = options.diffShaper || new DiffShaper();
   }
 
   /**
@@ -40,12 +41,11 @@ class EfficientPromptBuilder {
       diff = '';
     }
 
-    // Initialize prompt first - before any code that uses it
     let prompt = '';
 
-    // Analyze diff for change type and impact
-    const changeAnalysis = this.analyzeDiffForSpecialization(diff);
-    const impactAnalysis = this.analyzeChangeImpact(diff, context);
+    // Diff analysis comes from DiffShaper (pre-computed via options, or computed here)
+    const changeAnalysis = options.diffAnalysis || this.diffShaper.analyzeDiffType(diff, context);
+    const impactAnalysis = changeAnalysis;
 
     // Categorize diff by size
     const diffCategory = this.diffCategorizer.categorizeDiff(
@@ -109,7 +109,6 @@ class EfficientPromptBuilder {
 
     // Handle binary files specially - they have no code changes
     if (changeAnalysis.type === 'binary') {
-      const hasFileHeaders = /^diff --git/m.test(diff);
       const fileMatch = diff.match(/diff --git a\/(.+?) b\/(.+)/m);
       const fileName = fileMatch ? fileMatch[2].split('/').pop() : 'unknown';
       const isNew = changeAnalysis.keywords.includes('added');
@@ -184,7 +183,7 @@ Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
 Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
 
       // Add file-pattern hints only when they agree with the actual changed lines.
-      const typeHint = this.getCompatibleTypeHint(context?.files?.type, changeAnalysis);
+      const typeHint = this.diffShaper.getCompatibleTypeHint(context?.files?.type, changeAnalysis);
       if (typeHint) {
         prompt += `\n\nDetected type hint: ${typeHint} (confirmed by changed lines)`;
       }
@@ -252,9 +251,9 @@ REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE. NO WARNINGS. NO INSTRUCTIONS. NO DEPLO
 
 Single best commit message:`;
 
-    // Apply context line limiting for small diffs
+    // Apply context line limiting for small diffs (owned by DiffShaper)
     if (options.diffCategory && options.diffCategory.category === 'small') {
-      const limitedDiff = this.limitContextLines(diff, 3);
+      const limitedDiff = this.diffShaper.limitContextLines(diff, 3);
       options.truncatedDiff = limitedDiff;
       // Replace diff in prompt with limited version
       prompt = prompt.replace(/```diff\n[\s\S]*?```/, `\`\`\`diff\n${limitedDiff}\n\`\`\``);
@@ -267,61 +266,8 @@ Single best commit message:`;
       }
     }
 
-    // Compress if still too long
-    // Note: Diff is already budget-fitted by DiffShaper
+    // Note: Diff is already budget-fitted by DiffShaper; no compression here.
     return prompt;
-  }
-
-  /**
-   * Limit surrounding context lines for small diffs
-   */
-  limitContextLines(diff, maxLines = 3) {
-    if (!diff || typeof diff !== 'string') {
-      return diff;
-    }
-
-    const lines = diff.split('\n');
-    const result = [];
-    let inContextBlock = false;
-    let contextCount = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Always keep headers
-      if (
-        line.startsWith('diff --git') ||
-        line.startsWith('index') ||
-        line.startsWith('---') ||
-        line.startsWith('+++') ||
-        line.startsWith('@@')
-      ) {
-        result.push(line);
-        contextCount = 0;
-        inContextBlock = false;
-        continue;
-      }
-
-      // Keep added/removed lines
-      if (line.startsWith('+') || line.startsWith('-')) {
-        result.push(line);
-        contextCount = 0;
-        inContextBlock = true;
-        continue;
-      }
-
-      // Keep context lines within limit
-      if (inContextBlock && contextCount < maxLines) {
-        result.push(line);
-        contextCount++;
-      } else if (!inContextBlock) {
-        // Keep context before first change
-        result.push(line);
-      }
-      // Skip extra context lines beyond maxLines
-    }
-
-    return result.join('\n');
   }
 
   /**
@@ -392,28 +338,6 @@ Single best commit message:`;
     }
 
     return result.join('\n');
-  }
-
-  /**
-   * Combine chunk summaries for large diffs
-   */
-  combineChunkSummaries(summaries, conventional = false) {
-    if (!summaries || summaries.length === 0) {
-      return '';
-    }
-
-    const summaryTexts = summaries.map(s => {
-      if (s.keyChanges && s.keyChanges.length > 0) {
-        return `${s.fileName}: ${s.keyChanges.slice(0, 2).join('; ')}`;
-      }
-      if (s.entities && s.entities.functions && s.entities.functions.length > 0) {
-        return `${s.fileName}: ${s.entities.functions.slice(0, 2).join(', ')}`;
-      }
-      return `${s.fileName}: No specific changes`;
-    });
-
-    const prompt = PromptTemplates.buildCombineSummariesPrompt(summaryTexts, conventional);
-    return prompt;
   }
 
   /**
@@ -543,283 +467,6 @@ Single best commit message:`;
     }
 
     return guidance;
-  }
-
-  /**
-   * Compress prompt while preserving essential information
-   */
-  compressPrompt(prompt, diff, count, conventional, isWordPressFile = false) {
-    // Start with minimal essential requirements
-    let compressed = `Generate 1 concise commit message for following git diff.
-
-REQUIREMENTS:
- - CRITICAL: Focus ONLY on lines marked with + (added) or - (removed)
- - IGNORE unchanged code, function names, or class names that didn't change
- - Be specific about actual changes
- - Use imperative voice ("Add", "Fix", "Remove")
- - Max 72 characters per message
- - No generic terms like "changes", "updates"
- - Output ONLY commit message, no explanations
- - NEVER output warnings, instructions, or deployment advice`;
-
-    if (isWordPressFile) {
-      compressed += `
- - Focus on WordPress functionality changes
- - Look for hook/filter/shortcode modifications
- - NEVER output warnings about WordPress theme files`;
-    }
-
-    if (conventional) {
-      compressed += `
- - Use conventional format: type(scope): description`;
-    }
-
-    // Smart diff truncation for WordPress files
-    let processedDiff = diff;
-    if (diff.length > 2500) {
-      if (isWordPressFile) {
-        processedDiff = this.truncateWordPressDiff(diff);
-      } else {
-        processedDiff = this.truncateDiff(diff);
-      }
-    }
-
-    compressed += `
- \`\`\`diff
- ${processedDiff}
- \`\`\`
-
- Single best commit message:`;
-
-    return compressed;
-  }
-
-  /**
-   * Truncate WordPress diff intelligently
-   */
-  truncateWordPressDiff(diff) {
-    const lines = diff.split('\n');
-    const result = [];
-    let inImportantSection = false;
-    let skipCount = 0;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Always keep headers
-      if (
-        line.startsWith('diff --git') ||
-        line.startsWith('index') ||
-        line.startsWith('---') ||
-        line.startsWith('+++') ||
-        line.startsWith('@@')
-      ) {
-        result.push(line);
-        continue;
-      }
-
-      // PHP function changes are important
-      if (line.startsWith('+') && /function\s+\w+|add_action|add_filter|add_shortcode/.test(line)) {
-        inImportantSection = true;
-        result.push(line);
-        continue;
-      }
-
-      // Keep some context around important sections
-      if (inImportantSection) {
-        result.push(line);
-        // Reset after a few lines of context
-        if (line.startsWith(' ') && skipCount++ > 5) {
-          inImportantSection = false;
-          skipCount = 0;
-        }
-        continue;
-      }
-
-      // Skip repetitive HTML/template content
-      if (line.startsWith('+') && /<div|<span|<p|<h[1-6]|class=|id=/.test(line)) {
-        // Only keep every 3rd HTML line to reduce noise
-        if (Math.random() < 0.3) {
-          result.push(line);
-        }
-        continue;
-      }
-
-      // Keep other changes but limit total
-      if (result.length < 300) {
-        result.push(line);
-      }
-    }
-
-    if (result.length < lines.length) {
-      result.push(
-        `... (${lines.length - result.length} lines truncated for WordPress theme file) ...`
-      );
-    }
-
-    return result.join('\n');
-  }
-
-  /**
-   * Truncate diff intelligently
-   */
-  truncateDiff(diff) {
-    const lines = diff.split('\n');
-    const maxLines = 150; // Limit lines to stay within ~4K tokens for Groq free tier
-
-    if (lines.length <= maxLines) {
-      return diff;
-    }
-
-    // Keep headers and first/last parts of diff
-    const headerLines = [];
-    const contentLines = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      if (
-        lines[i].startsWith('diff --git') ||
-        lines[i].startsWith('index') ||
-        lines[i].startsWith('---') ||
-        lines[i].startsWith('+++') ||
-        lines[i].startsWith('@@')
-      ) {
-        headerLines.push(lines[i]);
-      } else {
-        contentLines.push(lines[i]);
-      }
-    }
-
-    // Take first and last parts of content to preserve change context
-    const firstPart = contentLines.slice(0, Math.floor(maxLines * 0.4));
-    const lastPart = contentLines.slice(-Math.floor(maxLines * 0.4));
-
-    const result = [
-      ...headerLines,
-      ...firstPart,
-      `... (${contentLines.length - firstPart.length - lastPart.length} lines truncated) ...`,
-      ...lastPart,
-    ];
-
-    return result.join('\n');
-  }
-
-  /**
-   * Build context-aware prompt for chunked processing
-   */
-  buildChunkPrompt(chunk, options = {}) {
-    const basePrompt = this.buildPrompt(chunk.content || chunk, options);
-
-    // Add chunk-specific instructions for better focus
-    const chunkedPrompt = `CONTEXT FOR CHUNKED PROCESSING:
-- Process only the changes in this specific chunk
-- Focus on the most significant changes
-- Maintain consistency with overall changes if known
-
-${basePrompt}`;
-
-    return chunkedPrompt;
-  }
-
-  /**
-   * Build specialized prompts for different change types
-   */
-  buildSpecializedPrompt(diff, changeType, options = {}) {
-    switch (changeType) {
-      case 'test':
-        return `Generate test-related commit message for git diff.
-Focus on test additions, updates, or improvements.
-Examples: "test(auth): add unit tests for login flow", "test(utils): improve test coverage"
-
-${this.buildPrompt(diff, options)}`;
-
-      case 'perf':
-        return `Generate performance-related commit message for git diff.
-Focus on optimization, performance improvements, or efficiency changes.
-Examples: "perf(api): optimize query performance", "perf(ui): reduce render time"
-
-${this.buildPrompt(diff, options)}`;
-
-      case 'fix':
-        return `Generate bug fix commit message for git diff.
-Focus on issue resolution, bug fixes, or error corrections.
-Examples: "fix(auth): resolve login timeout issue", "fix(api): fix null pointer error"
-
-${this.buildPrompt(diff, options)}`;
-
-      case 'feat':
-        return `Generate feature addition commit message for git diff.
-Focus on new functionality, capabilities, or features.
-Examples: "feat(auth): add OAuth2 support", "feat(api): add user profile endpoint"
-
-${this.buildPrompt(diff, options)}`;
-
-      case 'refactor':
-        return `Generate refactoring commit message for git diff.
-Focus on code restructuring, improvements, or reorganization.
-Examples: "refactor(utils): extract validation logic", "refactor(auth): improve module structure"
-
-${this.buildPrompt(diff, options)}`;
-
-      default:
-        return this.buildPrompt(diff, options);
-    }
-  }
-
-  /**
-   * Analyze change impact for better commit messages
-   */
-  analyzeChangeImpact(diff, context) {
-    const impact = {
-      breaking: false,
-      userFacing: false,
-      performance: false,
-      security: false,
-      dependency: false,
-      scope: 'internal',
-    };
-
-    // Handle null/undefined diff input
-    if (!diff) {
-      return impact;
-    }
-
-    const lowerDiff = diff.toLowerCase();
-
-    // Breaking changes detection
-    impact.breaking =
-      /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(lowerDiff);
-
-    // User-facing changes
-    impact.userFacing =
-      /ui|component|view|template|style|css|user.*interface|frontend/i.test(lowerDiff) ||
-      context?.files?.fileTypes?.jsx > 0 ||
-      context?.files?.fileTypes?.tsx > 0 ||
-      context?.files?.fileTypes?.vue > 0 ||
-      context?.files?.fileTypes?.html > 0;
-
-    // Performance changes
-    impact.performance = /performance|optimize|cache|memo|lazy|async|await|promise/i.test(
-      lowerDiff
-    );
-
-    // Security changes
-    impact.security = /security|auth|token|password|encrypt|decrypt|hash|validation|sanitize/i.test(
-      lowerDiff
-    );
-
-    // Dependency changes
-    impact.dependency =
-      /package\.json|requirements\.txt|composer\.json|yarn\.lock|npm install|"react":|"express":|"lodash":/i.test(
-        lowerDiff
-      );
-
-    // Determine scope
-    if (impact.userFacing) impact.scope = 'user-facing';
-    else if (impact.security) impact.scope = 'security';
-    else if (impact.performance) impact.scope = 'performance';
-    else if (impact.breaking) impact.scope = 'breaking';
-
-    return impact;
   }
 
   /**
@@ -999,229 +646,6 @@ ${this.buildPrompt(diff, options)}`;
   buildDiffFactConstraints(diffFacts) {
     const DiffFactAnalyzer = require('./diff-fact-analyzer');
     return new DiffFactAnalyzer().buildPromptConstraints(diffFacts);
-  }
-
-  /**
-   * Analyze diff content for specialized processing
-   */
-  analyzeDiffForSpecialization(diff) {
-    const analysis = {
-      type: 'chore', // default
-      confidence: 0.1,
-      keywords: [],
-    };
-
-    // Handle null/undefined/empty diff input
-    if (!diff) {
-      return analysis;
-    }
-
-    const actualChangeText = this.extractActualChangeText(diff);
-    const filePaths = this.extractChangedFilePaths(diff);
-    const fileTypeFallback = this.inferTypeFromChangedFiles(filePaths, actualChangeText);
-
-    // Detect binary files: file headers present but no +/- changes
-    const hasFileHeaders = /^diff --git/m.test(diff);
-    const hasChanges = actualChangeText.trim().length > 0;
-    if (hasFileHeaders && !hasChanges) {
-      const isNew =
-        /new file mode|mode:/m.test(diff) && !/deleted file mode|mode: 000000/m.test(diff);
-      const isDeleted = /deleted file mode|mode: 000000/m.test(diff);
-      analysis.type = 'binary';
-      analysis.confidence = 0.9;
-      analysis.keywords = ['binary', isNew ? 'added' : isDeleted ? 'removed' : 'changed'];
-      return analysis;
-    }
-
-    // Look for specific patterns in actual changed lines only.
-    const patterns = {
-      perf: {
-        keywords: ['cache', 'cached', 'transient', 'performance', 'optimize', 'memo', 'speed'],
-        regex:
-          /\b(perf|performance|optimi[sz]e|cache|cached|memo|speed|lazy|efficient|bottleneck|transient)\b|wp_cache_get_last_changed|get_transient|set_transient/gi,
-      },
-      test: {
-        keywords: ['test', 'spec', 'describe', 'expect', 'assert', 'jest', 'mocha'],
-        regex:
-          /\b(tests?|testing|tested|spec|coverage|jest|mocha|cypress|mock|fixture)\b|describe\s*\(|\bit\s*\(|expect\s*\(|assert\s*\(/gi,
-      },
-      fix: {
-        keywords: ['fix', 'bug', 'error', 'issue', 'problem', 'resolve', 'correct', 'security'],
-        regex:
-          /\b(fix|bug|error|issue|problem|resolve|correct|patch|prevent|guard|sanitize|validate|escape|hash_equals|csrf|xss|token)\b/gi,
-      },
-      feat: {
-        keywords: ['add', 'new', 'implement', 'feature', 'create', 'introduce'],
-        regex:
-          /\b(add|new|implement|feature|create|introduce|enable|support)\b|^\+\s*(public|private|protected)?\s*function\s+\w+/gim,
-      },
-      refactor: {
-        keywords: ['refactor', 'restructure', 'reorganize', 'clean', 'improve', 'move'],
-        regex: /\b(refactor|restructure|reorganize|cleanup|clean|move|extract)\b/gi,
-      },
-      docs: {
-        keywords: ['doc', 'readme', 'comment', 'documentation', 'guide'],
-        regex: /\b(docs?|readme|comment|documentation|guide)\b/gi,
-      },
-      style: {
-        keywords: ['style', 'format', 'lint', 'prettier', 'beautify'],
-        regex:
-          /\b(style|format|lint|prettier|beautify|indent|whitespace|css|margin|padding|color|background|font|width|height|display|flex|grid)\b/gi,
-      },
-      build: {
-        keywords: ['dependency', 'package', 'version', 'build', 'lockfile'],
-        regex:
-          /\b(dependencies|devdependencies|package|version|build|lockfile|composer|npm|yarn|pnpm)\b/gi,
-      },
-    };
-
-    // Count occurrences of pattern keywords in the diff
-    const lowerDiff = actualChangeText.toLowerCase();
-    let maxScore = 0;
-
-    for (const [type, pattern] of Object.entries(patterns)) {
-      let score = 0;
-
-      // Score based on regex matches
-      const matches = lowerDiff.match(pattern.regex);
-      if (matches) {
-        score += matches.length * (type === 'perf' ? 4 : 2);
-      }
-
-      // Score based on keyword occurrences
-      for (const keyword of pattern.keywords) {
-        const keywordMatches = lowerDiff.match(new RegExp(`\\b${keyword}\\b`, 'gi'));
-        if (keywordMatches) {
-          score += keywordMatches.length;
-        }
-      }
-
-      if (score > maxScore) {
-        maxScore = score;
-        analysis.type = type;
-        analysis.confidence = Math.min(0.9, score / (score + 2)); // Normalize confidence
-        analysis.keywords = pattern.keywords.slice(0, 3);
-      }
-    }
-
-    if (fileTypeFallback && (maxScore === 0 || this.shouldPreferFileTypeFallback(fileTypeFallback, analysis))) {
-      analysis.type = fileTypeFallback;
-      analysis.confidence = Math.max(analysis.confidence, 0.75);
-      analysis.keywords = [fileTypeFallback];
-    }
-
-    return analysis;
-  }
-
-  /**
-   * Extract only real added/removed diff lines for change classification.
-   */
-  extractActualChangeText(diff) {
-    if (!diff || typeof diff !== 'string') {
-      return '';
-    }
-
-    return diff
-      .split('\n')
-      .filter(line => {
-        return (
-          (line.startsWith('+') && !line.startsWith('+++')) ||
-          (line.startsWith('-') && !line.startsWith('---'))
-        );
-      })
-      .join('\n');
-  }
-
-  /**
-   * Keep path-derived type hints only when they support the diff-derived type.
-   */
-  getCompatibleTypeHint(typeHint, changeAnalysis) {
-    if (!typeHint || !changeAnalysis?.type || changeAnalysis.type === 'chore') {
-      return null;
-    }
-
-    return typeHint === changeAnalysis.type ? typeHint : null;
-  }
-
-  /**
-   * Extract changed file paths from diff headers.
-   */
-  extractChangedFilePaths(diff) {
-    if (!diff || typeof diff !== 'string') {
-      return [];
-    }
-
-    return diff
-      .split('\n')
-      .map(line => line.match(/^diff --git a\/(.+?) b\/(.+)$/))
-      .filter(Boolean)
-      .map(match => match[2]);
-  }
-
-  /**
-   * Infer a conservative type from changed file paths when content is neutral.
-   */
-  inferTypeFromChangedFiles(filePaths, actualChangeText = '') {
-    if (!filePaths.length) {
-      return null;
-    }
-
-    const normalized = filePaths.map(file => file.toLowerCase());
-
-    if (normalized.every(file => this.isTestFile(file))) {
-      return 'test';
-    }
-
-    if (normalized.every(file => this.isDocsFile(file))) {
-      return 'docs';
-    }
-
-    if (normalized.every(file => this.isStyleFile(file))) {
-      return 'style';
-    }
-
-    if (normalized.every(file => this.isDependencyFile(file))) {
-      return 'build';
-    }
-
-    if (normalized.every(file => this.isConfigFile(file))) {
-      return 'chore';
-    }
-
-    if (normalized.every(file => this.isMarkupFile(file)) && /[<>]|class=|id=|aria-|data-/.test(actualChangeText)) {
-      return 'feat';
-    }
-
-    return null;
-  }
-
-  shouldPreferFileTypeFallback(fileTypeFallback, analysis) {
-    const fileSpecificTypes = new Set(['test', 'docs', 'style', 'build']);
-    return fileSpecificTypes.has(fileTypeFallback) && analysis.confidence < 0.75;
-  }
-
-  isTestFile(file) {
-    return /(^|\/)(__tests__|tests?|specs?|mocks?|fixtures?)\//.test(file) || /\.(test|spec)\./.test(file);
-  }
-
-  isDocsFile(file) {
-    return /(^|\/)(readme|changelog|license|contributing)(\.|$)/.test(file) || /\.(md|txt|rst|adoc)$/.test(file) || /(^|\/)docs?\//.test(file);
-  }
-
-  isStyleFile(file) {
-    return /\.(css|scss|sass|less|styl)$/.test(file) || /(^|\/)styles?\//.test(file);
-  }
-
-  isDependencyFile(file) {
-    return /(^|\/)(package-lock\.json|package\.json|yarn\.lock|pnpm-lock\.yaml|composer\.json|composer\.lock|requirements\.txt|poetry\.lock|pom\.xml|build\.gradle)$/.test(file);
-  }
-
-  isConfigFile(file) {
-    return /(^|\/)(dockerfile|makefile|tsconfig.*\.json|webpack\.config\.\w+|vite\.config\.\w+|rollup\.config\.\w+|\.env|\.gitignore|\.editorconfig)$/.test(file) || /\.(json|ya?ml|toml|ini|conf|config)$/.test(file);
-  }
-
-  isMarkupFile(file) {
-    return /\.(html|htm|vue|svelte|hbs|ejs|twig|blade\.php)$/.test(file) || /\/templates?\//.test(file);
   }
 }
 
