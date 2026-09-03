@@ -36,6 +36,11 @@ const CLIPresenter = require('../src/cli-presenter');
 const buildGenerator = () => {
   const configManager = new ConfigManager();
   const activityLogger = new ActivityLogger();
+  // --verbose (or AIC_VERBOSE=1) mirrors info/debug logs to the console.
+  // Default is quiet: telemetry goes to the log file only.
+  if (program.opts().verbose || process.env.AIC_VERBOSE === '1') {
+    activityLogger.setVerbose(true);
+  }
   const gitManager = new GitManager();
   const cacheManager = new CacheManager();
   const analysisEngine = new AnalysisEngine();
@@ -95,7 +100,8 @@ const buildGenerator = () => {
 program
   .name('aic')
   .description('AI Commit - Super simple git workflow automation')
-  .version(version, '-v, --version', 'display version number');
+  .version(version, '-v, --version', 'display version number')
+  .option('--verbose', 'Show detailed logs on the console (default: log file only)');
 
 program
   .command('auto', { isDefault: true })

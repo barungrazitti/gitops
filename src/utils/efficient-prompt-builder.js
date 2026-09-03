@@ -95,8 +95,8 @@ class EfficientPromptBuilder {
       console.log(`Processing ${fileChunks.length} chunks summary...`);
     }
 
-    // Log category for debugging
-    console.log(`Diff category: ${diffCategory.category}`);
+    // Diff category is recorded on options for downstream use (not logged:
+    // console stays quiet by default; see the diff_management log entry).
 
     // Detect problematic cases (large WordPress files, etc.)
     const isProblematicCase = this.detectProblematicCase(diff, context);

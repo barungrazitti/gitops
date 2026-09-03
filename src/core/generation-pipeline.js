@@ -63,9 +63,6 @@ class GenerationPipeline {
       ? [preferredProvider, ...allProviders.filter(p => p !== preferredProvider)]
       : allProviders;
 
-    const mode = preferredProvider ? 'sequential fallback' : 'parallel';
-    console.log(chalk.blue(`🤖 Using ${mode} provider mode...`));
-
     // Enrich options with context first
     const enrichedOptions = {
       ...generationOptions,
@@ -79,8 +76,13 @@ class GenerationPipeline {
 
     // Step 1: Intelligent diff management with semantic context
     const diffManagement = this.diffShaper.manageDiffForAI(diff, enrichedOptions);
-    console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
-    console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
+    // Single status line (details stay in the log file): strategy + size delta.
+    const { strategy, size, originalSize } = diffManagement.info;
+    const sizeNote =
+      originalSize && originalSize !== size
+        ? ` (${Math.round(originalSize / 1024)}KB→${Math.round(size / 1024)}KB)`
+        : '';
+    console.log(chalk.dim(`📊 Diff: ${strategy}${sizeNote}`));
 
     // Binary/asset-only change: nothing for the AI to analyze; synthesize locally.
     if (diffManagement.strategy === 'binary-only') {
@@ -154,9 +156,10 @@ class GenerationPipeline {
         if (messages && messages.length > 0) {
           await this.statsManager.recordCommit(providerName);
 
+          const changeType = options.diffAnalysis?.type || 'change';
           console.log(
             chalk.green(
-              `✅ ${providerName} generated ${messages.length} messages in ${responseTime}ms`
+              `✅ ${providerName} generated ${messages.length} message${messages.length === 1 ? '' : 's'} (${changeType}) in ${responseTime}ms`
             )
           );
 
@@ -176,11 +179,14 @@ class GenerationPipeline {
             provider: providerName,
             responseTime,
             success: true,
+            semanticContext: !!options.context.hasSemanticContext,
           });
 
-          // Log context usage for debugging
+          // Log context usage for debugging (file log only; console stays quiet)
           if (options.context.hasSemanticContext) {
-            console.log(chalk.blue(`🧠 Used semantic context for ${providerName}`));
+            await this.activityLogger.debug('semantic_context_used', {
+              provider: providerName,
+            });
           }
 
           // QUAL-01/QUAL-02 quality gates (observability)

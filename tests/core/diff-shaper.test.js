@@ -276,6 +276,29 @@ Binary files /dev/null and b/img.png differ`;
       expect(filtered).toContain('src/f.js');
       expect(filtered).not.toContain('img.png');
     });
+
+    it('merges repeated file headers instead of emitting the file twice', () => {
+      const diff = `diff --git a/src/index.js b/src/index.js
+index 111..222 100644
+--- a/src/index.js
++++ b/src/index.js
+@@ -1 +1 @@
+-const a = 1;
++const a = 2;
+diff --git a/src/index.js b/src/index.js
+index 111..222 100644
+--- a/src/index.js
++++ b/src/index.js
+@@ -10 +10 @@
+-const b = 1;
++const b = 2;`;
+
+      const result = shaper.manageDiffForAI(diff);
+
+      expect(result.data.match(/diff --git a\/src\/index\.js/g).length).toBe(1);
+      expect(result.data).toContain('+const a = 2;');
+      expect(result.data).toContain('+const b = 2;');
+    });
   });
 
   describe('manageDiffForAI() — binary-only guard', () => {

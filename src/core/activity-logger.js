@@ -23,7 +23,19 @@ class ActivityLogger {
     this.sessionId = this.generateSessionId();
     this.currentLogFile = null;
 
+    // Console mirroring is quiet by default: file logging always runs, but
+    // info/debug only reach the console with --verbose (warn/error always do).
+    this.verboseConsole = false;
+
     this.initializeLogDirectory();
+  }
+
+  /**
+   * Enable/disable console mirroring of info/debug logs (e.g. via --verbose).
+   * File logging is unaffected.
+   */
+  setVerbose(enabled) {
+    this.verboseConsole = enabled === true;
   }
 
   /**
@@ -157,9 +169,14 @@ class ActivityLogger {
   }
 
   /**
-   * Log to console with formatting
+   * Log to console with formatting.
+   * Quiet by default: info/debug only print with --verbose. File logging
+   * in logActivity() is unaffected, so telemetry is never lost.
    */
   logToConsole(level, action, data) {
+    if ((level === 'info' || level === 'debug') && !this.verboseConsole) {
+      return;
+    }
     const timestamp = new Date().toLocaleTimeString();
     const prefix = `[${timestamp}] [${level.toUpperCase()}] ${action}`;
 

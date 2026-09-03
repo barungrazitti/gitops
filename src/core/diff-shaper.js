@@ -43,6 +43,9 @@ class DiffShaper {
 
   /**
    * Split a unified diff into per-file blocks.
+   * Repeat headers for the same file are merged (defensive: raw git output
+   * occasionally repeats a file section; without this the file is filtered,
+   * counted, and sent to the AI twice).
    * @returns {Array<{fileName: string, header: string, body: string, raw: string}>}
    */
   splitDiffIntoFileBlocks(diff) {
@@ -51,22 +54,29 @@ class DiffShaper {
     const lines = diff.split('\n');
     const blocks = [];
     let start = -1;
+    let firstHeaderIndex = -1;
 
     const pushBlock = end => {
       const rawLines = lines.slice(start, end);
       const header = rawLines[0] || '';
       const fileMatch = header.match(/diff --git a\/(.+?) b\/(.+)/);
-      blocks.push({
-        fileName: fileMatch ? fileMatch[2] : 'unknown',
-        header,
-        body: rawLines.slice(1).join('\n'),
-        raw: rawLines.join('\n'),
-      });
+      const fileName = fileMatch ? fileMatch[2] : 'unknown';
+      const body = rawLines.slice(1).join('\n');
+      const raw = rawLines.join('\n');
+      const existing = blocks.find(b => b.header.startsWith('diff --git') && b.fileName === fileName);
+      if (existing) {
+        existing.body = `${existing.body}\n${body}`;
+        // Drop the repeated header lines; keep the hunks so no change is lost.
+        existing.raw = `${existing.raw}\n${rawLines.slice(1).join('\n')}`;
+        return;
+      }
+      blocks.push({ fileName, header, body, raw });
     };
 
     for (let i = 0; i < lines.length; i++) {
       if (lines[i].startsWith('diff --git')) {
         if (start !== -1) pushBlock(i);
+        else firstHeaderIndex = i;
         start = i;
       }
     }
@@ -76,8 +86,8 @@ class DiffShaper {
     if (start === -1) {
       return [{ fileName: 'unknown', header: '', body: diff, raw: diff }];
     }
-    if (start > 0) {
-      const preamble = lines.slice(0, start).join('\n');
+    if (firstHeaderIndex > 0) {
+      const preamble = lines.slice(0, firstHeaderIndex).join('\n');
       if (preamble.trim()) {
         blocks.unshift({ fileName: 'unknown', header: '', body: preamble, raw: preamble });
       }
@@ -416,13 +426,7 @@ class DiffShaper {
 
       if (line.startsWith('diff --git')) {
         if (currentFile) {
-          fileChunks.push({
-            header: currentFile.header,
-            content: currentContent.join('\n'),
-            fileName: currentFile.fileName,
-            isNewFile: currentFile.isNewFile,
-            changeCount: currentFile.changeCount,
-          });
+          this.pushFileChunk(fileChunks, currentFile, currentContent);
         }
 
         const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
@@ -455,16 +459,33 @@ class DiffShaper {
     }
 
     if (currentFile) {
-      fileChunks.push({
-        header: currentFile.header,
-        content: currentContent.join('\n'),
-        fileName: currentFile.fileName,
-        isNewFile: currentFile.isNewFile,
-        changeCount: currentFile.changeCount,
-      });
+      this.pushFileChunk(fileChunks, currentFile, currentContent);
     }
 
     return fileChunks;
+  }
+
+  /**
+   * Append a parsed file chunk, merging into the existing entry when the
+   * same file header repeats (defensive: raw git output occasionally
+   * repeats a file section; without this the file is scored, preserved,
+   * and sent to the AI twice).
+   */
+  pushFileChunk(fileChunks, currentFile, currentContent) {
+    const content = currentContent.join('\n');
+    const existing = fileChunks.find(c => c.fileName === currentFile.fileName);
+    if (existing) {
+      existing.content = `${existing.content}\n${content}`;
+      existing.changeCount += currentFile.changeCount;
+      return;
+    }
+    fileChunks.push({
+      header: currentFile.header,
+      content,
+      fileName: currentFile.fileName,
+      isNewFile: currentFile.isNewFile,
+      changeCount: currentFile.changeCount,
+    });
   }
 
   /**

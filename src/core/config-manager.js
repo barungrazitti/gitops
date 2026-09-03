@@ -4,7 +4,8 @@
 
 const Conf = require('conf');
 
-require('dotenv').config();
+// quiet: true suppresses dotenv's per-run "injected env" banner (dotenv 17+).
+require('dotenv').config({ quiet: true });
 
 const fs = require('fs-extra');
 const Joi = require('joi');

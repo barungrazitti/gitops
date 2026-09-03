@@ -179,6 +179,24 @@ describe('GenerationPipeline', () => {
       expect(options.systemPrompt).toContain('Output ONLY commit messages');
     });
 
+    it('keeps console output to single-line summaries (quiet by default)', async () => {
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        deps.providerFactory.create.mockReturnValue({
+          generateResponse: jest.fn().mockResolvedValue('feat: add new constant'),
+        });
+
+        await pipeline.generate(fakeDiff, { context: { files: {} }, preferredProvider: 'groq' });
+
+        const output = logSpy.mock.calls.map(args => String(args[0])).join('\n');
+        expect(output).toContain('Diff: full');
+        expect(output).not.toContain('provider mode');
+        expect(output).not.toContain('semantic context');
+      } finally {
+        logSpy.mockRestore();
+      }
+    });
+
     it('synthesizes messages locally for binary-only diffs without calling providers', async () => {
       deps.diffShaper.manageDiffForAI.mockReturnValue({
         strategy: 'binary-only',

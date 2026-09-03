@@ -323,7 +323,7 @@ Do not explain the error, just provide the solution.`;
           }
         }
 
-        spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
+        spinner.succeed(chalk.green('Commit messages generated successfully!'));
 
         // Surface QUAL-01/QUAL-02 quality gates to the user (previously log-only)
         const batch = this.messageValidator.validateBatch(messages);

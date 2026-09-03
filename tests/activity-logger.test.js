@@ -97,10 +97,23 @@ describe('ActivityLogger', () => {
   });
 
   describe('logToConsole', () => {
-    it('should log to console', () => {
+    it('should stay quiet for info by default (file log only)', () => {
       console.info = jest.fn();
       logger.logToConsole('info', 'test', {});
+      expect(console.info).not.toHaveBeenCalled();
+    });
+
+    it('should mirror info to console with verbose enabled', () => {
+      console.info = jest.fn();
+      logger.setVerbose(true);
+      logger.logToConsole('info', 'test', {});
       expect(console.info).toHaveBeenCalled();
+    });
+
+    it('should always print warnings without verbose', () => {
+      console.warn = jest.fn();
+      logger.logToConsole('warn', 'test', {});
+      expect(console.warn).toHaveBeenCalled();
     });
   });
 });
