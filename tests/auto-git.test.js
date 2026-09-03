@@ -128,6 +128,16 @@ describe('AutoGit', () => {
       stdoutSpy.mockRestore();
     });
 
+    it('should prefer the manual message over AI on dry run', async () => {
+      const stdoutSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      await autoGit.run({ dryRun: true, manualMessage: 'custom message' });
+
+      expect(autoGit.generateCommitMessage).not.toHaveBeenCalled();
+      expect(stdoutSpy).toHaveBeenCalledWith('custom message');
+      stdoutSpy.mockRestore();
+    });
+
     it('should complete full workflow successfully', async () => {
       await autoGit.run();
 

@@ -31,11 +31,14 @@ class AutoGit {
 
       // Emit the message that WOULD be committed (stdout seam for hooks:
       // `aic --dry-run | head -1` must receive a real candidate message).
-      let dryRunMessage = null;
-      try {
-        dryRunMessage = await this.generateCommitMessage(options);
-      } catch (e) {
-        dryRunMessage = null;
+      // A manual message wins over AI generation, mirroring the commit path.
+      let dryRunMessage = options.manualMessage || null;
+      if (!dryRunMessage) {
+        try {
+          dryRunMessage = await this.generateCommitMessage(options);
+        } catch (e) {
+          dryRunMessage = null;
+        }
       }
       if (dryRunMessage) {
         console.log(dryRunMessage);
