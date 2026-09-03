@@ -29,16 +29,19 @@ describe('AutoGit', () => {
 
     // Setup mock git manager (the git facade)
     mockGitManager = {
-      configurePullStrategy: jest.fn().mockResolvedValue(),
       validateRepository: jest.fn(),
       getStatus: jest.fn(),
       stageAll: jest.fn(),
       getStagedDiff: jest.fn(),
+      getWorkingDiff: jest.fn().mockResolvedValue(''),
       commit: jest.fn(),
       pull: jest.fn(),
       push: jest.fn(),
       checkoutSide: jest.fn(),
       showIndexSide: jest.fn(),
+      rebaseContinue: jest.fn().mockResolvedValue(),
+      rebaseAbort: jest.fn().mockResolvedValue(),
+      mergeAbort: jest.fn().mockResolvedValue(),
       getRepositoryRoot: jest.fn(),
       getCurrentBranch: jest.fn().mockResolvedValue('main'),
     };
@@ -420,9 +423,16 @@ describe('AutoGit', () => {
     });
   });
 
-  describe('pullAndHandleConflicts', () => {
+  describe('pullAndHandleConflicts (rebase-first)', () => {
     beforeEach(() => {
       mockGitManager.pull.mockResolvedValue({ files: [] });
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: [] });
+    });
+
+    it('should pull with rebase by default', async () => {
+      await autoGit.pullAndHandleConflicts();
+
+      expect(mockGitManager.pull).toHaveBeenCalledWith({ rebase: true });
     });
 
     it('should pull successfully with no conflicts', async () => {
@@ -441,83 +451,97 @@ describe('AutoGit', () => {
       expect(mockSpinner.succeed).toHaveBeenCalledWith('Already up to date');
     });
 
-    it('should handle conflicts with AI resolution', async () => {
-      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGitManager.getStatus.mockResolvedValue({
-        conflicted: ['test.js'],
-      });
-
-      autoGit.resolveConflictsWithAI = jest.fn().mockResolvedValue();
-      inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'ai' });
+    it('should succeed cleanly when rebase applies upstream commits', async () => {
+      mockGitManager.pull.mockResolvedValue({ files: ['a.js'] });
 
       await autoGit.pullAndHandleConflicts();
 
+      expect(mockSpinner.succeed).toHaveBeenCalledWith('Pulled with rebase, no conflicts');
+    });
+
+    it('should handle rebase conflicts with AI resolution + continue (no commit)', async () => {
+      mockGitManager.pull.mockRejectedValue(new Error('could not apply'));
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
+
+      autoGit.resolveConflictsWithAI = jest.fn().mockResolvedValue();
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'ai' });
+
+      await autoGit.pullAndHandleConflicts();
+
+      expect(autoGit.syncOperation).toBe('rebase');
       expect(autoGit.resolveConflictsWithAI).toHaveBeenCalledWith(['test.js']);
+      expect(mockGitManager.stageAll).toHaveBeenCalled();
+      expect(mockGitManager.rebaseContinue).toHaveBeenCalled();
+      expect(mockGitManager.commit).not.toHaveBeenCalled();
+    });
+
+    it('should map keep-mine to theirs under rebase (sides swap)', async () => {
+      mockGitManager.pull.mockRejectedValue(new Error('could not apply'));
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'keep-mine' });
+
+      await autoGit.pullAndHandleConflicts();
+
+      // Rebase: local work is "theirs", so keeping mine checks out theirs.
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'theirs');
+      expect(mockGitManager.rebaseContinue).toHaveBeenCalled();
+    });
+
+    it('should map keep-incoming to ours under rebase', async () => {
+      mockGitManager.pull.mockRejectedValue(new Error('could not apply'));
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'keep-incoming' });
+
+      await autoGit.pullAndHandleConflicts();
+
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'ours');
+    });
+
+    it('should fall back to merge when requested', async () => {
+      mockGitManager.pull.mockRejectedValueOnce(new Error('could not apply'));
+      mockGitManager.pull.mockResolvedValueOnce({ files: [] });
+      mockGitManager.getStatus
+        .mockResolvedValueOnce({ conflicted: ['test.js'] })
+        .mockResolvedValue({ conflicted: [] });
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'merge-fallback' });
+
+      await autoGit.pullAndHandleConflicts();
+
+      expect(mockGitManager.rebaseAbort).toHaveBeenCalled();
+      expect(mockGitManager.pull).toHaveBeenLastCalledWith();
+      expect(autoGit.syncOperation).toBe('merge');
+    });
+
+    it('should abort the rebase on abort without touching the branch', async () => {
+      mockGitManager.pull.mockRejectedValue(new Error('could not apply'));
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'abort' });
+
+      await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow('Rebase aborted');
+
+      expect(mockGitManager.rebaseAbort).toHaveBeenCalled();
+      expect(mockGitManager.rebaseContinue).not.toHaveBeenCalled();
     });
 
     it('should handle conflicts with manual resolution', async () => {
-      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGitManager.getStatus.mockResolvedValue({
-        conflicted: ['test.js'],
-      });
+      mockGitManager.pull.mockRejectedValue(new Error('could not apply'));
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
 
-      inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'manual' });
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'manual' });
 
       await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow(
         'Manual conflict resolution required'
       );
     });
 
-    it('should handle conflicts by keeping current changes', async () => {
-      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGitManager.getStatus.mockResolvedValue({
-        conflicted: ['test.js'],
-      });
-
-      inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'ours' });
-      mockGitManager.stageAll.mockResolvedValue();
-      mockGitManager.commit.mockResolvedValue();
-
-      await autoGit.pullAndHandleConflicts();
-
-      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'ours');
-      expect(mockGitManager.stageAll).toHaveBeenCalledWith();
-      expect(mockGitManager.commit).toHaveBeenCalled();
-    });
-
-    it('should handle conflicts by using incoming changes', async () => {
-      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGitManager.getStatus.mockResolvedValue({
-        conflicted: ['test.js'],
-      });
-
-      inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'theirs' });
-      mockGitManager.stageAll.mockResolvedValue();
-      mockGitManager.commit.mockResolvedValue();
-
-      await autoGit.pullAndHandleConflicts();
-
-      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'theirs');
-      expect(mockGitManager.stageAll).toHaveBeenCalledWith();
-      expect(mockGitManager.commit).toHaveBeenCalled();
-    });
-
-    it('should cancel operation when user chooses', async () => {
-      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
-      mockGitManager.getStatus.mockResolvedValue({
-        conflicted: ['test.js'],
-      });
-
-      inquirer.prompt.mockResolvedValue({ resolutionStrategy: 'cancel' });
-
-      await expect(autoGit.pullAndHandleConflicts()).rejects.toThrow(
-        'Pull cancelled due to conflicts'
-      );
-    });
-
     it('should handle non-conflict pull errors', async () => {
       const error = new Error('Network error');
       mockGitManager.pull.mockRejectedValue(error);
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: [] });
 
       inquirer.prompt.mockResolvedValue({ skipPull: true });
 
@@ -534,16 +558,65 @@ describe('AutoGit', () => {
     });
   });
 
-  describe('resolveConflictsWithAI', () => {
-    beforeEach(() => {
-      autoGit.resolveFileConflictsWithAI = jest.fn().mockResolvedValue();
-      mockGitManager.stageAll.mockResolvedValue();
-      mockGitManager.commit.mockResolvedValue();
-      // Ensure spinner is available for this method
-      autoGit.spinner = mockSpinner;
+  describe('pullAndMerge (explicit fallback)', () => {
+    it('should merge-pull and commit side resolutions', async () => {
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'keep-mine' });
+
+      autoGit.syncOperation = null;
+      await autoGit.pullAndMerge();
+
+      // Merge: local work is "ours".
+      expect(mockGitManager.pull).toHaveBeenCalledWith();
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('test.js', 'ours');
+      expect(mockGitManager.stageAll).toHaveBeenCalled();
+      expect(mockGitManager.commit).toHaveBeenCalled();
     });
 
-    it('should resolve all conflicts successfully', async () => {
+    it('should abort the merge on abort', async () => {
+      mockGitManager.pull.mockResolvedValue({ files: ['test.js'] });
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['test.js'] });
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'abort' });
+
+      autoGit.syncOperation = null;
+      await expect(autoGit.pullAndMerge()).rejects.toThrow('Merge aborted');
+
+      expect(mockGitManager.mergeAbort).toHaveBeenCalled();
+    });
+  });
+
+  describe('sideForIntent', () => {
+    it('should map intents to merge sides', () => {
+      autoGit.syncOperation = 'merge';
+
+      expect(autoGit.sideForIntent('keep-mine')).toBe('ours');
+      expect(autoGit.sideForIntent('keep-incoming')).toBe('theirs');
+    });
+
+    it('should swap sides under rebase', () => {
+      autoGit.syncOperation = 'rebase';
+
+      expect(autoGit.sideForIntent('keep-mine')).toBe('theirs');
+      expect(autoGit.sideForIntent('keep-incoming')).toBe('ours');
+    });
+  });
+
+  describe('resolveConflictsWithAI (review-gated)', () => {
+    beforeEach(() => {
+      autoGit.resolveFileConflictsWithAI = jest.fn().mockResolvedValue();
+      autoGit.syncOperation = 'merge';
+      mockGitManager.stageAll.mockResolvedValue();
+      mockGitManager.commit.mockResolvedValue();
+      mockGitManager.getWorkingDiff.mockResolvedValue('+resolved line');
+      // Ensure spinner is available for this method
+      autoGit.spinner = mockSpinner;
+      inquirer.prompt.mockResolvedValue({ decision: 'accept' });
+    });
+
+    it('should resolve all conflicts and stop at the review gate (no commit here)', async () => {
       const conflictedFiles = ['file1.js', 'file2.js'];
 
       await autoGit.resolveConflictsWithAI(conflictedFiles);
@@ -551,9 +624,14 @@ describe('AutoGit', () => {
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledTimes(2);
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledWith('file1.js');
       expect(autoGit.resolveFileConflictsWithAI).toHaveBeenCalledWith('file2.js');
-      expect(mockGitManager.commit).toHaveBeenCalledWith(
-        'AI-resolved merge conflicts with intelligent merging'
+      // Review gate asked, staging done, commit left to the caller.
+      expect(inquirer.prompt).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({ name: 'decision' }),
+        ])
       );
+      expect(mockGitManager.stageAll).toHaveBeenCalled();
+      expect(mockGitManager.commit).not.toHaveBeenCalled();
       expect(mockAiCommit.activityLogger.logConflictResolution).toHaveBeenCalledWith(
         conflictedFiles,
         'ai',
@@ -562,14 +640,27 @@ describe('AutoGit', () => {
       );
     });
 
-    it('should handle AI resolution failures with fallback', async () => {
+    it('should abort the sync when the review is rejected with abort', async () => {
+      inquirer.prompt.mockResolvedValue({ decision: 'abort' });
+
+      await expect(autoGit.resolveConflictsWithAI(['file1.js'])).rejects.toThrow(
+        'AI resolution discarded'
+      );
+
+      expect(mockGitManager.mergeAbort).toHaveBeenCalled();
+      expect(mockGitManager.stageAll).not.toHaveBeenCalled();
+    });
+
+    it('should handle AI resolution failures with intent-based fallback', async () => {
       const conflictedFiles = ['file1.js'];
       const error = new Error('AI resolution failed');
       autoGit.resolveFileConflictsWithAI.mockRejectedValue(error);
 
-      inquirer.prompt.mockResolvedValue({ fallback: 'ours' });
+      inquirer.prompt.mockResolvedValueOnce({ fallback: 'keep-mine' });
+      inquirer.prompt.mockResolvedValueOnce({ decision: 'accept' });
       mockGitManager.checkoutSide.mockResolvedValue();
 
+      autoGit.syncOperation = 'merge';
       await autoGit.resolveConflictsWithAI(conflictedFiles);
 
       expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('file1.js', 'ours');
@@ -588,34 +679,48 @@ describe('AutoGit', () => {
     });
   });
 
-  describe('resolveFileConflictsWithAI', () => {
+  describe('resolveFileConflictsWithAI (operation-aware sides)', () => {
     const fs = require('fs-extra');
 
     beforeEach(() => {
       mockGitManager.getRepositoryRoot.mockResolvedValue('/repo/root');
       mockGitManager.showIndexSide.mockImplementation((filePath, side) => {
-        if (side === 'theirs') return Promise.resolve('current');
-        if (side === 'ours') return Promise.resolve('incoming');
+        if (side === 'ours') return Promise.resolve('stage2-content');
+        if (side === 'theirs') return Promise.resolve('stage3-content');
       });
       fs.readFile.mockResolvedValue('conflicted content');
       fs.writeFile.mockResolvedValue();
       mockAiCommit.conflictResolver.resolveConflictWithAI.mockResolvedValue('resolved content');
     });
 
-    it('should resolve conflicts successfully', async () => {
+    it('should pass local=:2, incoming=:3 for merges', async () => {
+      autoGit.syncOperation = 'merge';
+
       await autoGit.resolveFileConflictsWithAI('test.js');
 
-      expect(mockGitManager.showIndexSide).toHaveBeenCalledWith('test.js', 'theirs');
       expect(mockGitManager.showIndexSide).toHaveBeenCalledWith('test.js', 'ours');
+      expect(mockGitManager.showIndexSide).toHaveBeenCalledWith('test.js', 'theirs');
       expect(mockAiCommit.conflictResolver.resolveConflictWithAI).toHaveBeenCalledWith({
         filePath: 'test.js',
-        currentVersion: 'current',
-        incomingVersion: 'incoming',
+        currentVersion: 'stage2-content',
+        incomingVersion: 'stage3-content',
         language: 'javascript',
       });
       expect(fs.writeFile).toHaveBeenCalledWith('/repo/root/test.js', 'resolved content', 'utf8');
     });
 
+    it('should swap inputs under rebase so current is still local', async () => {
+      autoGit.syncOperation = 'rebase';
+
+      await autoGit.resolveFileConflictsWithAI('test.js');
+
+      expect(mockAiCommit.conflictResolver.resolveConflictWithAI).toHaveBeenCalledWith(
+        expect.objectContaining({
+          currentVersion: 'stage3-content',
+          incomingVersion: 'stage2-content',
+        })
+      );
+    });
     it('should pass php language hint for php files', async () => {
       await autoGit.resolveFileConflictsWithAI('theme/functions.php');
 

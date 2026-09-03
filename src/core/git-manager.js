@@ -190,13 +190,46 @@ class GitManager {
   }
 
   /**
-   * Configure git to prefer merge over rebase for safety
+   * Continue an in-progress rebase after conflicts are resolved and staged.
    */
-  async configurePullStrategy() {
+  async rebaseContinue() {
     try {
-      await this.git.raw(['config', 'pull.rebase', 'false']);
+      return await this.git.raw(['rebase', '--continue']);
     } catch (error) {
-      throw new Error(`Failed to configure pull strategy: ${error.message}`);
+      throw new Error(`Failed to continue rebase: ${error.message}`);
+    }
+  }
+
+  /**
+   * Abort an in-progress rebase, restoring the pre-rebase state.
+   */
+  async rebaseAbort() {
+    try {
+      return await this.git.raw(['rebase', '--abort']);
+    } catch (error) {
+      throw new Error(`Failed to abort rebase: ${error.message}`);
+    }
+  }
+
+  /**
+   * Abort an in-progress merge, restoring the pre-merge state.
+   */
+  async mergeAbort() {
+    try {
+      return await this.git.raw(['merge', '--abort']);
+    } catch (error) {
+      throw new Error(`Failed to abort merge: ${error.message}`);
+    }
+  }
+
+  /**
+   * Unstaged working-tree diff (used to show AI resolutions for review).
+   */
+  async getWorkingDiff() {
+    try {
+      return await this.git.diff();
+    } catch (error) {
+      throw new Error(`Failed to get working diff: ${error.message}`);
     }
   }
 

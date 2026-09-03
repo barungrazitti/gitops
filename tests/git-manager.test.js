@@ -486,19 +486,62 @@ describe('GitManager', () => {
     });
   });
 
-  describe('configurePullStrategy', () => {
-    it('should set pull.rebase to false', async () => {
-      await gitManager.configurePullStrategy();
+  describe('rebaseContinue', () => {
+    it('should continue the rebase', async () => {
+      await gitManager.rebaseContinue();
 
-      expect(mockGit.raw).toHaveBeenCalledWith(['config', 'pull.rebase', 'false']);
+      expect(mockGit.raw).toHaveBeenCalledWith(['rebase', '--continue']);
     });
 
-    it('should handle config errors', async () => {
-      mockGit.raw.mockRejectedValue(new Error('Config error'));
+    it('should handle continue errors', async () => {
+      mockGit.raw.mockRejectedValue(new Error('Continue error'));
 
-      await expect(gitManager.configurePullStrategy()).rejects.toThrow(
-        'Failed to configure pull strategy'
-      );
+      await expect(gitManager.rebaseContinue()).rejects.toThrow('Failed to continue rebase');
+    });
+  });
+
+  describe('rebaseAbort', () => {
+    it('should abort the rebase', async () => {
+      await gitManager.rebaseAbort();
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['rebase', '--abort']);
+    });
+
+    it('should handle abort errors', async () => {
+      mockGit.raw.mockRejectedValue(new Error('Abort error'));
+
+      await expect(gitManager.rebaseAbort()).rejects.toThrow('Failed to abort rebase');
+    });
+  });
+
+  describe('mergeAbort', () => {
+    it('should abort the merge', async () => {
+      await gitManager.mergeAbort();
+
+      expect(mockGit.raw).toHaveBeenCalledWith(['merge', '--abort']);
+    });
+
+    it('should handle abort errors', async () => {
+      mockGit.raw.mockRejectedValue(new Error('Abort error'));
+
+      await expect(gitManager.mergeAbort()).rejects.toThrow('Failed to abort merge');
+    });
+  });
+
+  describe('getWorkingDiff', () => {
+    it('should return the unstaged diff', async () => {
+      mockGit.diff.mockResolvedValue('diff content');
+
+      const result = await gitManager.getWorkingDiff();
+
+      expect(mockGit.diff).toHaveBeenCalledWith();
+      expect(result).toBe('diff content');
+    });
+
+    it('should handle diff errors', async () => {
+      mockGit.diff.mockRejectedValue(new Error('Diff error'));
+
+      await expect(gitManager.getWorkingDiff()).rejects.toThrow('Failed to get working diff');
     });
   });
 });

@@ -9,6 +9,13 @@ const ora = require('ora');
 const { DIFF_MARKER_REGEX } = require('./core/conflict-resolver');
 
 class AutoGit {
+  // Cap on rebase --continue rounds: each round replays remaining commits and
+  // can surface new conflicts. Past this, the branch needs human attention.
+  static MAX_SYNC_ROUNDS = 3;
+
+  // Preview length for the AI-resolution review gate.
+  static REVIEW_PREVIEW_LINES = 100;
+
   constructor({ gitManager, analysisEngine, configManager, generateMessages, conflictResolver, activityLogger } = {}) {
     this.gitManager = gitManager;
     this.analysisEngine = analysisEngine;
@@ -17,6 +24,10 @@ class AutoGit {
     this.conflictResolver = conflictResolver;
     this.activityLogger = activityLogger;
     this.spinner = ora();
+    // 'rebase' | 'merge' | null — which sync operation produced the current
+    // conflicts. ours/theirs MEANING depends on it (git swaps the sides
+    // under rebase), so every side choice goes through sideForIntent().
+    this.syncOperation = null;
   }
 
   /**
@@ -273,138 +284,280 @@ class AutoGit {
   }
 
   /**
-   * Pull latest changes and handle any conflicts
+   * Sync with the remote, rebase-first.
+   *
+   * Team-scale rationale: plain `git pull` mints a merge commit on every
+   * divergent sync. On a busy repo that buries real work under "Merge
+   * branch ..." noise and breaks `git bisect`. Rebasing replays the (few,
+   * just-committed) local commits onto the updated upstream instead, keeping
+   * history linear and reviewable. Merge stays available as an explicit
+   * fallback — never the default. We pass --rebase per command rather than
+   * setting pull.rebase in the user's config, so the tool never mutates
+   * their global git setup.
    */
   async pullAndHandleConflicts() {
+    this.spinner.start('Pulling latest changes (rebase)...');
+    let pullResult;
     try {
-      this.spinner.start('Pulling latest changes...');
-      const pullResult = await this.gitManager.pull();
-
-      if (!pullResult || !pullResult.files || pullResult.files.length === 0) {
-        this.spinner.succeed('Already up to date');
-        return;
-      }
-
-      // Check for conflicts using git status (more reliable)
-      const status = await this.gitManager.getStatus();
-      const hasConflicts = status.conflicted.length > 0;
-
-      if (hasConflicts) {
-        console.log(chalk.yellow(`⚠ Merge conflicts in ${status.conflicted.length} file(s)`));
-        status.conflicted.forEach(file => {
-          console.log(chalk.gray(`  • ${file}`));
-        });
-
-        const { resolutionStrategy } = await inquirer.prompt([
-          {
-            type: 'list',
-            name: 'resolutionStrategy',
-            message: 'Choose conflict resolution strategy:',
-            choices: [
-              {
-                name: '🤖 AI-powered resolution (intelligent merge)',
-                value: 'ai',
-              },
-              {
-                name: '💾 Keep current changes (theirs)',
-                value: 'ours',
-              },
-              {
-                name: '📥 Use incoming changes (mine)',
-                value: 'theirs',
-              },
-              {
-                name: '🔧 Manual resolution',
-                value: 'manual',
-              },
-              {
-                name: '❌ Cancel operation',
-                value: 'cancel',
-              },
-            ],
-            default: 'ai',
-          },
-        ]);
-
-        if (resolutionStrategy === 'cancel') {
-          throw new Error('Pull cancelled due to conflicts');
-        }
-
-        if (resolutionStrategy === 'manual') {
-          console.log(chalk.yellow('\n📝 Manual conflict resolution required:'));
-          console.log(chalk.dim('   1. Resolve conflicts in your editor'));
-          console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
-          console.log(chalk.dim('   3. Continue with: git commit'));
-          throw new Error(
-            'Manual conflict resolution required. Please resolve conflicts and run again.'
-          );
-        }
-
-        try {
-          if (resolutionStrategy === 'ai') {
-            await this.resolveConflictsWithAI(status.conflicted);
-          } else {
-            // Traditional resolution
-
-            for (const file of status.conflicted) {
-              await this.gitManager.checkoutSide(file, resolutionStrategy);
-            }
-
-            await this.gitManager.stageAll();
-            await this.gitManager.commit(
-              `Auto-resolved merge conflicts (kept ${resolutionStrategy} changes)`
-            );
-
-            console.log(chalk.green(`✓ Resolved ${status.conflicted.length} conflict(s)`));
-            this.spinner.succeed('Pull and conflict resolution complete');
-            return;
-          }
-        } catch (resolveError) {
-          console.log(chalk.red('✗ Failed to resolve conflicts'));
-          throw new Error(`Resolution failed: ${resolveError.message}`);
-        }
-      }
-      this.spinner.succeed('Pull successful with no conflicts');
+      pullResult = await this.gitManager.pull({ rebase: true });
     } catch (error) {
-      if (error.message.includes('Not possible to fast-forward')) {
-        try {
-          await this.gitManager.pull({ rebase: true });
-          console.log(chalk.green('✓ Rebased and pulled changes'));
-        } catch (rebaseError) {
-          console.log(chalk.red('✗ Rebase failed'));
-          const status = await this.gitManager.getStatus();
-          if (status.conflicted.length > 0) {
-            throw new Error(`Rebase resulted in conflicts that need to be resolved manually.`);
-          }
-          throw new Error(`Failed to rebase: ${rebaseError.message}`);
-        }
+      // Rebase conflicts surface as pull failures — confirm via status rather
+      // than parsing error text, which varies across git versions.
+      const conflicted = await this.conflictedFiles();
+      if (conflicted.length > 0) {
+        this.syncOperation = 'rebase';
+        await this.handleRebaseConflicts(conflicted);
         return;
       }
-
       console.log(chalk.red(`✗ Pull failed: ${error.message}`));
+      const { skipPull } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'skipPull',
+          message: 'Skip pull and continue with push?',
+          default: false,
+        },
+      ]);
 
-      if (!error.message.includes('conflict') && !error.message.includes('Manual conflict')) {
-        const { skipPull } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'skipPull',
-            message: 'Skip pull and continue with push?',
-            default: false,
-          },
-        ]);
-
-        if (skipPull) {
-          console.log(chalk.yellow('✓ Skipping pull'));
-          return;
-        }
+      if (skipPull) {
+        console.log(chalk.yellow('✓ Skipping pull'));
+        return;
       }
 
       throw error;
     }
+
+    if (!pullResult || !pullResult.files || pullResult.files.length === 0) {
+      this.spinner.succeed('Already up to date');
+      return;
+    }
+
+    // Rebase applied cleanly but moved the branch — double-check for leftovers.
+    const leftover = await this.conflictedFiles();
+    if (leftover.length > 0) {
+      this.syncOperation = 'rebase';
+      await this.handleRebaseConflicts(leftover);
+      return;
+    }
+    this.spinner.succeed('Pulled with rebase, no conflicts');
   }
 
   /**
-   * Resolve conflicts using AI with intelligent merging
+   * List currently conflicted files, tolerating status failures.
+   */
+  async conflictedFiles() {
+    try {
+      const status = await this.gitManager.getStatus();
+      return status?.conflicted || [];
+    } catch (error) {
+      return [];
+    }
+  }
+
+  /**
+   * Map a user intent to the git side for the CURRENT sync operation.
+   *
+   * Merge: ours = local HEAD, theirs = incoming remote (intuitive).
+   * Rebase: git replays local work ONTO the upstream, so the sides swap —
+   * ours = upstream, theirs = the local commits being replayed (per
+   * git-checkout docs: "during rebase, ours and theirs may appear swapped").
+   * Callers use intents ('keep-mine'/'keep-incoming') and never raw sides,
+   * so the UI stays correct under both operations.
+   */
+  sideForIntent(intent) {
+    if (this.syncOperation === 'rebase') {
+      return intent === 'keep-mine' ? 'theirs' : 'ours';
+    }
+    return intent === 'keep-mine' ? 'ours' : 'theirs';
+  }
+
+  /**
+   * Abort whichever sync operation is in progress, restoring the branch.
+   */
+  async abortSync() {
+    if (this.syncOperation === 'rebase') {
+      await this.gitManager.rebaseAbort();
+    } else {
+      await this.gitManager.mergeAbort();
+    }
+  }
+
+  /**
+   * Shared strategy menu. No ours/theirs jargon: users pick an intent and
+   * sideForIntent() translates it for the active operation.
+   */
+  async promptSyncStrategy(conflictedFiles, { allowMergeFallback }) {
+    const op = this.syncOperation;
+    console.log(chalk.yellow(`⚠ Sync conflicts in ${conflictedFiles.length} file(s) (${op})`));
+    conflictedFiles.forEach(file => {
+      console.log(chalk.gray(`  • ${file}`));
+    });
+
+    const choices = [
+      {
+        name: '🤖 AI-powered resolution (you review before anything is committed)',
+        value: 'ai',
+      },
+      { name: '💾 Keep my changes (local)', value: 'keep-mine' },
+      { name: '📥 Use incoming changes (remote)', value: 'keep-incoming' },
+    ];
+    if (allowMergeFallback) {
+      choices.push({ name: '🔀 Fall back to merge instead of rebase', value: 'merge-fallback' });
+    }
+    choices.push(
+      { name: '🔧 Manual resolution', value: 'manual' },
+      {
+        name:
+          op === 'rebase'
+            ? '❌ Abort rebase (branch stays exactly as it was)'
+            : '❌ Abort merge (branch stays exactly as it was)',
+        value: 'abort',
+      }
+    );
+
+    const { resolutionStrategy } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'resolutionStrategy',
+        message: 'Choose conflict resolution strategy:',
+        choices,
+        default: 'ai',
+      },
+    ]);
+    return resolutionStrategy;
+  }
+
+  manualInstructions() {
+    if (this.syncOperation === 'rebase') {
+      console.log(chalk.yellow('\n📝 Manual conflict resolution required:'));
+      console.log(chalk.dim('   1. Resolve conflicts in your editor'));
+      console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
+      console.log(chalk.dim('   3. Continue with: git rebase --continue (or abort with: git rebase --abort)'));
+    } else {
+      console.log(chalk.yellow('\n📝 Manual conflict resolution required:'));
+      console.log(chalk.dim('   1. Resolve conflicts in your editor'));
+      console.log(chalk.dim('   2. Stage resolved files with: git add <files>'));
+      console.log(chalk.dim('   3. Continue with: git commit'));
+    }
+  }
+
+  /**
+   * Handle rebase conflicts. Resolving does NOT commit: fixed files are
+   * staged and the rebase is continued, preserving linear history.
+   */
+  async handleRebaseConflicts(conflictedFiles, round = 1) {
+    const strategy = await this.promptSyncStrategy(conflictedFiles, {
+      allowMergeFallback: true,
+    });
+
+    if (strategy === 'abort') {
+      await this.abortSync();
+      throw new Error('Rebase aborted. Your branch is unchanged — resolve and run again.');
+    }
+
+    if (strategy === 'manual') {
+      this.manualInstructions();
+      throw new Error(
+        'Manual conflict resolution required. Please resolve conflicts and run again.'
+      );
+    }
+
+    if (strategy === 'merge-fallback') {
+      await this.gitManager.rebaseAbort();
+      await this.pullAndMerge();
+      return;
+    }
+
+    try {
+      if (strategy === 'ai') {
+        await this.resolveConflictsWithAI(conflictedFiles);
+      } else {
+        await this.resolveWithSide(conflictedFiles, strategy);
+      }
+      await this.gitManager.stageAll();
+      await this.gitManager.rebaseContinue();
+    } catch (error) {
+      if (/cancelled|Manual|discarded/i.test(error.message)) {
+        throw error;
+      }
+      // --continue can surface the NEXT commit's conflicts; loop with a cap.
+      const remaining = await this.conflictedFiles();
+      if (remaining.length > 0 && round < AutoGit.MAX_SYNC_ROUNDS) {
+        console.log(
+          chalk.yellow(`↻ More conflicts after continuing (round ${round + 1}/${AutoGit.MAX_SYNC_ROUNDS})`)
+        );
+        await this.handleRebaseConflicts(remaining, round + 1);
+        return;
+      }
+      throw new Error(
+        `Rebase could not continue: ${error.message}. Resolve manually (git status, git add, git rebase --continue) or abort (git rebase --abort).`
+      );
+    }
+
+    this.spinner.succeed('Rebase completed with no conflicts');
+  }
+
+  /**
+   * Explicit merge fallback (and only path that creates a merge commit).
+   * Used solely when the user opts out of rebase mid-conflict.
+   */
+  async pullAndMerge() {
+    this.syncOperation = 'merge';
+    this.spinner.start('Pulling latest changes (merge)...');
+    await this.gitManager.pull();
+    const conflicted = await this.conflictedFiles();
+    if (conflicted.length === 0) {
+      this.spinner.succeed('Pulled with merge, no conflicts');
+      return;
+    }
+
+    const strategy = await this.promptSyncStrategy(conflicted, {
+      allowMergeFallback: false,
+    });
+
+    if (strategy === 'abort') {
+      await this.abortSync();
+      throw new Error('Merge aborted. Your branch is unchanged — resolve and run again.');
+    }
+
+    if (strategy === 'manual') {
+      this.manualInstructions();
+      throw new Error(
+        'Manual conflict resolution required. Please resolve conflicts and run again.'
+      );
+    }
+
+    if (strategy === 'ai') {
+      await this.resolveConflictsWithAI(conflicted);
+    } else {
+      await this.resolveWithSide(conflicted, strategy);
+    }
+
+    await this.gitManager.stageAll();
+    await this.gitManager.commit('AI-resolved merge conflicts with intelligent merging');
+    console.log(chalk.green(`✓ Resolved ${conflicted.length} conflict(s)`));
+    this.spinner.succeed('Pull and conflict resolution complete');
+  }
+
+  /**
+   * Resolve every conflicted file to one side by user intent.
+   */
+  async resolveWithSide(conflictedFiles, intent) {
+    const side = this.sideForIntent(intent);
+    for (const file of conflictedFiles) {
+      await this.gitManager.checkoutSide(file, side);
+    }
+  }
+
+  /**
+   * Resolve conflicts using AI with intelligent merging.
+   *
+   * Writes resolved content to the working tree, then STOPS at a human
+   * review gate — nothing is committed or continued until the user accepts
+   * the diff. On a multi-person repo, machine-merged code that nobody read
+   * is how subtle breakage ships: the resolver has no access to CI, intent,
+   * or tribal knowledge, so a person signs off. Staging is left to the
+   * caller (merge path commits, rebase path continues).
    */
   async resolveConflictsWithAI(conflictedFiles) {
     const resolutionStartTime = Date.now();
@@ -419,8 +572,8 @@ class AutoGit {
             name: 'fallback',
             message: `Fallback strategy for ${file}:`,
             choices: [
-              { name: 'Keep current changes (theirs)', value: 'ours' },
-              { name: 'Use incoming changes (mine)', value: 'theirs' },
+              { name: 'Keep my changes (local)', value: 'keep-mine' },
+              { name: 'Use incoming changes (remote)', value: 'keep-incoming' },
               { name: 'Cancel entire operation', value: 'cancel' },
             ],
           },
@@ -436,13 +589,13 @@ class AutoGit {
           throw new Error('Operation cancelled due to resolution failure');
         }
 
-        await this.gitManager.checkoutSide(file, fallback);
+        await this.gitManager.checkoutSide(file, this.sideForIntent(fallback));
       }
     }
 
-    // Stage all resolved files
+    await this.reviewAiResolution(conflictedFiles);
+
     await this.gitManager.stageAll();
-    await this.gitManager.commit('AI-resolved merge conflicts with intelligent merging');
 
     await this.activityLogger.logConflictResolution(conflictedFiles, 'ai', true, {
       resolutionTime: Date.now() - resolutionStartTime,
@@ -452,19 +605,70 @@ class AutoGit {
   }
 
   /**
-   * Resolve conflicts in a single file using AI
+   * Human review gate: show what the AI wrote, proceed only on accept.
+   */
+  async reviewAiResolution(conflictedFiles) {
+    let preview = '';
+    try {
+      const workingDiff = await this.gitManager.getWorkingDiff();
+      preview = (workingDiff || '').split('\n').slice(0, AutoGit.REVIEW_PREVIEW_LINES).join('\n');
+    } catch (error) {
+      preview = '';
+    }
+
+    console.log(chalk.cyan('\n🔍 AI-resolved changes (review before anything is committed):'));
+    if (preview.trim()) {
+      console.log(preview);
+    } else {
+      console.log(chalk.dim('   (no visible working-tree diff — resolutions may match one side exactly)'));
+    }
+
+    const { decision } = await inquirer.prompt([
+      {
+        type: 'list',
+        name: 'decision',
+        message: `Accept this AI resolution for ${conflictedFiles.length} file(s)?`,
+        choices: [
+          { name: '✅ Accept — proceed', value: 'accept' },
+          { name: '🔧 Reject — I will resolve manually', value: 'manual' },
+          { name: '❌ Discard — abort the sync, keep my branch as-is', value: 'abort' },
+        ],
+        default: 'accept',
+      },
+    ]);
+
+    if (decision === 'abort') {
+      await this.abortSync();
+      throw new Error('AI resolution discarded. Your branch is unchanged.');
+    }
+
+    if (decision === 'manual') {
+      this.manualInstructions();
+      throw new Error(
+        'AI resolution set aside. Resolve manually and run again.'
+      );
+    }
+  }
+
+  /**
+   * Resolve conflicts in a single file using AI.
+   *
+   * Side inputs are operation-aware: git stage #2 is always "ours" and #3
+   * always "theirs", but what those MEAN flips under rebase (ours=upstream,
+   * theirs=local work being replayed). currentVersion is therefore always
+   * the LOCAL content and incomingVersion always the UPSTREAM content,
+   * regardless of operation — the resolver prompt stays truthful.
    */
   async resolveFileConflictsWithAI(filePath) {
     try {
-      // Both sides of the conflict (theirs = current/HEAD, ours = incoming)
-      const currentContent = await this.gitManager.showIndexSide(filePath, 'theirs');
-      const incomingContent = await this.gitManager.showIndexSide(filePath, 'ours');
+      const stage2 = await this.gitManager.showIndexSide(filePath, 'ours');
+      const stage3 = await this.gitManager.showIndexSide(filePath, 'theirs');
+      const isRebase = this.syncOperation === 'rebase';
 
-      // Resolve via AI and write the result back to the working copy
       const resolvedContent = await this.conflictResolver.resolveConflictWithAI({
         filePath,
-        currentVersion: currentContent,
-        incomingVersion: incomingContent,
+        currentVersion: isRebase ? stage3 : stage2,
+        incomingVersion: isRebase ? stage2 : stage3,
         language: filePath.split('.').pop() === 'php' ? 'php' : 'javascript',
       });
 
