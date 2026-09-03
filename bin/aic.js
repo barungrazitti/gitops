@@ -149,6 +149,7 @@ program
   .command('config')
   .description('Show configuration')
   .option('--list', 'List all configuration values')
+  .option('--get <key>', 'Get a specific configuration value (supports dot notation)')
   .option('--set <key=value>', 'Set a configuration value')
   .option('--reset', 'Reset configuration to defaults')
   .action(async (options) => {
@@ -194,6 +195,9 @@ program
   .description('Show usage statistics')
   .option('--analyze', 'Analyze recent activity')
   .option('--export', 'Export detailed logs to file')
+  .option('--reset', 'Reset statistics')
+  .option('--days <number>', 'Number of days to analyze/export', '30')
+  .option('--format <format>', 'Export format (json or text)', 'json')
   .action(async (options) => {
     try {
       const { generator } = buildGenerator();

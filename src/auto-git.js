@@ -57,6 +57,7 @@ class AutoGit {
       // Step 2: Check for changes
       const hasChanges = await this.checkForChanges();
       if (!hasChanges && !options.force) {
+        console.log(chalk.yellow('Nothing to commit — no changes detected. Use "aic -f" to force.'));
         await this.activityLogger.info('auto_git_completed', {
           reason: 'no_changes',
           duration: Date.now() - startTime,
@@ -203,7 +204,9 @@ class AutoGit {
 
       if (!diff || diff.trim().length === 0) {
         this.spinner.fail('No staged changes available');
-        throw new Error('No staged changes available');
+        throw new Error(
+          'No staged changes available. Stage files first with "git add ." or use "aic" (auto mode stages everything).'
+        );
       }
 
       // Check for and clean up conflict markers before generating commit

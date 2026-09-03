@@ -234,7 +234,7 @@ class CLIPresenter {
 
     if (options.analyze) {
       const analysis = await this.activityLogger.analyzeLogs(options.days || 30);
-      this.displayLogAnalysis(analysis);
+      this.displayLogAnalysis(analysis, options.days || 30);
       return;
     }
 
@@ -261,8 +261,8 @@ class CLIPresenter {
   /**
    * Display log analysis results
    */
-  displayLogAnalysis(analysis) {
-    console.log(chalk.cyan('\n📈 Activity Analysis (Last 30 days):'));
+  displayLogAnalysis(analysis, days = 30) {
+    console.log(chalk.cyan(`\n📈 Activity Analysis (Last ${days} days):`));
 
     console.log(chalk.yellow('\n🔥 Usage Metrics:'));
     console.log(`  Total Sessions: ${analysis.totalSessions}`);

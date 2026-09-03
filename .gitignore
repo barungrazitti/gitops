@@ -132,6 +132,9 @@ tmp_code_*
 # AI Commit Generator specific
 .aic-logs/
 
+# graphify knowledge graph output
+graphify-out/
+
 # Crush data (unrelated to project)
 .crush/
 

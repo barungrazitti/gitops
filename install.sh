@@ -38,7 +38,7 @@ npm install
 
 # Test installation with npx
 echo "🧪 Testing installation..."
-if node bin/aicommit.js --version &> /dev/null; then
+if node bin/aic.js --version &> /dev/null; then
     echo "✅ Installation successful! You can use 'npx aic' immediately."
 else
     echo "❌ Installation failed."
@@ -59,8 +59,7 @@ case $choice in
     1)
         echo "🔗 Creating local symlink..."
         mkdir -p ~/.local/bin
-        ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
-        ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aicommit
+        ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
         
         # Add to PATH if not already there
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
@@ -91,8 +90,7 @@ case $choice in
             else
                 echo "❌ Global installation failed. Falling back to local symlink..."
                 mkdir -p ~/.local/bin
-                ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
-                ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aicommit
+                ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
                 if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
                     echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null
                     echo "✅ Added ~/.local/bin to PATH in your shell config."
@@ -114,8 +112,7 @@ case $choice in
     *)
         echo "❌ Invalid choice. Using local symlink option."
         mkdir -p ~/.local/bin
-        ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aic
-        ln -sf "$(pwd)/bin/aicommit.js" ~/.local/bin/aicommit
+        ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
         if [[ ":$PATH:" != *":$HOME/.local/bin:"* ]]; then
             echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc 2>/dev/null || echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc 2>/dev/null
             echo "✅ Added ~/.local/bin to PATH in your shell config."

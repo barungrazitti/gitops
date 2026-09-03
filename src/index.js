@@ -202,7 +202,11 @@ Do not explain the error, just provide the solution.`;
       let diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
-        spinner.fail(chalk.red('❌ No staged changes found. Please stage your changes first.'));
+        spinner.fail(
+          chalk.red(
+            '❌ No staged changes found. Stage files with "git add ." or just run "aic" (auto mode stages everything).'
+          )
+        );
         await this.activityLogger.warn('generate_failed', {
           reason: 'no_staged_changes',
         });

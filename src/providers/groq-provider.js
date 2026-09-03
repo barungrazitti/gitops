@@ -30,7 +30,7 @@ class GroqProvider extends BaseProvider {
     const config = await this.getConfig();
 
     if (!config.apiKey) {
-      throw new Error('Groq API key not configured. Run "aicommit setup" to configure.');
+      throw new Error('Groq API key not configured. Run "aic setup" to configure.');
     }
 
     this.client = new Groq({
@@ -67,7 +67,8 @@ class GroqProvider extends BaseProvider {
       const estimatedTokens = this.estimateTokens(`${systemPrompt}\n\n${prompt}`);
       if (estimatedTokens > maxInputTokens) {
         throw new Error(
-          `Prompt too large for Groq (~${estimatedTokens} tokens > ${maxInputTokens} limit)`
+          `Prompt too large for Groq (~${estimatedTokens} tokens > ${maxInputTokens} limit). ` +
+            'Stage fewer files, or lower categorization thresholds via "aic config --set categorization.small.tokens=100".'
         );
       }
       const finalPrompt = prompt;

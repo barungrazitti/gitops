@@ -201,7 +201,10 @@ class GenerationPipeline {
       }
     }
 
-    throw new Error('All AI providers failed to generate commit messages.');
+    throw new Error(
+      'All AI providers failed. Check your setup: run "aic config --list" to verify config, or "aic setup" to reconfigure. ' +
+        'For Groq, ensure GROQ_API_KEY is set in .env. For Ollama, ensure it is running (ollama serve).'
+    );
   }
 
   /**
