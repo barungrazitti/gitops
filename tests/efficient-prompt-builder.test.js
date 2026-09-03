@@ -218,4 +218,71 @@ index acd6a14108..e1765113af 100644
     expect(prompt).toContain('Examples: style(ui): adjust responsive button spacing');
     expect(prompt).not.toContain('chore(config): update environment variables');
   });
+
+  describe('count handling (matches buildPrompt count branch)', () => {
+    const simpleDiff = `diff --git a/src/util.js b/src/util.js
+--- a/src/util.js
++++ b/src/util.js
+@@ -1,2 +1,3 @@
++export const util2 = () => {};`;
+
+    const baseOptions = {
+      conventional: true,
+      context: { files: {} },
+    };
+
+    it('requests a single message with singular wording when count is 1', () => {
+      const prompt = builder.buildPrompt(simpleDiff, { ...baseOptions, count: 1 });
+
+      expect(prompt).toContain('Generate 1 precise commit message for this git diff.');
+      expect(prompt).toContain('Single best commit message:');
+      expect(prompt).not.toContain('DIFFERENT emphasis');
+      expect(prompt).not.toContain('distinct commit messages');
+    });
+
+    it('defaults to singular wording when count is omitted', () => {
+      const prompt = builder.buildPrompt(simpleDiff, baseOptions);
+
+      expect(prompt).toContain('Generate 1 precise commit message for this git diff.');
+      expect(prompt).toContain('Single best commit message:');
+    });
+
+    it('requests distinct messages with varied emphasis when count > 1', () => {
+      const prompt = builder.buildPrompt(simpleDiff, { ...baseOptions, count: 3 });
+
+      expect(prompt).toContain('Generate 3 precise commit messages for this git diff');
+      expect(prompt).toContain('DIFFERENT emphasis');
+      expect(prompt).toContain('3 distinct commit messages, one per line:');
+      expect(prompt).not.toContain('Single best commit message:');
+    });
+
+    it('pluralizes the REMEMBER trailer when count > 1', () => {
+      const single = builder.buildPrompt(simpleDiff, { ...baseOptions, count: 1 });
+      const multi = builder.buildPrompt(simpleDiff, { ...baseOptions, count: 3 });
+
+      expect(single).toContain('REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE.');
+      expect(multi).toContain('REMEMBER: OUTPUT ONLY THE COMMIT MESSAGES.');
+    });
+
+    it('instructs rename output for pure renames', () => {
+      const renameDiff = `diff --git a/old.js b/new.js
+similarity index 98%
+rename from old.js
+rename to new.js`;
+
+      const prompt = builder.buildPrompt(renameDiff, { ...baseOptions, count: 1 });
+
+      expect(prompt).toContain('chore: rename old.js to new.js');
+    });
+
+    it('instructs executable output for mode changes', () => {
+      const modeDiff = `diff --git a/run.sh b/run.sh
+old mode 100644
+new mode 100755`;
+
+      const prompt = builder.buildPrompt(modeDiff, { ...baseOptions, count: 1 });
+
+      expect(prompt).toContain('chore: make run.sh executable');
+    });
+  });
 });

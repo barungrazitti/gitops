@@ -104,6 +104,23 @@ describe('AICommitGenerator', () => {
       expect(mockSpinner.fail).toHaveBeenCalledWith(expect.stringContaining('No staged changes'));
     });
 
+    it('should refuse to generate when staged diff contains conflict markers', async () => {
+      generator.activityLogger.warn = jest.fn().mockResolvedValue();
+      generator.gitManager.getStagedDiff.mockResolvedValue(
+        'diff --git a/f.js b/f.js\n+<<<<<<< HEAD\n+const a = 1;\n+=======\n+const a = 2;\n+>>>>>>> branch'
+      );
+
+      await generator.generate();
+
+      expect(mockSpinner.fail).toHaveBeenCalledWith(
+        expect.stringContaining('merge-conflict markers')
+      );
+      expect(generator.activityLogger.warn).toHaveBeenCalledWith('generate_failed', {
+        reason: 'conflict_markers_in_diff',
+      });
+      expect(generator.gitManager.commit).not.toHaveBeenCalled();
+    });
+
     it('should use cached messages when available', async () => {
       generator.cacheManager.getValidated = jest.fn().mockResolvedValue(mockMessages);
 
@@ -170,6 +187,49 @@ describe('AICommitGenerator', () => {
 
       await expect(generator.generate()).rejects.toThrow('Test generation error');
       expect(mockSpinner.fail).toHaveBeenCalled();
+    });
+
+    describe('quality-gate surface (matches index.js generate loop)', () => {
+      let consoleSpy;
+
+      beforeEach(() => {
+        consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+        generator.activityLogger.info = jest.fn().mockResolvedValue();
+        generator.activityLogger.debug = jest.fn().mockResolvedValue();
+      });
+
+      afterEach(() => {
+        consoleSpy.mockRestore();
+      });
+
+      const loggedText = () =>
+        consoleSpy.mock.calls.map(args => String(args[0])).join('\n');
+
+      it('should print the Quality line and a reasoning tip when QUAL-02 fails', async () => {
+        generator.cacheManager.getValidated = jest
+          .fn()
+          .mockResolvedValue(['feat: add new feature', 'fix: resolve issue']);
+
+        await generator.generate({ dryRun: true });
+
+        expect(loggedText()).toContain('Quality:');
+        expect(loggedText()).toContain('QUAL-02 ✗');
+        expect(loggedText()).toContain('Write custom message');
+      });
+
+      it('should print the Quality line without the tip when QUAL-02 passes', async () => {
+        generator.cacheManager.getValidated = jest.fn().mockResolvedValue([
+          'feat(auth): add JWT validation to improve security',
+          'fix(api): resolve race condition to prevent crashes',
+          'refactor(db): extract query logic for reuse',
+        ]);
+
+        await generator.generate({ dryRun: true });
+
+        expect(loggedText()).toContain('Quality:');
+        expect(loggedText()).toContain('QUAL-02 ✓');
+        expect(loggedText()).not.toContain('Write custom message');
+      });
     });
   });
 

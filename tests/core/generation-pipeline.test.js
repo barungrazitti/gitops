@@ -178,6 +178,64 @@ describe('GenerationPipeline', () => {
       const [, options] = adapter.generateResponse.mock.calls[0];
       expect(options.systemPrompt).toContain('Output ONLY commit messages');
     });
+
+    it('synthesizes messages locally for binary-only diffs without calling providers', async () => {
+      deps.diffShaper.manageDiffForAI.mockReturnValue({
+        strategy: 'binary-only',
+        data: '',
+        chunks: null,
+        info: {
+          strategy: 'binary-only',
+          size: 0,
+          chunks: 1,
+          reasoning: 'Binary/asset-only change',
+          binaryFiles: [{ fileName: 'img.png', change: 'added' }],
+        },
+      });
+
+      const messages = await pipeline.generate(fakeDiff, {
+        context: { files: {} },
+        preferredProvider: 'groq',
+        count: 3,
+      });
+
+      expect(messages).toEqual(['chore: add img.png']);
+      expect(deps.providerFactory.create).not.toHaveBeenCalled();
+      expect(deps.promptBuilder.buildPrompt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('synthesizeBinaryOnlyMessages()', () => {
+    it('maps added/removed/changed to add/remove/update with basenames', () => {
+      expect(
+        pipeline.synthesizeBinaryOnlyMessages(
+          [
+            { fileName: 'assets/img.png', change: 'added' },
+            { fileName: 'old/logo.png', change: 'removed' },
+            { fileName: 'fonts/a.woff2', change: 'changed' },
+          ],
+          3
+        )
+      ).toEqual(['chore: add img.png', 'chore: remove logo.png', 'chore: update a.woff2']);
+    });
+
+    it('appends a combined message for multi-file changes within count', () => {
+      const messages = pipeline.synthesizeBinaryOnlyMessages(
+        [
+          { fileName: 'a.png', change: 'added' },
+          { fileName: 'b.png', change: 'changed' },
+        ],
+        3
+      );
+
+      expect(messages).toEqual(['chore: add a.png', 'chore: update b.png', 'chore: update 2 asset files']);
+    });
+
+    it('falls back to a generic message when no files are listed', () => {
+      expect(pipeline.synthesizeBinaryOnlyMessages([], 3)).toEqual([
+        'chore: update binary assets',
+      ]);
+    });
   });
 
   describe('parseCommitMessages(content)', () => {

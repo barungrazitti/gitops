@@ -123,6 +123,26 @@ For BINARY FILES with no code changes:
 - DO NOT guess functionality - the diff contains no code changes to analyze`;
     }
 
+    // Handle pure renames: no content changed, only the path.
+    if (changeAnalysis.rename) {
+      const { from, to } = changeAnalysis.rename;
+      basePrompt += `
+
+For a FILE RENAME with no content changes:
+- Output "chore: rename ${from} to ${to}"
+- DO NOT describe functionality - nothing inside the file changed`;
+    }
+
+    // Handle pure mode changes (e.g. chmod +x): no content changed.
+    if (changeAnalysis.modeChange) {
+      const { file, executable } = changeAnalysis.modeChange;
+      basePrompt += `
+
+For a FILE MODE change with no content changes:
+- ${executable ? `Output "chore: make ${file} executable"` : `Output "chore: change file mode of ${file}"`}
+- DO NOT describe functionality - nothing inside the file changed`;
+    }
+
     prompt = basePrompt;
 
     // Add enhanced instructions for problematic cases

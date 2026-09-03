@@ -179,6 +179,129 @@ Binary files a/logo.png and /dev/null differ`;
       expect(typeof analysis.breaking).toBe('boolean');
       expect(typeof analysis.scope).toBe('string');
     });
+
+    it('classifies pure renames as chore with from/to (not binary)', () => {
+      const diff = `diff --git a/old.js b/new.js
+similarity index 98%
+rename from old.js
+rename to new.js`;
+
+      const analysis = shaper.analyzeDiffType(diff);
+
+      expect(analysis.type).toBe('chore');
+      expect(analysis.rename).toEqual({ from: 'old.js', to: 'new.js' });
+    });
+
+    it('classifies pure mode changes as chore with executable flag (not binary)', () => {
+      const diff = `diff --git a/run.sh b/run.sh
+old mode 100644
+new mode 100755`;
+
+      const analysis = shaper.analyzeDiffType(diff);
+
+      expect(analysis.type).toBe('chore');
+      expect(analysis.modeChange).toMatchObject({
+        file: 'run.sh',
+        oldMode: '100644',
+        newMode: '100755',
+        executable: true,
+      });
+    });
+
+    it('classifies LFS pointer changes as binary (not test)', () => {
+      const diff = `diff --git a/model.bin b/model.bin
+--- a/model.bin
++++ b/model.bin
+@@ -1,3 +1,3 @@
+-version https://git-lfs.github.com/spec/v1
+-oid sha256:aaa
+-size 100
++version https://git-lfs.github.com/spec/v1
++oid sha256:bbb
++size 200`;
+
+      const analysis = shaper.analyzeDiffType(diff);
+
+      expect(analysis.type).toBe('binary');
+      expect(analysis.keywords).toContain('lfs');
+    });
+
+    it('ignores URL words when keyword-scoring changes', () => {
+      const diff = `diff --git a/src/link.js b/src/link.js
+--- a/src/link.js
++++ b/src/link.js
+@@ -1 +1 @@
+-const url = "https://example.com/spec/v1";
++const url = "https://example.com/spec/v2";`;
+
+      const analysis = shaper.analyzeDiffType(diff);
+
+      expect(analysis.type).not.toBe('test');
+    });
+  });
+
+  describe('filterBinaryFiles() — block scan', () => {
+    it('filters binaries whose marker sits below mode/index lines', () => {
+      const diff = `diff --git a/app.bin b/app.bin
+new file mode 100644
+index 0000000..abc1234
+Binary files /dev/null and b/app.bin differ`;
+
+      expect(shaper.filterBinaryFiles(diff).trim()).toBe('');
+    });
+
+    it('filters binaries by extension even without a marker line', () => {
+      const diff = `diff --git a/tool.exe b/tool.exe
+new file mode 100644
+index 0000000..abc1234
+Binary files /dev/null and b/tool.exe differ`;
+
+      expect(shaper.filterBinaryFiles(diff).trim()).toBe('');
+    });
+
+    it('keeps code files while dropping binary blocks', () => {
+      const diff = `diff --git a/src/f.js b/src/f.js
+--- a/src/f.js
++++ b/src/f.js
+@@ -1 +1 @@
+-const a = 1;
++const a = 2;
+diff --git a/img.png b/img.png
+new file mode 100644
+index 0000000..abc1234
+Binary files /dev/null and b/img.png differ`;
+
+      const filtered = shaper.filterBinaryFiles(diff);
+
+      expect(filtered).toContain('src/f.js');
+      expect(filtered).not.toContain('img.png');
+    });
+  });
+
+  describe('manageDiffForAI() — binary-only guard', () => {
+    it('returns binary-only strategy with file summary when everything filters out', () => {
+      const diff = `diff --git a/img.png b/img.png
+new file mode 100644
+index 0000000..abc1234
+Binary files /dev/null and b/img.png differ`;
+
+      const result = shaper.manageDiffForAI(diff);
+
+      expect(result.strategy).toBe('binary-only');
+      expect(result.info.binaryFiles).toEqual([{ fileName: 'img.png', change: 'added' }]);
+    });
+
+    it('marks removed binaries as removed', () => {
+      const diff = `diff --git a/old.png b/old.png
+deleted file mode 100644
+index 1234567..0000000
+Binary files a/old.png and /dev/null differ`;
+
+      const result = shaper.manageDiffForAI(diff);
+
+      expect(result.strategy).toBe('binary-only');
+      expect(result.info.binaryFiles).toEqual([{ fileName: 'old.png', change: 'removed' }]);
+    });
   });
 
   describe('limitContextLines()', () => {

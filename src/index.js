@@ -17,6 +17,7 @@ const MessageFormatter = require('./core/message-formatter');
 const MessageRanker = require('./core/message-ranker');
 const MessageValidator = require('./core/message-validator');
 const ConflictResolver = require('./core/conflict-resolver');
+const { DIFF_MARKER_REGEX } = require('./core/conflict-resolver');
 const StatsManager = require('./core/stats-manager');
 const HookManager = require('./core/hook-manager');
 const ActivityLogger = require('./core/activity-logger');
@@ -209,6 +210,24 @@ Do not explain the error, just provide the solution.`;
         );
         await this.activityLogger.warn('generate_failed', {
           reason: 'no_staged_changes',
+        });
+        return;
+      }
+
+      // Refuse to generate from conflicted state: markers would be fed to
+      // the AI as normal changes. (auto-git cleans markers first; the
+      // direct generate path has no such step.)
+      if (DIFF_MARKER_REGEX.test(diff)) {
+        spinner.fail(
+          chalk.red(
+            '❌ Staged changes contain merge-conflict markers (<<<<<<<, =======, >>>>>>>). Resolve conflicts first, then regenerate.'
+          )
+        );
+        console.log(
+          chalk.yellow('   Tip: run "aic" auto mode for AI-assisted resolution, or resolve manually and "git add" the result.')
+        );
+        await this.activityLogger.warn('generate_failed', {
+          reason: 'conflict_markers_in_diff',
         });
         return;
       }

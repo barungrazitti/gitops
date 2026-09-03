@@ -214,17 +214,26 @@ describe('MessageValidator', () => {
       expect(result.stats.genericCount).toBe(2);
     });
 
-    it('should track reasoning count', () => {
+    it('should track reasoning count (generic messages are exempt from no-reasoning per validate())', () => {
       const messages = [
         'add caching to improve performance',
         'fix validation to prevent errors',
-        'update code', // This one has no reasoning
+        'update code', // generic → never gets a no-reasoning issue (see validate(): !hasReasoning && !isGeneric)
       ];
 
       const result = validator.validateBatch(messages);
 
-      // First two have reasoning ("to improve", "to prevent"), third doesn't
-      expect(result.stats.withReasoning).toBe(3); // "update code" may still pass due to no explicit no-reasoning flag when generic
+      // All three lack a no-reasoning issue, so all three count as withReasoning.
+      // This documents current code behavior, not an endorsement of the exemption.
+      expect(result.stats.withReasoning).toBe(3);
+      expect(result.stats.genericCount).toBe(1);
+    });
+
+    it('should exempt generic messages from the no-reasoning issue', () => {
+      const generic = validator.validate('update code');
+
+      expect(generic.issues).toContain('generic');
+      expect(generic.issues).not.toContain('no-reasoning');
     });
 
     it('should calculate quality rate', () => {

@@ -82,6 +82,28 @@ class GenerationPipeline {
     console.log(chalk.blue(`📊 Diff strategy: ${diffManagement.info.strategy}`));
     console.log(chalk.dim(`   Reasoning: ${diffManagement.info.reasoning}`));
 
+    // Binary/asset-only change: nothing for the AI to analyze; synthesize locally.
+    if (diffManagement.strategy === 'binary-only') {
+      const messages = this.synthesizeBinaryOnlyMessages(
+        diffManagement.info.binaryFiles || [],
+        options.count || 3
+      );
+      await this.activityLogger.info('diff_management', {
+        ...diffManagement.info,
+        provider: 'local',
+        responseTime: 0,
+        success: true,
+      });
+      const batch = this.messageValidator.validateBatch(messages);
+      const thresholds = this.messageValidator.checkQualityThresholds(batch);
+      await this.activityLogger.info('quality_gates', {
+        provider: 'local',
+        stats: batch.stats,
+        thresholds,
+      });
+      return messages;
+    }
+
     // Compute diff analysis once (DiffShaper owns classification); prompt builders reuse it
     enrichedOptions.diffAnalysis = this.diffShaper.analyzeDiffType(
       diffManagement.data,
@@ -212,6 +234,27 @@ class GenerationPipeline {
    */
   applyProviderPreamble(providerName, prompt) {
     return providerName === 'ollama' ? OLLAMA_COMMIT_PREAMBLE + prompt : prompt;
+  }
+
+  /**
+   * Build commit messages for binary/asset-only changes without an AI call.
+   * One message per file (verb from the diff headers), plus a combined
+   * message when several files changed.
+   */
+  synthesizeBinaryOnlyMessages(binaryFiles, count = 3) {
+    if (!binaryFiles || binaryFiles.length === 0) {
+      return ['chore: update binary assets'];
+    }
+    const verb = { added: 'add', removed: 'remove', changed: 'update' };
+    const perFile = binaryFiles.map(f => {
+      const base = (f.fileName || 'binary files').split('/').pop();
+      return `chore: ${verb[f.change] || 'update'} ${base}`;
+    });
+    if (binaryFiles.length > 1) {
+      perFile.push(`chore: update ${binaryFiles.length} asset files`);
+    }
+    const unique = [...new Set(perFile)];
+    return unique.slice(0, Math.max(1, count));
   }
 
   /**

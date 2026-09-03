@@ -9,46 +9,98 @@ const chalk = require('chalk');
 class DiffShaper {
   /**
    * Filter out binary/media files from a diff.
+   * Scans each file block (not just the line after the header) for the
+   * `Binary files ... differ` marker, so new/deleted binaries whose marker
+   * sits below mode/index lines are still caught.
    */
   filterBinaryFiles(diff) {
     if (!diff) return '';
 
     const BINARY_EXTENSIONS = [
       'svg', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'woff', 'woff2', 'ttf', 'eot', 'mp4',
-      'mp3', 'pdf', 'zip', 'tar', 'gz', 'log', 'lock' // Add common lock/log files
+      'mp3', 'pdf', 'zip', 'tar', 'gz', 'log', 'lock', // Add common lock/log files
+      'bin', 'dat', 'exe', 'dll', 'so', 'dylib', 'o', 'a', 'wasm', 'sqlite', 'db',
+      'pyc', 'class', 'jar', 'war', 'ear', 'psd', 'ai', 'sketch', 'mov', 'avi', 'flac',
+      'ogg', 'ttc', 'otf', 'eot',
     ];
 
-    const lines = diff.split('\n');
-    const filteredLines = [];
-    let skipUntilNextDiff = false;
+    const blocks = this.splitDiffIntoFileBlocks(diff);
+    const kept = [];
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    for (const block of blocks) {
+      const ext = block.fileName.split('.').pop().toLowerCase();
+      const hasBinaryMarker = /^Binary files .+ differ$/m.test(block.body);
 
-      if (line.startsWith('diff --git')) {
-        skipUntilNextDiff = false; // Reset for new file
-        const fileMatch = line.match(/diff --git a\/(.+?) b\/(.+)/);
-        if (fileMatch) {
-          const filePath = fileMatch[2];
-          const ext = filePath.split('.').pop().toLowerCase();
-
-          // Check for binary files by extension or explicit marker
-          if (BINARY_EXTENSIONS.includes(ext) || lines[i + 1]?.startsWith('Binary files')) {
-            console.log(chalk.gray(`🗑️  Skipping binary/asset file: ${filePath}`));
-            skipUntilNextDiff = true;
-            continue; // Skip the diff --git line itself
-          }
-        }
+      if (BINARY_EXTENSIONS.includes(ext) || hasBinaryMarker) {
+        console.log(chalk.gray(`🗑️  Skipping binary/asset file: ${block.fileName}`));
+        continue;
       }
-
-      if (skipUntilNextDiff) {
-        continue; // Skip all lines for the current binary file
-      }
-
-      filteredLines.push(line);
+      kept.push(block.raw);
     }
 
-    return filteredLines.join('\n');
+    return kept.join('\n');
+  }
+
+  /**
+   * Split a unified diff into per-file blocks.
+   * @returns {Array<{fileName: string, header: string, body: string, raw: string}>}
+   */
+  splitDiffIntoFileBlocks(diff) {
+    if (!diff) return [];
+
+    const lines = diff.split('\n');
+    const blocks = [];
+    let start = -1;
+
+    const pushBlock = end => {
+      const rawLines = lines.slice(start, end);
+      const header = rawLines[0] || '';
+      const fileMatch = header.match(/diff --git a\/(.+?) b\/(.+)/);
+      blocks.push({
+        fileName: fileMatch ? fileMatch[2] : 'unknown',
+        header,
+        body: rawLines.slice(1).join('\n'),
+        raw: rawLines.join('\n'),
+      });
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].startsWith('diff --git')) {
+        if (start !== -1) pushBlock(i);
+        start = i;
+      }
+    }
+    if (start !== -1) pushBlock(lines.length);
+
+    // Content before the first `diff --git` header (unusual, but don't drop it)
+    if (start === -1) {
+      return [{ fileName: 'unknown', header: '', body: diff, raw: diff }];
+    }
+    if (start > 0) {
+      const preamble = lines.slice(0, start).join('\n');
+      if (preamble.trim()) {
+        blocks.unshift({ fileName: 'unknown', header: '', body: preamble, raw: preamble });
+      }
+    }
+
+    return blocks;
+  }
+
+  /**
+   * Describe binary-only changes (file + added/removed/changed) from the
+   * original diff. Used when filtering leaves nothing for the AI.
+   * @returns {Array<{fileName: string, change: string}>}
+   */
+  extractBinaryFileSummary(diff) {
+    return this.splitDiffIntoFileBlocks(diff)
+      .filter(block => block.header.startsWith('diff --git'))
+      .map(block => {
+        const body = block.body;
+        let change = 'changed';
+        if (/deleted file mode|mode: 000000/.test(body)) change = 'removed';
+        else if (/new file mode/.test(body)) change = 'added';
+        return { fileName: block.fileName, change };
+      });
   }
 
   /**
@@ -66,6 +118,25 @@ class DiffShaper {
     // overhead (~475–750 tokens), system prompt, and output within Groq's 6K TPM budget.
     const MAX_SAFE_SIZE = 12000;
     const { context } = options;
+
+    // Everything was binary/asset content: nothing left for the AI to analyze.
+    // Synthesize a message locally instead of sending an empty prompt.
+    if (diff && filteredDiff.trim().length === 0) {
+      const binaryFiles = this.extractBinaryFileSummary(diff);
+      const fileList = binaryFiles.map(f => f.fileName).join(', ') || 'binary files';
+      return {
+        strategy: 'binary-only',
+        data: '',
+        chunks: null,
+        info: {
+          strategy: 'binary-only',
+          size: 0,
+          chunks: 1,
+          reasoning: `Binary/asset-only change (${fileList}); message synthesized without AI`,
+          binaryFiles,
+        },
+      };
+    }
 
     if (diffSize <= MAX_SAFE_SIZE) {
       return {
@@ -501,6 +572,46 @@ class DiffShaper {
 
     // --- Change-type classification (uses actual changed lines only) ---
 
+    // Git LFS pointer changes carry no real content (and the pointer URL
+    // contains words like "spec" that poison keyword scoring).
+    if (/version https:\/\/git-lfs\.github\.com\/spec\/v1/m.test(diff)) {
+      const isNew =
+        /new file mode/.test(diff) && !/deleted file mode|mode: 000000/.test(diff);
+      const isDeleted = /deleted file mode|mode: 000000/.test(diff);
+      analysis.type = 'binary';
+      analysis.confidence = 0.9;
+      analysis.keywords = ['binary', 'lfs', isNew ? 'added' : isDeleted ? 'removed' : 'changed'];
+      return analysis;
+    }
+
+    // Pure renames: headers only, no +/- lines.
+    const renameFrom = diff.match(/^rename from (.+)$/m);
+    const renameTo = diff.match(/^rename to (.+)$/m);
+    if (renameFrom && renameTo) {
+      analysis.type = 'chore';
+      analysis.confidence = 0.9;
+      analysis.keywords = ['rename'];
+      analysis.rename = { from: renameFrom[1].trim(), to: renameTo[1].trim() };
+      return analysis;
+    }
+
+    // Pure mode changes (e.g. chmod +x): headers only, no +/- lines.
+    const oldMode = diff.match(/^old mode (\d+)$/m);
+    const newMode = diff.match(/^new mode (\d+)$/m);
+    if (oldMode && newMode) {
+      const files = this.extractChangedFilePaths(diff);
+      analysis.type = 'chore';
+      analysis.confidence = 0.9;
+      analysis.keywords = ['mode'];
+      analysis.modeChange = {
+        file: files[0] || 'file',
+        oldMode: oldMode[1],
+        newMode: newMode[1],
+        executable: newMode[1] === '100755',
+      };
+      return analysis;
+    }
+
     // Detect binary files: file headers present but no +/- changes
     const hasFileHeaders = /^diff --git/m.test(diff);
     const hasChanges = actualChangeText.trim().length > 0;
@@ -559,7 +670,10 @@ class DiffShaper {
       },
     };
 
-    const lowerChangeText = actualChangeText.toLowerCase();
+    // Strip URLs before keyword scoring: words inside pointer/schema URLs
+    // (LFS, OpenAPI $refs) describe locations, not changes ("spec" in a URL
+    // is not a test).
+    const lowerChangeText = actualChangeText.replace(/https?:\/\/\S+/g, '').toLowerCase();
     let maxScore = 0;
 
     for (const [type, pattern] of Object.entries(patterns)) {
