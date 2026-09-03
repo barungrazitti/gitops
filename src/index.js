@@ -306,6 +306,26 @@ Do not explain the error, just provide the solution.`;
 
         spinner.succeed(chalk.green('✅ Commit messages generated successfully!'));
 
+        // Surface QUAL-01/QUAL-02 quality gates to the user (previously log-only)
+        const batch = this.messageValidator.validateBatch(messages);
+        const gates = this.messageValidator.checkQualityThresholds(batch);
+        const gateColor = gates.qual01Pass && gates.qual02Pass ? chalk.green : chalk.yellow;
+        console.log(
+          gateColor(
+            `🎯 Quality: ${batch.stats.validCount}/${batch.stats.total} specific` +
+              ` (QUAL-01 ${gates.qual01Pass ? '✓' : '✗'}) · ` +
+              `${batch.stats.withReasoning}/${batch.stats.total} with reasoning` +
+              ` (QUAL-02 ${gates.qual02Pass ? '✓' : '✗'})`
+          )
+        );
+        if (!gates.qual02Pass) {
+          console.log(
+            chalk.dim(
+              '   Tip: messages say what changed, not why — consider "Write custom message" to add intent.'
+            )
+          );
+        }
+
         // Format messages
         const formattedMessages = messages.map(msg =>
           this.messageFormatter.format(msg, mergedOptions)

@@ -103,7 +103,10 @@ class EfficientPromptBuilder {
     const isWordPressFile = this.isWordPressFile(diff, context);
 
     // Build concise, focused prompt
-    let basePrompt = `Generate ${count} precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
+    let basePrompt =
+      count > 1
+        ? `Generate ${count} precise commit messages for this git diff, each with a DIFFERENT emphasis (vary the focus or scope — do not reword the same message). OUTPUT ONLY COMMIT MESSAGES - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`
+        : `Generate 1 precise commit message for this git diff. OUTPUT ONLY COMMIT MESSAGE - NO INSTRUCTIONS, WARNINGS, OR EXPLANATIONS.`;
 
     // Handle binary files specially - they have no code changes
     if (changeAnalysis.type === 'binary') {
@@ -241,9 +244,9 @@ Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
 ${diff}
 \`\`\`
 
-REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE. NO WARNINGS. NO INSTRUCTIONS. NO DEPLOYMENT ADVICE.
+REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE${count > 1 ? 'S' : ''}. NO WARNINGS. NO INSTRUCTIONS. NO DEPLOYMENT ADVICE.
 
-Single best commit message:`;
+${count > 1 ? `${count} distinct commit messages, one per line:` : 'Single best commit message:'}`;
 
     // Apply context line limiting for small diffs (owned by DiffShaper)
     if (options.diffCategory && options.diffCategory.category === 'small') {
