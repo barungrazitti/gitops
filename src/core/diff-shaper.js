@@ -62,7 +62,9 @@ class DiffShaper {
     // Filter out binary/media files first
     const filteredDiff = this.filterBinaryFiles(diff);
     const diffSize = filteredDiff.length;
-    const MAX_SAFE_SIZE = 18000; // ~4.5K tokens, safe for Groq free-tier TPM (6K) with system prompt overhead
+    // ~3K tokens for the diff; leaves ~1.5K token headroom for prompt template
+    // overhead (~475–750 tokens), system prompt, and output within Groq's 6K TPM budget.
+    const MAX_SAFE_SIZE = 12000;
     const { context } = options;
 
     if (diffSize <= MAX_SAFE_SIZE) {

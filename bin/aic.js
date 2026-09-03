@@ -118,7 +118,27 @@ program
         conflictResolver,
         activityLogger,
       });
-      await autoGit.run(options);
+      await autoGit.run({ ...options, manualMessage: message || null });
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('generate')
+  .description('Generate AI commit message for staged changes (interactive selection)')
+  .option('-p, --provider <provider>', 'AI provider to use (groq, ollama)')
+  .option('-c, --count <number>', 'Number of messages to generate', '3')
+  .option('--conventional', 'Use conventional commit format')
+  .option('--dry-run', 'Print messages without committing')
+  .action(async (options) => {
+    try {
+      const { generator } = buildGenerator();
+      await generator.generate({
+        ...options,
+        count: parseInt(options.count) || 3,
+      });
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);

@@ -61,16 +61,16 @@ class GroqProvider extends BaseProvider {
         options.systemPrompt ||
         'You are an expert software developer who helps fix code issues and improve code quality.';
 
-      // Groq has 6000 TPM limit - leave margin for prompt overhead
+      // Groq free tier: 6000 TPM; reserve tokens for output and prompt overhead.
+      // DiffShaper owns the diff budget and should keep input well under this limit.
       const maxInputTokens = 4500;
-
-      // Guard against oversized input (diff is already budget-fitted by
-      // DiffShaper; this covers prose overhead on long prompts)
       const estimatedTokens = this.estimateTokens(`${systemPrompt}\n\n${prompt}`);
-      const finalPrompt =
-        estimatedTokens > maxInputTokens
-          ? prompt.substring(0, maxInputTokens * 4) // ~4 chars per token
-          : prompt;
+      if (estimatedTokens > maxInputTokens) {
+        throw new Error(
+          `Prompt too large for Groq (~${estimatedTokens} tokens > ${maxInputTokens} limit)`
+        );
+      }
+      const finalPrompt = prompt;
 
       return await this.withRetry(
         async () =>

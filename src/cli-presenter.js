@@ -82,10 +82,12 @@ class CLIPresenter {
       }
 
       if (choiceNum === messages.length + 2) {
-        const customMessage = await question('Enter your custom commit message: ');
-        if (!customMessage.trim()) {
-          console.log(chalk.red('Message cannot be empty'));
-          return { action: 'cancel' };
+        let customMessage = '';
+        while (!customMessage.trim()) {
+          customMessage = await question('Enter your custom commit message: ');
+          if (!customMessage.trim()) {
+            console.log(chalk.yellow('Message cannot be empty. Try again (Ctrl+C to cancel).'));
+          }
         }
         rl.close();
         return { action: 'commit', message: customMessage.trim() };
@@ -158,6 +160,9 @@ class CLIPresenter {
           console.log(chalk.red('❌ API key is required for Groq'));
           rl.close();
           return;
+        }
+        if (!apiKey.trim().startsWith('gsk_')) {
+          console.log(chalk.yellow('⚠️  Groq keys typically start with "gsk_" — double-check your key.'));
         }
       }
 

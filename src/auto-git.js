@@ -17,8 +17,6 @@ class AutoGit {
     this.conflictResolver = conflictResolver;
     this.activityLogger = activityLogger;
     this.spinner = ora();
-    // Configure git to prefer merge over rebase for safety
-    this.gitManager.configurePullStrategy();
   }
 
   /**
@@ -477,13 +475,27 @@ class AutoGit {
    * Push changes to remote
    */
   async pushChanges() {
-    this.spinner.start('Pushing changes to remote...');
+    let branch = '';
+    try {
+      branch = await this.gitManager.getCurrentBranch();
+    } catch (_) {}
+    this.spinner.start(`Pushing to origin/${branch || '<branch>'}...`);
     try {
       await this.gitManager.push();
-      this.spinner.succeed('Pushed to remote');
+      this.spinner.succeed(`Pushed to origin/${branch || 'remote'}`);
     } catch (error) {
       this.spinner.fail('Failed to push changes');
-      console.log(chalk.red('✗ Failed to push changes'));
+      if (
+        error.message.includes('no tracking information') ||
+        error.message.includes('set-upstream') ||
+        error.message.includes('has no upstream')
+      ) {
+        console.log(
+          chalk.yellow(`\n💡 Tip: git push --set-upstream origin ${branch || '<branch>'}`)
+        );
+      } else {
+        console.log(chalk.red('✗ Failed to push changes'));
+      }
       throw error;
     }
   }

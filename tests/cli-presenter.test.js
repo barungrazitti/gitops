@@ -61,12 +61,12 @@ describe('CLIPresenter.selectMessage', () => {
     expect(result).toEqual({ action: 'commit', message: 'my custom message' });
   });
 
-  it('cancels on an empty custom message', async () => {
-    presenter.createReadline = jest.fn(() => createFakeReadline(['4', '   ']));
+  it('re-prompts on empty custom message then commits on valid input', async () => {
+    presenter.createReadline = jest.fn(() => createFakeReadline(['4', '   ', 'my valid message']));
 
     const result = await presenter.selectMessage(messages);
 
-    expect(result).toEqual({ action: 'cancel' });
+    expect(result).toEqual({ action: 'commit', message: 'my valid message' });
   });
 
   it('returns a regenerate result', async () => {

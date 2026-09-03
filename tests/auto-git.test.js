@@ -40,6 +40,7 @@ describe('AutoGit', () => {
       checkoutSide: jest.fn(),
       showIndexSide: jest.fn(),
       getRepositoryRoot: jest.fn(),
+      getCurrentBranch: jest.fn().mockResolvedValue('main'),
     };
 
     // Setup mock AI commit generator and collaborators
@@ -91,9 +92,6 @@ describe('AutoGit', () => {
       expect(autoGit.conflictResolver).toBe(mockAiCommit.conflictResolver);
     });
 
-    it('should configure git to prefer merge over rebase', () => {
-      expect(mockGitManager.configurePullStrategy).toHaveBeenCalled();
-    });
   });
 
   describe('run', () => {
@@ -633,7 +631,7 @@ describe('AutoGit', () => {
       await autoGit.pushChanges();
 
       expect(mockGitManager.push).toHaveBeenCalled();
-      expect(mockSpinner.succeed).toHaveBeenCalledWith('Pushed to remote');
+      expect(mockSpinner.succeed).toHaveBeenCalledWith('Pushed to origin/main');
     });
 
     it('should handle push errors', async () => {

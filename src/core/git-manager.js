@@ -267,7 +267,7 @@ class GitManager {
   /**
    * Get recent commit patterns for learning
    */
-  async getCommitPatterns(limit = 100) {
+  async getCommitPatterns(limit = 20) {
     try {
       const commits = await this.getCommitHistory(limit);
 
