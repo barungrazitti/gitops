@@ -209,8 +209,13 @@ class DiffShaper {
       fc => !IGNORED_PATTERNS.some(pattern => fc.fileName.includes(pattern))
     );
 
-    const scoredChunks = filteredChunks.map(fc => {
-      const score = this.scoreFileChunk(fc, semanticContext);
+    // Rebuilt minified bundles (foo.<oldhash>.css deleted + foo.<newhash>.css added)
+    // are single giant lines — normal excerpts would show the file START, not the
+    // change. Collapse each pair into a synthetic chunk holding the real delta.
+    const chunksToScore = this.collapseRebuildPairs(filteredChunks);
+
+    const scoredChunks = chunksToScore.map(fc => {
+      const score = fc.isRebuildPair ? this.scoreFileChunk(fc, semanticContext) + 200 : this.scoreFileChunk(fc, semanticContext);
       return { ...fc, score };
     });
 
@@ -891,6 +896,102 @@ class DiffShaper {
 
   isMarkupFile(file) {
     return /\.(html|htm|vue|svelte|hbs|ejs|twig|blade\.php)$/.test(file) || /\/templates?\//.test(file);
+  }
+
+  /**
+   * Collapse deleted-then-added hashed bundles (`name.<hash>.ext`) into a single
+   * synthetic chunk that holds the actual changed region. ponytail: changes at
+   * both ends of the file produce one wide span; add per-hunk segmentation when
+   * that becomes noisy.
+   */
+  collapseRebuildPairs(fileChunks) {
+    const pairs = this.extractRebuildPairs(fileChunks);
+    if (!pairs.length) return fileChunks;
+
+    const consumed = new Set();
+    for (const p of pairs) { consumed.add(p.added); consumed.add(p.deleted); }
+
+    const synth = pairs.map(p => this.buildRebuildPairChunk(p)).filter(Boolean);
+
+    // Splice synthetic chunks where the added chunk sat (preserve file order).
+    const out = [];
+    for (const c of fileChunks) {
+      if (consumed.has(c)) continue;
+      out.push(c);
+    }
+    if (synth.length) out.push(...synth);
+    return out;
+  }
+
+  extractRebuildPairs(fileChunks) {
+    const HASHED = /^(.*\/)?([^.]+)\.([0-9a-f]{6,})\.(css|js)$/i;
+    const groups = new Map();
+    const pairs = [];
+
+    for (const chunk of fileChunks) {
+      const m = chunk.fileName.match(HASHED);
+      if (!m) continue;
+
+      const isDeleted = /^deleted file mode/m.test(chunk.content);
+      const isAdded   = /^new file mode/m.test(chunk.content);
+      if (!isDeleted && !isAdded) continue;
+
+      const key = `${m[1] || ''}${m[2]}.${m[4]}`;
+      if (!groups.has(key)) groups.set(key, { added: null, deleted: null });
+      groups.get(key)[isDeleted ? 'deleted' : 'added'] = chunk;
+    }
+
+    for (const [key, g] of groups) {
+      if (g.added && g.deleted) pairs.push({ key, ...g });
+    }
+    return pairs;
+  }
+
+  extractContentLines(content, sign) {
+    const prefix = sign === '+' ? '+++' : '---';
+    return content
+      .split('\n')
+      .filter(l => l.startsWith(sign) && !l.startsWith(prefix))
+      .map(l => l.slice(1))
+      .join('\n')
+      .trim();
+  }
+
+  buildRebuildPairChunk(pair, budgetPerSide = 1200) {
+    const oldText = this.extractContentLines(pair.deleted.content, '-');
+    const newText = this.extractContentLines(pair.added.content, '+');
+    if (!oldText || !newText) return null;
+
+    // Trim common prefix / suffix — keeps only the real changed region.
+    let start = 0;
+    const minLen = Math.min(oldText.length, newText.length);
+    while (start < minLen && oldText[start] === newText[start]) start++;
+    let endOld = oldText.length;
+    let endNew = newText.length;
+    while (endOld > start && endNew > start && oldText[endOld - 1] === newText[endNew - 1]) { endOld--; endNew--; }
+
+    const CONTEXT = 120;
+    const oldRegion = oldText.slice(Math.max(0, start - CONTEXT), Math.min(endOld + CONTEXT, oldText.length));
+    const newRegion = newText.slice(Math.max(0, start - CONTEXT), Math.min(endNew + CONTEXT, newText.length));
+
+    const clip = s => (s.length > budgetPerSide ? `${s.slice(0, budgetPerSide)}… [clipped]` : s);
+    const content = [
+      '# NOTE: rebuilt minified bundle — only the changed region is shown',
+      `-${clip(oldRegion)}`,
+      `+${clip(newRegion)}`,
+    ].join('\n');
+
+    const oldFile = pair.deleted.fileName.split('/').pop();
+    const newFile = pair.added.fileName.split('/').pop();
+
+    return {
+      header: `diff --git a/${pair.deleted.fileName} b/${pair.added.fileName}`,
+      content,
+      fileName: pair.added.fileName,
+      isNewFile: true,
+      changeCount: 2,
+      isRebuildPair: true,
+    };
   }
 }
 

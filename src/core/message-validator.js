@@ -113,6 +113,10 @@ class MessageValidator {
     if (this.conventionalTypePattern.test(trimmed)) {
       score += 20;
     }
+    // Allow multiline bullet lists: reward lines starting with '-' and increase score
+    if (/\n-\s/.test(trimmed)) {
+      score += 10;
+    }
 
     // Check for specific technical terms (reward specificity)
     let hasSpecificTerms = false;

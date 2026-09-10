@@ -30,6 +30,17 @@ const LANG_MAP = {
   sql: 'sql',
 };
 
+/**
+ * Map a file path to a language hint for the resolution prompt.
+ * Single source of truth so every caller (auto path, cleanup path) agrees.
+ * @param {string} filePath - File path or name with extension.
+ * @returns {string} Language identifier (defaults to javascript).
+ */
+function languageForFile(filePath) {
+  const extension = String(filePath || '').split('.').pop();
+  return LANG_MAP[extension] || 'javascript';
+}
+
 class ConflictResolver {
   /**
    * @param {Object} deps
@@ -133,7 +144,8 @@ class ConflictResolver {
    * @returns {Promise<string>} Resolved content (falls back to currentVersion on failure).
    */
   async resolveConflictWithAI(conflictCtx) {
-    const { filePath, currentVersion, incomingVersion, language = 'javascript' } = conflictCtx || {};
+    const { filePath, currentVersion, incomingVersion, language } = conflictCtx || {};
+    const languageHint = language || languageForFile(filePath);
 
     if (!filePath || typeof currentVersion !== 'string' || typeof incomingVersion !== 'string') {
       throw new Error(
@@ -159,7 +171,7 @@ class ConflictResolver {
 
 CONTEXT:
 - File: ${filePath}
-- Language: ${language}
+- Language: ${languageHint}
 - Original code (HEAD): The code before the conflict
 - Incoming code: The new code that conflicts with HEAD
 
@@ -277,8 +289,7 @@ RESOLVED CODE (output only):
         let cleanedContent = content;
         let fileResolved = 0;
         let fileAiUsed = false;
-        const extension = file.fileB.split('.').pop();
-        const language = LANG_MAP[extension] || 'javascript';
+        const language = languageForFile(file.fileB);
 
         for (const conflict of conflicts) {
           // Resolve each conflict block
@@ -330,3 +341,4 @@ RESOLVED CODE (output only):
 
 module.exports = ConflictResolver;
 module.exports.DIFF_MARKER_REGEX = DIFF_MARKER_REGEX;
+module.exports.languageForFile = languageForFile;

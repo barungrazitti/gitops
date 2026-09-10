@@ -395,4 +395,30 @@ Binary files a/old.png and /dev/null differ`;
       expect(shaper.getCompatibleTypeHint(null, analysis)).toBeNull();
     });
   });
+
+  describe('collapseRebuildPairs() — cmpv2 hash-bump guard', () => {
+    it('collapses deleted+added hashed bundle into one delta chunk', () => {
+      const oldCss = `${'a'.repeat(5000)}OLD-RULE{color:red}${'b'.repeat(5000)}`;
+      const newCss = `${'a'.repeat(5000)}NEW-RULE{color:blue}${'b'.repeat(5000)}`;
+      const diff = `diff --git a/assets/cmpv2.aaa111.css b/assets/cmpv2.aaa111.css
+deleted file mode 100644
+--- a/assets/cmpv2.aaa111.css
++++ /dev/null
+@@ -1 +1 @@
+-${oldCss}
+diff --git a/assets/cmpv2.bbb222.css b/assets/cmpv2.bbb222.css
+new file mode 100644
+--- /dev/null
++++ b/assets/cmpv2.bbb222.css
+@@ -1 +1 @@
++${newCss}`;
+
+      const result = shaper.manageDiffForAI(diff, {});
+
+      expect(result.info.preservedFiles).toContain('assets/cmpv2.bbb222.css');
+      expect(result.data).toContain('rebuilt minified bundle');
+      expect(result.data).toContain('OLD-RULE');
+      expect(result.data).toContain('NEW-RULE');
+    });
+  });
 });

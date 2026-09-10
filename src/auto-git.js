@@ -6,7 +6,7 @@
 const chalk = require('chalk');
 const inquirer = require('inquirer');
 const ora = require('ora');
-const { DIFF_MARKER_REGEX } = require('./core/conflict-resolver');
+const { DIFF_MARKER_REGEX, languageForFile } = require('./core/conflict-resolver');
 
 class AutoGit {
   // Cap on rebase --continue rounds: each round replays remaining commits and
@@ -327,7 +327,7 @@ class AutoGit {
       throw error;
     }
 
-    if (!pullResult || !pullResult.files || pullResult.files.length === 0) {
+    if (!pullResult) {
       this.spinner.succeed('Already up to date');
       return;
     }
@@ -339,7 +339,9 @@ class AutoGit {
       await this.handleRebaseConflicts(leftover);
       return;
     }
-    this.spinner.succeed('Pulled with rebase, no conflicts');
+    // Note: a rebase that only replays local commits reports no changed
+    // files, so "synced" (not "already up to date") is the honest label.
+    this.spinner.succeed('Synced with upstream via rebase, no conflicts');
   }
 
   /**

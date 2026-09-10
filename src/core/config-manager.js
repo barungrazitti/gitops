@@ -3,9 +3,15 @@
  */
 
 const Conf = require('conf');
+const path = require('path');
 
 // quiet: true suppresses dotenv's per-run "injected env" banner (dotenv 17+).
-require('dotenv').config({ quiet: true });
+// Path is resolved from this module (not cwd) so `aic` finds the .env bundled
+// with this project no matter which repo it is run from.
+require('dotenv').config({
+  quiet: true,
+  path: path.resolve(__dirname, '..', '..', '.env'),
+});
 
 const fs = require('fs-extra');
 const Joi = require('joi');

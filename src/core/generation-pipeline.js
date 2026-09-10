@@ -2,8 +2,8 @@
  * Generation Pipeline - deep module for AI commit message generation.
  *
  * One interface in: generate(diff, options) → messages[].
- * Owns: diff shaping, prompt assembly, provider sequencing (with fallback),
- * response parsing, ranking, quality gates, and activity logging.
+ * Owns: secret redaction, diff shaping, prompt assembly, provider sequencing
+ * (with fallback), response parsing, ranking, quality gates, and activity logging.
  * Providers are thin adapters (generateResponse: text in → text out).
  * Note: the DiffShaper budget contract returns 'full'/'smart-truncated' today;
  * there is no chunked strategy in production, so the pipeline is single-pass.
@@ -11,6 +11,7 @@
 
 const chalk = require('chalk');
 const AIProviderFactory = require('../providers/ai-provider-factory');
+const SecretScanner = require('../utils/secret-scanner');
 
 // Commit-message generation lives here, at the pipeline layer.
 const COMMIT_SYSTEM_PROMPT =
@@ -21,7 +22,7 @@ const OLLAMA_COMMIT_PREAMBLE =
 
 const COMMIT_GENERATION_OPTIONS = {
   systemPrompt: COMMIT_SYSTEM_PROMPT,
-  maxTokens: 150,
+  maxTokens: 300,
   temperature: 0.3,
 };
 
@@ -34,24 +35,26 @@ class GenerationPipeline {
    * @param {Object} deps.messageValidator - QUAL-01/02 quality gates.
    * @param {Object} deps.activityLogger - Structured activity logging.
    * @param {Object} deps.statsManager - Usage statistics.
+   * @param {Object} [deps.secretScanner] - Redacts secrets/PII before provider calls.
    * @param {Object} [deps.providerFactory] - Creates provider adapters (injectable for tests).
    * @param {Object} [deps.configManager] - Config store shared with provider adapters.
    */
-  constructor({ diffShaper, promptBuilder, messageRanker, messageValidator, activityLogger, statsManager, providerFactory = AIProviderFactory, configManager }) {
+  constructor({ diffShaper, promptBuilder, messageRanker, messageValidator, activityLogger, statsManager, secretScanner = new SecretScanner(), providerFactory = AIProviderFactory, configManager }) {
     this.diffShaper = diffShaper;
     this.promptBuilder = promptBuilder;
     this.messageRanker = messageRanker;
     this.messageValidator = messageValidator;
     this.activityLogger = activityLogger;
     this.statsManager = statsManager;
+    this.secretScanner = secretScanner;
     this.providerFactory = providerFactory;
     this.configManager = configManager;
   }
 
   /**
    * Generate commit messages for a diff, with sequential provider fallback.
-   * @param {string} diff - The (already sanitized) diff content.
-   * @param {Object} options - context, count, conventional, preferredProvider, ...
+   * @param {string} diff - The diff content (redacted here if not already).
+   * @param {Object} options - context, count, conventional, preferredProvider, sanitize, ...
    * @returns {Promise<string[]>} Ranked candidate commit messages.
    */
   async generate(diff, options = {}) {
@@ -74,8 +77,28 @@ class GenerationPipeline {
       },
     };
 
+    // SECURITY: redact secrets/PII at the pipeline boundary so EVERY caller is
+    // covered (interactive generate AND auto mode), not just the CLI path.
+    // Idempotent: diffs already redacted upstream pass through unchanged.
+    let safeDiff = diff;
+    if (options.sanitize !== false) {
+      const originalLength = diff.length;
+      safeDiff = this.secretScanner.scanAndRedact(diff, true);
+      const redactionSummary = this.secretScanner.getRedactionSummary();
+      if (redactionSummary.found) {
+        await this.activityLogger.warn('sensitive_data_redacted', {
+          source: 'generation_pipeline',
+          redacted: redactionSummary.redacted,
+          byCategory: redactionSummary.byCategory,
+          originalSize: originalLength,
+          sanitizedSize: safeDiff.length,
+        });
+      }
+      this.secretScanner.clearRedactionLog();
+    }
+
     // Step 1: Intelligent diff management with semantic context
-    const diffManagement = this.diffShaper.manageDiffForAI(diff, enrichedOptions);
+    const diffManagement = this.diffShaper.manageDiffForAI(safeDiff, enrichedOptions);
     // Single status line (details stay in the log file): strategy + size delta.
     const { strategy, size, originalSize } = diffManagement.info;
     const sizeNote =
@@ -272,10 +295,11 @@ class GenerationPipeline {
       return [];
     }
 
-    return content
-      .split('\n')
-      .map(msg => msg.trim())
-      .filter(msg => msg.length >= 10 && msg.length <= 200);
+    const blocks = content.split(/\n\s*\n/).map(block => block.trim()).filter(block => block.length > 0);
+    return blocks.filter(block => {
+      const firstLine = block.split('\n')[0];
+      return firstLine.length >= 10 && firstLine.length <= 200;
+    });
   }
 }
 

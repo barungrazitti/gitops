@@ -52,7 +52,7 @@ describe('GenerationPipeline', () => {
       deps.providerFactory.create.mockReturnValue({
         generateResponse: jest
           .fn()
-          .mockResolvedValue('feat: add new constant\nfix: unrelated message'),
+          .mockResolvedValue('feat: add new constant\n\nfix: unrelated message'),
       });
 
       const messages = await pipeline.generate(fakeDiff, {
@@ -70,7 +70,7 @@ describe('GenerationPipeline', () => {
       deps.providerFactory.create.mockReturnValue({
         generateResponse: jest
           .fn()
-          .mockResolvedValue('feat: add new constant\nfix: unrelated message\nchore: bump'),
+          .mockResolvedValue('feat: add new constant\n\nfix: unrelated message\n\nchore: bump'),
       });
 
       await pipeline.generate(fakeDiff, {
@@ -257,12 +257,22 @@ describe('GenerationPipeline', () => {
   });
 
   describe('parseCommitMessages(content)', () => {
-    it('splits lines and filters by length', () => {
-      const result = pipeline.parseCommitMessages(
-        'feat: add new feature\nshort\n\n   fix: resolve timeout issue   '
-      );
+    it('splits on blank lines and keeps first-line length >= 10', () => {
+      const raw = `feat: add new constant
 
-      expect(result).toEqual(['feat: add new feature', 'fix: resolve timeout issue']);
+fix: unrelated message
+`;
+      expect(pipeline.parseCommitMessages(raw)).toEqual([
+        'feat: add new constant',
+        'fix: unrelated message',
+      ]);
+    });
+
+    it('filters blocks whose first line is too short or too long', () => {
+      const result = pipeline.parseCommitMessages(
+        'short\n\n   fix: resolve timeout issue   '
+      );
+      expect(result).toEqual(['fix: resolve timeout issue']);
     });
 
     it('returns empty array for invalid input', () => {

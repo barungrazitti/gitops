@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "aic Conflict Resolution Sequence",
+    "output": "diagrams/aic-sequence.html",
+    "viewBox": [1380, 710],
+    "column_fit": "spread",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "sync-and-detect",
+        "label": "Sync and detect",
+        "focus": ["user", "autogit", "git"],
+        "note": "Follow the auto run up to the moment rebase conflicts surface."
+      },
+      {
+        "id": "ai-resolution",
+        "label": "AI resolution",
+        "focus": ["resolver", "scanner", "ai"],
+        "note": "See both file sides scanned, redacted, and merged by the provider."
+      },
+      {
+        "id": "review-and-continue",
+        "label": "Review and continue",
+        "focus": ["user", "autogit", "git"],
+        "note": "The human gate before staging and rebase --continue."
+      }
+    ]
+  },
+  "participants": [
+    { "id": "user", "type": "external", "label": "User" },
+    { "id": "autogit", "type": "backend", "label": "AutoGit" },
+    { "id": "git", "type": "backend", "label": "GitManager" },
+    { "id": "resolver", "type": "security", "label": "ConflictResolver" },
+    { "id": "scanner", "type": "security", "label": "SecretScanner" },
+    { "id": "ai", "type": "cloud", "label": "AI Provider" }
+  ],
+  "messages": [
+    { "id": "run", "from": "user", "to": "autogit", "y": 160, "label": "aic (auto)", "variant": "emphasis" },
+    { "id": "sync", "from": "autogit", "to": "git", "y": 200, "label": "stage · commit · pull --rebase" },
+    { "id": "conflicted", "from": "git", "to": "autogit", "y": 237, "label": "conflicted files", "variant": "return" },
+    { "id": "resolve-file", "from": "autogit", "to": "resolver", "y": 285, "label": "resolveConflictWithAI", "variant": "emphasis" },
+    { "id": "redact", "from": "resolver", "to": "scanner", "y": 328, "label": "scanAndRedact both sides", "variant": "security" },
+    { "id": "redacted", "from": "scanner", "to": "resolver", "y": 365, "label": "redacted versions", "variant": "return" },
+    { "id": "merge-prompt", "from": "resolver", "to": "ai", "y": 413, "label": "generateResponse (merged code)", "variant": "emphasis" },
+    { "id": "merged", "from": "ai", "to": "resolver", "y": 450, "label": "resolved content", "variant": "return" },
+    { "id": "resolved-out", "from": "resolver", "to": "autogit", "y": 498, "label": "resolved file", "variant": "return" },
+    { "id": "review-gate", "from": "autogit", "to": "user", "y": 541, "label": "review diff (100 lines)", "variant": "security" },
+    { "id": "accept", "from": "user", "to": "autogit", "y": 578, "label": "accept", "variant": "return" },
+    { "id": "continue-push", "from": "autogit", "to": "git", "y": 620, "label": "stage · rebase --continue · push", "variant": "emphasis" }
+  ],
+  "activations": [
+    { "participant": "autogit", "from": 155, "to": 625, "type": "backend" },
+    { "participant": "git", "from": 195, "to": 245, "type": "backend" },
+    { "participant": "git", "from": 612, "to": 625, "type": "backend" },
+    { "participant": "resolver", "from": 278, "to": 505, "type": "security" },
+    { "participant": "scanner", "from": 321, "to": 372, "type": "security" },
+    { "participant": "ai", "from": 406, "to": 458, "type": "cloud" }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Sync Flow",
+      "items": [
+        "Stage, commit, and pull --rebase keep history linear",
+        "Conflicts surface as a file list, not parsed error text",
+        "ours/theirs meaning flips under rebase; sides swap before prompting"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Safety Before AI",
+      "items": [
+        "Both conflict sides pass SecretScanner before leaving the machine",
+        "Resolver uses generateResponse, never the commit-message path",
+        "Failure falls back to the local version, not the incoming one"
+      ]
+    },
+    {
+      "dot": "orange",
+      "title": "Human Gate",
+      "items": [
+        "AI writes to the working tree but never commits",
+        "A 100-line diff preview precedes the accept prompt",
+        "Discard aborts the sync; the branch stays untouched"
+      ]
+    }
+  ]
+}

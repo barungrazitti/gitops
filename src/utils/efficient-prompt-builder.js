@@ -182,6 +182,14 @@ For a FILE MODE change with no content changes:
     // Add change-specific guidance
     prompt += this.buildChangeSpecificGuidance(changeAnalysis, impactAnalysis);
 
+    // Rebuilt-bundle guidance: describe the shown changed region, not the hash bump
+    if (diff.includes('# NOTE: rebuilt minified bundle')) {
+      prompt += `\n\nREBUILT BUNDLE DETECTED:
+  - A hashed bundle was rebuilt; the "-"/"+" lines show the ACTUAL changed region (common prefix/suffix already trimmed)
+  - Describe WHAT changed in the bundle content (CSS rules, selectors, JS logic)
+  - Do NOT just say "update bundle hash" unless the changed region is trivial`;
+    }
+
     // Add WordPress-specific guidance if detected
     if (isWordPressFile) {
       prompt += this.buildWordPressGuidance(diff, context);
@@ -196,7 +204,9 @@ For a FILE MODE change with no content changes:
     if (conventional) {
       prompt += `\n\nFormat: type(scope): description
 Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
-Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)`;
+Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)
+
+After the title line, add a blank line then bullet points starting with "- " summarizing each distinct change. End with a blank line followed by "Refs: <issue-refs>" listing related issue references.`;
 
       // Add file-pattern hints only when they agree with the actual changed lines.
       // Pre-computed by the pipeline; falls back for direct construction.

@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "aic — AI Commit Generator",
+    "output": "diagrams/aic-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1120, 580],
+    "views": [
+      { "id": "generation-path", "label": "Generation path", "focus": ["cli", "generator", "secrets", "cache", "pipeline", "shaper", "groq"], "note": "Follow one diff from the CLI through redaction, cache, shaping, and the provider call." },
+      { "id": "auto-workflow", "label": "Auto workflow", "focus": ["cli", "autogit", "gitman", "resolver"], "note": "The stage-commit-pull-push loop and where AI conflict resolution plugs in." },
+      { "id": "safety-layer", "label": "Safety layer", "focus": ["secrets", "resolver"], "note": "Secrets and PII leave every diff before any AI call." }
+    ]
+  },
+  "components": [
+    { "id": "cli", "type": "frontend", "label": "bin/aic", "sublabel": "composition root", "pos": [40, 200], "size": [130, 60] },
+    { "id": "generator", "type": "backend", "label": "AICommitGenerator", "sublabel": "interactive pipeline", "pos": [250, 200], "size": [150, 64] },
+    { "id": "cache", "type": "database", "label": "CacheManager", "sublabel": "diff-keyed cache", "pos": [470, 200], "size": [150, 60] },
+    { "id": "pipeline", "type": "backend", "label": "GenerationPipeline", "sublabel": "single pass", "tag": "provider fallback", "pos": [690, 200], "size": [170, 68] },
+    { "id": "shaper", "type": "backend", "label": "DiffShaper", "sublabel": "12,000-char budget", "pos": [900, 60], "size": [150, 60] },
+    { "id": "groq", "type": "cloud", "label": "GroqProvider", "sublabel": "openai/gpt-oss-20b", "pos": [900, 180], "size": [160, 60] },
+    { "id": "ollama", "type": "external", "label": "OllamaProvider", "sublabel": "localhost:11434", "pos": [900, 300], "size": [160, 60] },
+    { "id": "gitman", "type": "backend", "label": "GitManager", "sublabel": "simple-git", "pos": [40, 400], "size": [150, 60] },
+    { "id": "autogit", "type": "backend", "label": "AutoGit", "sublabel": "auto workflow", "pos": [260, 400], "size": [150, 64] },
+    { "id": "resolver", "type": "security", "label": "ConflictResolver", "sublabel": "AI merge resolution", "pos": [520, 400], "size": [150, 64] },
+    { "id": "secrets", "type": "security", "label": "SecretScanner", "sublabel": "secrets + PII redaction", "pos": [740, 400], "size": [160, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "aic CLI process", "wraps": ["cli", "gitman", "autogit", "generator", "resolver", "pipeline", "shaper", "cache", "secrets"] }
+  ],
+  "connections": [
+    { "id": "cli-autogit", "from": "cli", "to": "autogit", "label": "aic auto", "fromSide": "bottom", "toSide": "top", "via": [[105, 366], [335, 366]] },
+    { "id": "cli-generator", "from": "cli", "to": "generator", "label": "aic generate" },
+    { "id": "autogit-gitman", "from": "autogit", "to": "gitman", "label": "stage · commit · pull · push", "labelAt": [225, 478] },
+    { "id": "autogit-resolver", "from": "autogit", "to": "resolver", "label": "rebase conflicts" },
+    { "id": "generator-secrets", "from": "generator", "to": "secrets", "label": "redact diff", "variant": "security", "fromSide": "bottom", "toSide": "top", "via": [[325, 330], [820, 330]], "labelAt": [600, 318] },
+    { "id": "generator-cache", "from": "generator", "to": "cache", "label": "get/set validated", "variant": "dashed", "labelAt": [435, 288] },
+    { "id": "generator-pipeline", "from": "generator", "to": "pipeline", "label": "generate", "variant": "emphasis", "fromSide": "top", "toSide": "top", "via": [[325, 150], [775, 150]], "labelAt": [550, 136] },
+    { "id": "pipeline-shaper", "from": "pipeline", "to": "shaper", "variant": "dashed" },
+    { "id": "pipeline-groq", "from": "pipeline", "to": "groq", "variant": "emphasis" },
+    { "id": "pipeline-ollama", "from": "pipeline", "to": "ollama", "variant": "dashed" },
+    { "id": "resolver-secrets", "from": "resolver", "to": "secrets", "label": "redact sides", "variant": "security" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Generation Pipeline", "items": [
+      "DiffShaper is the only owner of the 12,000-char diff budget",
+      "One prompt pass per provider; no chunked strategy",
+      "Preferred provider first, then sequential fallback to the other"
+    ] },
+    { "dot": "rose", "title": "Safety", "items": [
+      "SecretScanner strips secrets and PII before any AI call",
+      "Direct generate path refuses diffs containing conflict markers",
+      "AI merge resolutions stop at a human review gate"
+    ] },
+    { "dot": "emerald", "title": "Composition", "items": [
+      "bin/aic builds every collaborator once and injects them",
+      "Both entry paths reach git through GitManager",
+      ".env overrides config but is never persisted to the conf store"
+    ] }
+  ]
+}

@@ -440,7 +440,9 @@ describe('AutoGit', () => {
 
       await autoGit.pullAndHandleConflicts();
 
-      expect(mockSpinner.succeed).toHaveBeenCalledWith('Already up to date');
+      expect(mockSpinner.succeed).toHaveBeenCalledWith(
+        'Synced with upstream via rebase, no conflicts'
+      );
     });
 
     it('should handle already up to date', async () => {
@@ -456,7 +458,9 @@ describe('AutoGit', () => {
 
       await autoGit.pullAndHandleConflicts();
 
-      expect(mockSpinner.succeed).toHaveBeenCalledWith('Pulled with rebase, no conflicts');
+      expect(mockSpinner.succeed).toHaveBeenCalledWith(
+        'Synced with upstream via rebase, no conflicts'
+      );
     });
 
     it('should handle rebase conflicts with AI resolution + continue (no commit)', async () => {
