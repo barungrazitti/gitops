@@ -19,6 +19,9 @@ class CacheManager {
     // Persistent cache directory
     this.cacheDir = path.join(os.homedir(), '.ai-commit-generator', 'cache');
     this.ensureCacheDir();
+
+    // Clean expired entries on startup (fire-and-forget)
+    this.cleanup().catch(() => {});
   }
 
   /**
@@ -88,12 +91,7 @@ class CacheManager {
       // Try memory cache first
       const cached = this.memoryCache.get(key);
       if (cached) {
-        // Validate semantic similarity before returning
-        if (this.validateSemanticSimilarity(diff, cached.diff || '')) {
-          return cached.messages;
-        }
-        // Remove invalid cache entry
-        this.memoryCache.del(key);
+        return cached.messages;
       }
 
       // Try persistent cache
@@ -105,18 +103,12 @@ class CacheManager {
         const now = Date.now();
         if (now - cacheData.timestamp < 86400000) {
           // 24 hours
-          // Validate semantic similarity
-          if (this.validateSemanticSimilarity(diff, cacheData.diff || '')) {
-            // Add to memory cache for faster access
-            this.memoryCache.set(key, cacheData);
-            return cacheData.messages;
-          }
-          // Remove invalid cache file
-          await fs.remove(cacheFile);
-        } else {
-          // Remove expired cache file
-          await fs.remove(cacheFile);
+          // Add to memory cache for faster access
+          this.memoryCache.set(key, cacheData);
+          return cacheData.messages;
         }
+        // Remove expired cache file
+        await fs.remove(cacheFile);
       }
 
       return null;
@@ -132,10 +124,11 @@ class CacheManager {
   async setValidated(diff, messages) {
     try {
       const key = this.generateKey(diff);
+      const diffHash = crypto.createHash('sha256').update(diff).digest('hex');
       const cacheData = {
         messages,
         timestamp: Date.now(),
-        diff,
+        diffHash,
         semanticFingerprint: this.extractSemanticFingerprint(diff),
         structuralFingerprint: this.extractStructuralFingerprint(diff),
       };
@@ -196,10 +189,12 @@ class CacheManager {
       }
 
       const files = await fs.readdir(this.cacheDir);
+      const jsonFiles = files.filter(f => f.endsWith('.json'));
       const now = Date.now();
       let cleanedCount = 0;
 
-      for (const file of files) {
+      // Remove expired files
+      for (const file of jsonFiles) {
         const filePath = path.join(this.cacheDir, file);
 
         try {
@@ -213,6 +208,27 @@ class CacheManager {
         } catch (error) {
           // Remove corrupted cache files
           await fs.remove(filePath);
+          cleanedCount++;
+        }
+      }
+
+      // Enforce max count limit (500 files)
+      const MAX_CACHE_FILES = 500;
+      const remainingFiles = await fs.readdir(this.cacheDir);
+      const remainingJson = remainingFiles.filter(f => f.endsWith('.json'));
+      if (remainingJson.length > MAX_CACHE_FILES) {
+        // Sort by modification time (oldest first) and remove excess
+        const filesWithStats = await Promise.all(
+          remainingJson.map(async (file) => {
+            const filePath = path.join(this.cacheDir, file);
+            const stats = await fs.stat(filePath);
+            return { file, mtime: stats.mtimeMs };
+          })
+        );
+        filesWithStats.sort((a, b) => a.mtime - b.mtime);
+        const toRemove = filesWithStats.slice(0, remainingJson.length - MAX_CACHE_FILES);
+        for (const { file } of toRemove) {
+          await fs.remove(path.join(this.cacheDir, file));
           cleanedCount++;
         }
       }

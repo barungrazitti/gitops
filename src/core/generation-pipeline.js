@@ -177,7 +177,7 @@ class GenerationPipeline {
         const responseTime = Date.now() - startProviderTime;
 
         if (messages && messages.length > 0) {
-          await this.statsManager.recordCommit(providerName);
+          await this.statsManager.recordCommit(providerName, responseTime);
 
           const changeType = options.diffAnalysis?.type || 'change';
           console.log(

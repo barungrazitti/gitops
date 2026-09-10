@@ -49,30 +49,6 @@ class ConfigManager {
       sanitize: true, // Auto-redact secrets and PII before sending to AI
       redactionLog: true, // Log what was redacted for transparency
 
-      // Test validation settings
-      testValidation: {
-        enabled: false,
-        autoFix: true,
-        testCommand: 'npm run test:quick',
-        lintCommand: 'npm run lint',
-        formatCommand: 'npm run format',
-        aiProvider: 'ollama',
-        confirmFixes: true,
-        timeout: 120000,
-        pushAfterValidation: false,
-      },
-      // Advanced code formatting settings
-      codeFormatting: {
-        enabled: false,
-        useAdvancedFormatting: true,
-        phpTools: true,
-        htmlTools: true,
-        cssTools: true,
-        jsTools: true,
-        prettierConfig: null,
-        formatTimeout: 30000,
-        autoSetupConfigs: true,
-      },
       commitTypes: [
         'feat',
         'fix',
@@ -132,28 +108,6 @@ class ConfigManager {
       sanitize: Joi.boolean(),
       redactionLog: Joi.boolean(),
       commitTypes: Joi.array().items(Joi.string()),
-      testValidation: Joi.object({
-        enabled: Joi.boolean(),
-        autoFix: Joi.boolean(),
-        testCommand: Joi.string(),
-        lintCommand: Joi.string(),
-        formatCommand: Joi.string(),
-        aiProvider: Joi.string().valid('groq', 'ollama'),
-        confirmFixes: Joi.boolean(),
-        timeout: Joi.number().integer().min(5000),
-        pushAfterValidation: Joi.boolean(),
-      }),
-      codeFormatting: Joi.object({
-        enabled: Joi.boolean(),
-        useAdvancedFormatting: Joi.boolean(),
-        phpTools: Joi.boolean(),
-        htmlTools: Joi.boolean(),
-        cssTools: Joi.boolean(),
-        jsTools: Joi.boolean(),
-        prettierConfig: Joi.string().allow(null),
-        formatTimeout: Joi.number().integer().min(5000),
-        autoSetupConfigs: Joi.boolean(),
-      }),
       scopes: Joi.array().items(Joi.string()),
       templates: Joi.object(),
       categorization: Joi.object({

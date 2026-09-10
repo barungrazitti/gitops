@@ -92,7 +92,6 @@ class EfficientPromptBuilder {
       });
 
       prompt += '\n\n' + largeDiffPrompt;
-      console.log(`Processing ${fileChunks.length} chunks summary...`);
     }
 
     // Diff category is recorded on options for downstream use (not logged:

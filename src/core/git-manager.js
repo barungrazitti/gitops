@@ -8,6 +8,30 @@ const InputSanitizer = require('../utils/input-sanitizer');
 class GitManager {
   constructor() {
     this.git = simpleGit();
+    this._statusCache = null;
+    this._statusCacheTime = 0;
+  }
+
+  /**
+   * Get git status with short-lived cache (2 seconds).
+   * Avoids redundant git status spawns within a single workflow.
+   */
+  async getStatusCached() {
+    const now = Date.now();
+    if (this._statusCache && (now - this._statusCacheTime) < 2000) {
+      return this._statusCache;
+    }
+    this._statusCache = await this.getStatus();
+    this._statusCacheTime = now;
+    return this._statusCache;
+  }
+
+  /**
+   * Invalidate the status cache (call after staging/committing).
+   */
+  invalidateStatusCache() {
+    this._statusCache = null;
+    this._statusCacheTime = 0;
   }
 
   /**

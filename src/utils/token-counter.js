@@ -2,7 +2,14 @@
  * Token Counter - Accurate token counting using tiktoken
  */
 
-const { encoding_for_model } = require('tiktoken');
+let tiktoken = null;
+
+function getTiktoken() {
+  if (!tiktoken) {
+    tiktoken = require('tiktoken');
+  }
+  return tiktoken;
+}
 
 class TokenCounter {
   constructor() {
@@ -38,6 +45,7 @@ class TokenCounter {
    */
   getEncoding(model) {
     if (!this.encodingCache.has(model)) {
+      const { encoding_for_model } = getTiktoken();
       const encoding = encoding_for_model(model);
       this.encodingCache.set(model, encoding);
     }

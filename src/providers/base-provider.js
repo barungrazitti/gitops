@@ -105,24 +105,6 @@ class BaseProvider {
   }
 
   /**
-   * Send HTTP request with error handling
-   */
-  async sendHTTPRequest(url, options = {}) {
-    try {
-      const config = await this.getConfig();
-      const axios = require('axios');
-      const requestOptions = {
-        timeout: config.timeout || 120000,
-        ...options,
-      };
-      const response = await axios(url, requestOptions);
-      return response.data;
-    } catch (error) {
-      this.handleError(error, this.name);
-    }
-  }
-
-  /**
    * Cleanup method for resource release
    */
   cleanup() {

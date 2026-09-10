@@ -31,6 +31,8 @@ describe('AutoGit', () => {
     mockGitManager = {
       validateRepository: jest.fn(),
       getStatus: jest.fn(),
+      getStatusCached: jest.fn().mockImplementation(() => mockGitManager.getStatus()),
+      invalidateStatusCache: jest.fn(),
       stageAll: jest.fn(),
       getStagedDiff: jest.fn(),
       getWorkingDiff: jest.fn().mockResolvedValue(''),

@@ -158,7 +158,7 @@ class AutoGit {
       const isRepo = await this.gitManager.validateRepository();
       if (!isRepo) {
         this.spinner.fail('Repository validation failed');
-        throw new Error('Not a git repository');
+        throw new Error('Not a git repository. Run "git init" to create one, or cd into an existing repo.');
       }
       this.spinner.succeed('Git repository validated');
     } catch (error) {
@@ -173,7 +173,7 @@ class AutoGit {
   async checkForChanges() {
     this.spinner.start('Checking for changes...');
     try {
-      const status = await this.gitManager.getStatus();
+      const status = await this.gitManager.getStatusCached();
       const hasChanges =
         status.files.length > 0 ||
         status.not_added.length > 0 ||
@@ -203,6 +203,7 @@ class AutoGit {
     try {
       // Stage all changes including new files
       await this.gitManager.stageAll();
+      this.gitManager.invalidateStatusCache();
       this.spinner.succeed('Changes staged');
     } catch (error) {
       this.spinner.fail('Failed to stage changes');
@@ -307,6 +308,7 @@ class AutoGit {
     } catch (error) {
       this.spinner.fail('Failed to generate commit message');
       console.log(chalk.red('✗ Failed to generate commit message'));
+      console.log(chalk.dim('  Check your API key with "aic config --list" or run "aic setup"'));
       throw error;
     }
   }
@@ -322,6 +324,9 @@ class AutoGit {
     } catch (error) {
       this.spinner.fail('Failed to commit changes');
       console.log(chalk.red('✗ Failed to commit changes'));
+      if (error.message.includes('hook')) {
+        console.log(chalk.dim('  A git hook rejected the commit. Check your .git/hooks/'));
+      }
       throw error;
     }
   }
@@ -748,8 +753,11 @@ class AutoGit {
         console.log(
           chalk.yellow(`\n💡 Tip: git push --set-upstream origin ${branch || '<branch>'}`)
         );
+      } else if (error.message.includes('authentication') || error.message.includes('403')) {
+        console.log(chalk.yellow('\n💡 Tip: Check your git credentials or SSH key'));
       } else {
         console.log(chalk.red('✗ Failed to push changes'));
+        console.log(chalk.dim('  Try "git push" manually to see the full error'));
       }
       throw error;
     }

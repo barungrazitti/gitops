@@ -27,7 +27,7 @@ class OllamaProvider extends BaseProvider {
    */
   async generateResponse(prompt, options = {}) {
     const config = await this.getConfig();
-    const model = options.model || config.model || 'deepseek-v3.1:671b-cloud';
+    const model = options.model || config.model || 'qwen2.5-coder:latest';
 
     const systemPrompt =
       options.systemPrompt ||

@@ -2,9 +2,10 @@
  * Groq Provider - Fast inference models
  */
 
-const Groq = require('groq-sdk');
 const BaseProvider = require('./base-provider');
 const CircuitBreaker = require('../core/circuit-breaker');
+
+let Groq = null;
 
 class GroqProvider extends BaseProvider {
   constructor(deps = {}) {
@@ -26,6 +27,10 @@ class GroqProvider extends BaseProvider {
    */
   async initializeClient() {
     if (this.client) return;
+
+    if (!Groq) {
+      Groq = require('groq-sdk');
+    }
 
     const config = await this.getConfig();
 

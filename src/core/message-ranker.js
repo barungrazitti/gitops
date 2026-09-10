@@ -3,15 +3,25 @@
  * Faithfully mirrors the commit ranking logic previously in index.js.
  */
 class MessageRanker {
+  constructor() {
+    this._entitiesCache = new Map();
+  }
+
   selectBestMessages(messages, count = 3, diff = null) {
     if (!messages || messages.length === 0) return [];
+    // Pre-extract entities once for all messages
+    if (diff) {
+      this._entitiesCache.set(diff, this.extractEntitiesFromDiff(diff));
+    }
     const uniqueMessages = [...new Set(messages)];
     const scored = uniqueMessages.map(msg => ({
       message: msg,
       score: this.scoreCommitMessage(msg, diff),
     }));
     scored.sort((a, b) => b.score - a.score);
-    return scored.slice(0, count).map(item => item.message);
+    const result = scored.slice(0, count).map(item => item.message);
+    this._entitiesCache.clear();
+    return result;
   }
 
   scoreCommitMessage(message, diff = null) {
@@ -70,17 +80,17 @@ class MessageRanker {
 
   calculateRelevanceScore(message, diff) {
     let relevanceScore = 0;
-    const entitiesFromDiff = this.extractEntitiesFromDiff(diff);
+    const entitiesFromDiff = this._entitiesCache.get(diff) || this.extractEntitiesFromDiff(diff);
     const messageKeywords = this.extractKeywordsFromMessage(message);
     const entityOverlap = this.calculateEntityOverlap(entitiesFromDiff, messageKeywords);
     relevanceScore += entityOverlap * 8;
     if (this.checkTypeMatch(message, diff)) {
       relevanceScore += 5;
     }
-    if (this.checkScopeMatch(message, diff)) {
+    if (this.checkScopeMatch(message, diff, entitiesFromDiff)) {
       relevanceScore += 3;
     }
-    if (this.isMessageTooGenericForDiff(message, diff)) {
+    if (this.isMessageTooGenericForDiff(message, diff, entitiesFromDiff)) {
       relevanceScore -= 10;
     }
     return relevanceScore;
@@ -231,11 +241,11 @@ class MessageRanker {
     return diffIndicators[changeType] || false;
   }
 
-  checkScopeMatch(message, diff) {
+  checkScopeMatch(message, diff, cachedEntities = null) {
     const scopeMatch = message.match(/^[a-z]+\(([^)]+)\):/);
     if (!scopeMatch) return false;
     const scope = scopeMatch[1];
-    const entities = this.extractEntitiesFromDiff(diff);
+    const entities = cachedEntities || this.extractEntitiesFromDiff(diff);
     const fileTypes = entities.fileTypes.added;
     const scopeTypeMap = {
       api: ['js', 'ts', 'py', 'php', 'java', 'go', 'rb'],
@@ -258,8 +268,8 @@ class MessageRanker {
     return false;
   }
 
-  isMessageTooGenericForDiff(message, diff) {
-    const entities = this.extractEntitiesFromDiff(diff);
+  isMessageTooGenericForDiff(message, diff, cachedEntities = null) {
+    const entities = cachedEntities || this.extractEntitiesFromDiff(diff);
     const hasSpecificEntities =
       entities.functions.added.length > 0 || entities.classes.added.length > 0 || entities.variables.added.length > 0;
     const genericTerms = [
