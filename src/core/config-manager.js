@@ -34,53 +34,14 @@ class ConfigManager {
       apiKey: null,
       model: null,
       conventionalCommits: true,
-      language: 'en',
-      messageCount: 1,
       maxTokens: 150,
       temperature: 0.7,
       cache: true,
-      cacheExpiry: 86400000, // 24 hours in milliseconds
       proxy: null,
       timeout: 120000, // 2 minutes for large files
       retries: 3,
-      customPrompts: {},
-      excludeFiles: ['*.log', '*.tmp', 'node_modules/**', '.git/**', 'dist/**', 'build/**'],
       // Security settings
       sanitize: true, // Auto-redact secrets and PII before sending to AI
-      redactionLog: true, // Log what was redacted for transparency
-
-      commitTypes: [
-        'feat',
-        'fix',
-        'docs',
-        'style',
-        'refactor',
-        'perf',
-        'test',
-        'chore',
-        'ci',
-        'build',
-      ],
-      scopes: [],
-      templates: {
-        conventional: '{type}({scope}): {description}',
-        simple: '{description}',
-        detailed: '{type}({scope}): {description}\n\n{body}',
-      },
-
-      // Diff categorization thresholds
-      categorization: {
-        small: {
-          tokens: 100,
-          files: 2,
-          entities: 5,
-        },
-        medium: {
-          tokens: 2000,
-          files: 10,
-          entities: 20,
-        },
-      },
     };
   }
 
@@ -94,34 +55,13 @@ class ConfigManager {
       apiKey: Joi.string().allow(null),
       model: Joi.string().allow(null),
       conventionalCommits: Joi.boolean(),
-      language: Joi.string().valid('en', 'es', 'fr', 'de', 'zh', 'ja'),
-      messageCount: Joi.number().integer().min(1).max(10),
       maxTokens: Joi.number().integer().min(50).max(1000),
       temperature: Joi.number().min(0).max(2),
       cache: Joi.boolean(),
-      cacheExpiry: Joi.number().integer().min(0),
       proxy: Joi.string().allow(null),
       timeout: Joi.number().integer().min(1000),
       retries: Joi.number().integer().min(0).max(10),
-      customPrompts: Joi.object(),
-      excludeFiles: Joi.array().items(Joi.string()),
       sanitize: Joi.boolean(),
-      redactionLog: Joi.boolean(),
-      commitTypes: Joi.array().items(Joi.string()),
-      scopes: Joi.array().items(Joi.string()),
-      templates: Joi.object(),
-      categorization: Joi.object({
-        small: Joi.object({
-          tokens: Joi.number().integer().min(0),
-          files: Joi.number().integer().min(1),
-          entities: Joi.number().integer().min(0),
-        }),
-        medium: Joi.object({
-          tokens: Joi.number().integer().min(0),
-          files: Joi.number().integer().min(1),
-          entities: Joi.number().integer().min(0),
-        }),
-      }),
     });
   }
 
@@ -321,18 +261,6 @@ class ConfigManager {
       return config;
     } catch (error) {
       throw new Error(`Failed to get all configuration: ${error.message}`);
-    }
-  }
-
-  /**
-   * Helper function to validate URL format
-   */
-  isValidUrl(string) {
-    try {
-      new URL(string); // eslint-disable-line no-new
-      return true;
-    } catch (_) {
-      return false;
     }
   }
 

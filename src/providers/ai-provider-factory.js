@@ -33,18 +33,6 @@ class AIProviderFactory {
         );
     }
   }
-
-  /**
-   * Validate provider configuration
-   */
-  static async validateProvider(providerName, config) {
-    try {
-      const provider = this.create(providerName);
-      return await provider.validate(config);
-    } catch (error) {
-      throw new Error(`Provider validation failed: ${error.message}`);
-    }
-  }
 }
 
 module.exports = AIProviderFactory;

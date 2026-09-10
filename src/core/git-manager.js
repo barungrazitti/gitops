@@ -64,18 +64,6 @@ class GitManager {
   }
 
   /**
-   * Get unstaged changes diff
-   */
-  async getUnstagedDiff() {
-    try {
-      const diff = await this.git.diff();
-      return diff;
-    } catch (error) {
-      throw new Error(`Failed to get unstaged diff: ${error.message}`);
-    }
-  }
-
-  /**
    * Get commit history for analysis
    */
   async getCommitHistory(limit = 50) {
@@ -258,18 +246,6 @@ class GitManager {
   }
 
   /**
-   * Check if there are staged changes
-   */
-  async hasStagedChanges() {
-    try {
-      const status = await this.git.status();
-      return status.staged.length > 0;
-    } catch (error) {
-      throw new Error(`Failed to check staged changes: ${error.message}`);
-    }
-  }
-
-  /**
    * Commit with message
    */
   async commit(message) {
@@ -372,89 +348,6 @@ class GitManager {
   }
 
   /**
-   * Create a temporary branch for validation workflow
-   */
-  async pushCommits(branch = null, force = false) {
-    try {
-      const targetBranch = branch || (await this.getCurrentBranch());
-
-      // Validate branch name to prevent injection
-      if (targetBranch && !InputSanitizer.validateGitReference(targetBranch)) {
-        throw new Error(`Invalid branch name: ${targetBranch}`);
-      }
-
-      const forceFlag = force ? '--force' : '';
-
-      const result = await this.git.push('origin', targetBranch, forceFlag);
-      return result;
-    } catch (error) {
-      throw new Error(`Failed to push commits: ${error.message}`);
-    }
-  }
-
-  /**
-   * Stash current changes
-   */
-  async stashChanges(message = 'Auto-stash before validation') {
-    try {
-      const sanitizedMessage = InputSanitizer.sanitizeString(message);
-      const result = await this.git.stash(
-        InputSanitizer.sanitizeGitArgs(['push', '-m', sanitizedMessage])
-      );
-      return result;
-    } catch (error) {
-      throw new Error(`Failed to stash changes: ${error.message}`);
-    }
-  }
-
-  /**
-   * Pop stashed changes
-   */
-  async popStash() {
-    try {
-      const result = await this.git.stash(['pop']);
-      return result;
-    } catch (error) {
-      throw new Error(`Failed to pop stash: ${error.message}`);
-    }
-  }
-
-  /**
-   * Check if there are any stashed changes
-   */
-  async hasStash() {
-    try {
-      const stashList = await this.git.stashList();
-      return stashList.all.length > 0;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
-   * Get unstaged files list
-   */
-  async getUnstagedFiles() {
-    try {
-      const status = await this.git.status();
-      return status.modified.concat(status.not_added, status.deleted, status.created);
-    } catch (error) {
-      throw new Error(`Failed to get unstaged files: ${error.message}`);
-    }
-  }
-
-  /**
-   * Reset staged changes
-   */
-  async resetStaged() {
-    try {
-      await this.git.reset(['--mixed']);
-    } catch (error) {
-      throw new Error(`Failed to reset staged changes: ${error.message}`);
-    }
-  }
-
-  /**
    * Check syntax of staged .js files using node --check.
    * Returns { valid: boolean, errors: Array<{file: string, error: string}> }.
    */
@@ -479,25 +372,6 @@ class GitManager {
     }
 
     return { valid: errors.length === 0, errors };
-  }
-
-  /**
-   * Get list of all changed files (staged and unstaged)
-   */
-  async getAllChangedFiles() {
-    try {
-      const status = await this.git.status();
-      const allChanged = [
-        ...status.staged,
-        ...status.modified,
-        ...status.not_added,
-        ...status.deleted,
-        ...status.created,
-      ];
-      return [...new Set(allChanged)]; // Remove duplicates
-    } catch (error) {
-      throw new Error(`Failed to get all changed files: ${error.message}`);
-    }
   }
 }
 

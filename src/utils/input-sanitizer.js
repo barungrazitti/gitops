@@ -2,46 +2,7 @@
  * Input Sanitizer - Utility for sanitizing inputs to prevent injection attacks
  */
 
-const path = require('path');
-
 class InputSanitizer {
-  /**
-   * Sanitize file paths to prevent directory traversal
-   */
-  static sanitizeFilePath(inputPath) {
-    if (!inputPath) return null;
-
-    // Normalize the path to remove .. and . components
-    const normalizedPath = path.normalize(inputPath);
-
-    // Check for directory traversal attempts
-    if (normalizedPath.includes('..')) {
-      throw new Error('Invalid path: Directory traversal detected');
-    }
-
-    // Ensure path starts with a valid character (not absolute path manipulation)
-    if (path.isAbsolute(normalizedPath)) {
-      throw new Error('Invalid path: Absolute paths not allowed');
-    }
-
-    // Prevent certain dangerous patterns
-    const dangerousPatterns = [
-      /[\x00-\x1f\x7f]/, // Control characters
-      /^\s+|\s+$/, // Leading/trailing whitespace
-      /[\r\n]/, // Newline characters (potential command injection)
-      /\.\.\//, // Explicit parent directory references
-      /\/\/+/, // Multiple slashes
-    ];
-
-    for (const pattern of dangerousPatterns) {
-      if (pattern.test(normalizedPath)) {
-        throw new Error(`Invalid path: Contains dangerous pattern: ${pattern}`);
-      }
-    }
-
-    return normalizedPath;
-  }
-
   /**
    * Sanitize git command arguments
    */
@@ -165,38 +126,6 @@ class InputSanitizer {
     }
 
     return true;
-  }
-
-  /**
-   * Sanitize repository URL
-   */
-  static sanitizeRepoUrl(url) {
-    if (typeof url !== 'string') {
-      return url;
-    }
-
-    try {
-      const parsed = new URL(url);
-
-      // Only allow http/https/ssh protocols
-      if (!['http:', 'https:', 'ssh:'].includes(parsed.protocol)) {
-        throw new Error('Invalid protocol');
-      }
-
-      // Basic validation of hostname
-      if (!parsed.hostname || parsed.hostname.length > 255) {
-        throw new Error('Invalid hostname');
-      }
-
-      // Check for suspicious patterns in URL
-      if (parsed.href.includes(';') || parsed.href.includes('&') || parsed.href.includes('|')) {
-        throw new Error('Suspicious characters in URL');
-      }
-
-      return parsed.href;
-    } catch (error) {
-      throw new Error(`Invalid repository URL: ${error.message}`);
-    }
   }
 }
 

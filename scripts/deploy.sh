@@ -82,8 +82,8 @@ fi
 
 # Check if binaries are executable
 print_status "Checking binary permissions..."
-if [ -f "./bin/aicommit.js" ]; then
-    chmod +x ./bin/aicommit.js
+if [ -f "./bin/aic.js" ]; then
+    chmod +x ./bin/aic.js
     print_status "✅ Binary permissions set"
 else
     print_error "❌ Binary not found"

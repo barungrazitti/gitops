@@ -57,8 +57,8 @@ console.log('✅ package.json validation passed');
 
 # Check binary files
 print_status "Checking binary files..."
-if [ -f "./bin/aicommit.js" ]; then
-    chmod +x ./bin/aicommit.js
+if [ -f "./bin/aic.js" ]; then
+    chmod +x ./bin/aic.js
     print_status "✅ Binary files ready"
 else
     print_error "❌ Binary file not found"
