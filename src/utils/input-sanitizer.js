@@ -111,10 +111,14 @@ class InputSanitizer {
     // Remove potential command injection characters
     sanitized = sanitized.replace(/[;&|$`]/g, '');
 
-    // Remove newlines that could break git commands
-    sanitized = sanitized.replace(/[\r\n]+/g, ' ');
+    // Preserve newlines – they are part of a proper multi‑line commit body.
+    // However, strip trailing whitespace on each line to keep the git command safe.
+    sanitized = sanitized
+      .split(/\r?\n/)
+      .map(l => l.trimEnd())
+      .join('\n');
 
-    // Limit length to prevent oversized commits
+    // Limit length to prevent oversized commits (raw body length).
     if (sanitized.length > 1000) {
       sanitized = sanitized.substring(0, 1000);
     }

@@ -114,6 +114,62 @@ class DiffShaper {
   }
 
   /**
+   * Filter out lockfiles and generated dependency files from a diff.
+   * These files are large but semantically just "dependency update".
+   */
+  filterLockfiles(diff) {
+    if (!diff) return '';
+
+    const LOCKFILE_PATTERNS = [
+      'package-lock.json',
+      'yarn.lock',
+      'pnpm-lock.yaml',
+      'Gemfile.lock',
+      'composer.lock',
+      'Pipfile.lock',
+      'poetry.lock',
+      'Cargo.lock',
+      'go.sum',
+    ];
+
+    const blocks = this.splitDiffIntoFileBlocks(diff);
+    const kept = [];
+
+    for (const block of blocks) {
+      const isLockfile = LOCKFILE_PATTERNS.some(pattern => block.fileName.endsWith(pattern));
+      if (isLockfile) {
+        console.log(chalk.gray(`🗑️  Skipping lockfile: ${block.fileName}`));
+        continue;
+      }
+      kept.push(block.raw);
+    }
+
+    return kept.join('\n');
+  }
+
+  /**
+   * Check if a diff contains only whitespace changes (no actual code changes).
+   * Returns true only if ALL changed lines are whitespace-only.
+   */
+  isWhitespaceOnly(diff) {
+    if (!diff) return false;
+
+    const lines = diff.split('\n');
+    const changeLines = lines.filter(
+      line => (line.startsWith('+') || line.startsWith('-')) && !line.startsWith('+++') && !line.startsWith('---')
+    );
+
+    // If there are no change lines at all, this isn't a whitespace-only diff
+    // (it might be a header-only diff like a rename)
+    if (changeLines.length === 0) return false;
+
+    return changeLines.every(line => {
+      const content = line.slice(1);
+      return content.trim().length === 0;
+    });
+  }
+
+  /**
    * Intelligent diff management for optimal AI generation.
    * Smart truncation that preserves file headers and prioritizes significant changes.
    * @param {string} diff - The full git diff content.
@@ -123,7 +179,14 @@ class DiffShaper {
   manageDiffForAI(diff, options = {}) {
     // Filter out binary/media files first
     const filteredDiff = this.filterBinaryFiles(diff);
-    const diffSize = filteredDiff.length;
+
+    // Filter out lockfiles (they're huge but semantically just "dependency update")
+    const noLockfiles = this.filterLockfiles(filteredDiff);
+
+    // Detect whitespace-only changes
+    const whitespaceOnly = this.isWhitespaceOnly(noLockfiles);
+
+    const diffSize = noLockfiles.length;
     // ~3K tokens for the diff; leaves ~1.5K token headroom for prompt template
     // overhead (~475–750 tokens), system prompt, and output within Groq's 6K TPM budget.
     const MAX_SAFE_SIZE = 12000;
@@ -131,7 +194,7 @@ class DiffShaper {
 
     // Everything was binary/asset content: nothing left for the AI to analyze.
     // Synthesize a message locally instead of sending an empty prompt.
-    if (diff && filteredDiff.trim().length === 0) {
+    if (diff && noLockfiles.trim().length === 0) {
       const binaryFiles = this.extractBinaryFileSummary(diff);
       const fileList = binaryFiles.map(f => f.fileName).join(', ') || 'binary files';
       return {
@@ -148,10 +211,26 @@ class DiffShaper {
       };
     }
 
+    // Whitespace-only changes: classify as style, skip AI.
+    if (whitespaceOnly) {
+      return {
+        strategy: 'whitespace-only',
+        data: '',
+        chunks: null,
+        info: {
+          strategy: 'whitespace-only',
+          size: 0,
+          chunks: 1,
+          reasoning: 'Whitespace-only changes detected; classified as style',
+          whitespaceOnly: true,
+        },
+      };
+    }
+
     if (diffSize <= MAX_SAFE_SIZE) {
       return {
         strategy: 'full',
-        data: filteredDiff,
+        data: noLockfiles,
         chunks: null,
         info: {
           strategy: 'full',
@@ -169,7 +248,7 @@ class DiffShaper {
       )
     );
 
-    const smartTruncated = this.smartTruncateDiff(filteredDiff, MAX_SAFE_SIZE, context);
+    const smartTruncated = this.smartTruncateDiff(noLockfiles, MAX_SAFE_SIZE, context);
     return {
       strategy: 'smart-truncated',
       data: smartTruncated.data,
@@ -980,9 +1059,6 @@ class DiffShaper {
       `-${clip(oldRegion)}`,
       `+${clip(newRegion)}`,
     ].join('\n');
-
-    const oldFile = pair.deleted.fileName.split('/').pop();
-    const newFile = pair.added.fileName.split('/').pop();
 
     return {
       header: `diff --git a/${pair.deleted.fileName} b/${pair.added.fileName}`,

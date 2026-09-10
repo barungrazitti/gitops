@@ -23,7 +23,7 @@ Use conventional format: type(scope): description
 );
 
 function buildSmallDiffPrompt(options) {
-  const { category, entityList, entityCount, conventional, context } = options;
+  const { category, entityList, entityCount: _entityCount, conventional, context } = options;
 
   let prompt = smallDiffTemplate({ category, entityList });
 

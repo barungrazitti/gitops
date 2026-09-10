@@ -144,7 +144,7 @@ describe('AICommitGenerator', () => {
 
     it('should re-generate from scratch on regenerate, bypassing cache', async () => {
       generator.cacheManager.getValidated = jest.fn().mockResolvedValue(mockMessages);
-      const firstBatch = ['feat: cached message'];
+      const _firstBatch = ['feat: cached message'];
       const secondBatch = ['fix: regenerated message'];
       generator.generationPipeline.generate = jest
         .fn()

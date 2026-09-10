@@ -251,7 +251,7 @@ RESOLVED CODE (output only):
     const filePattern = /diff --git a\/(.+?) b\/(.+)/g;
     const files = [];
     let match;
-    while ((match = filePattern.exec(diff)) !== null) {
+    while ((match = filePattern.exec(diff)) !== null) { // eslint-disable-line no-cond-assign
       files.push({ fileA: match[1], fileB: match[2] });
     }
 

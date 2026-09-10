@@ -119,10 +119,8 @@ class MessageValidator {
     }
 
     // Check for specific technical terms (reward specificity)
-    let hasSpecificTerms = false;
     for (const pattern of this.specificPatterns) {
       if (pattern.test(trimmed)) {
-        hasSpecificTerms = true;
         score += 15;
         break;
       }

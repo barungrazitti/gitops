@@ -296,8 +296,21 @@ class GenerationPipeline {
     }
 
     const blocks = content.split(/\n\s*\n/).map(block => block.trim()).filter(block => block.length > 0);
-    return blocks.filter(block => {
-      const firstLine = block.split('\n')[0];
+
+    // Merge continuation blocks (bullet bodies, Refs trailers) into the
+    // previous message so multi-line commits survive as ONE candidate.
+    const messages = [];
+    for (const block of blocks) {
+      const isContinuation = /^(-|Refs?:|Co-authored-by:)/i.test(block);
+      if (isContinuation && messages.length > 0) {
+        messages[messages.length - 1] += `\n\n${block}`;
+      } else {
+        messages.push(block);
+      }
+    }
+
+    return messages.filter(message => {
+      const firstLine = message.split('\n')[0];
       return firstLine.length >= 10 && firstLine.length <= 200;
     });
   }

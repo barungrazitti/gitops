@@ -13,7 +13,6 @@ require('dotenv').config({
   path: path.resolve(__dirname, '..', '..', '.env'),
 });
 
-const fs = require('fs-extra');
 const Joi = require('joi');
 
 class ConfigManager {
@@ -376,7 +375,7 @@ class ConfigManager {
    */
   isValidUrl(string) {
     try {
-      new URL(string);
+      new URL(string); // eslint-disable-line no-new
       return true;
     } catch (_) {
       return false;

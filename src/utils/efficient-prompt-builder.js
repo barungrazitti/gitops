@@ -276,7 +276,7 @@ ${diff}
 
 REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE${count > 1 ? 'S' : ''}. NO WARNINGS. NO INSTRUCTIONS. NO DEPLOYMENT ADVICE.
 
-${count > 1 ? `${count} distinct commit messages, one per line:` : 'Single best commit message:'}`;
+    ${count > 1 ? `${count} distinct commit messages, each separated by one blank line:` : 'Single best commit message:'}`;
 
     // Apply context line limiting for small diffs (owned by DiffShaper)
     if (options.diffCategory && options.diffCategory.category === 'small') {

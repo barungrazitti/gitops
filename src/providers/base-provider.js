@@ -83,7 +83,7 @@ class BaseProvider {
           willRetry: attempt < maxRetries - 1,
         });
         if (attempt < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, delay * 2 ** attempt));
+          await new Promise(resolve => { setTimeout(resolve, delay * 2 ** attempt); });
         } else {
           throw error;
         }

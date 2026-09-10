@@ -66,7 +66,7 @@ class MetricsScorer {
       return { isConventional: false, issues };
     }
 
-    const [full, type, scope, description] = match;
+    const [, type, scope, description] = match;
 
     if (!ALLOWED_TYPES.includes(type)) {
       issues.push(`Invalid type "${type}". Allowed: ${ALLOWED_TYPES.join(', ')}`);

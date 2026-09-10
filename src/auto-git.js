@@ -6,7 +6,7 @@
 const chalk = require('chalk');
 const inquirer = require('inquirer');
 const ora = require('ora');
-const { DIFF_MARKER_REGEX, languageForFile } = require('./core/conflict-resolver');
+const { DIFF_MARKER_REGEX } = require('./core/conflict-resolver');
 
 class AutoGit {
   // Cap on rebase --continue rounds: each round replays remaining commits and
@@ -81,6 +81,12 @@ class AutoGit {
 
       // Step 3: Stage all changes (if not already staged)
       await this.stageChanges();
+
+      // Step 3.5: Syntax check staged .js files
+      if (!options.skipSyntaxCheck) {
+        const syntaxOk = await this.syntaxCheck();
+        if (!syntaxOk) return;
+      }
 
       // Step 4: Generate or use provided commit message
       let commitMessage;
@@ -201,6 +207,43 @@ class AutoGit {
     } catch (error) {
       this.spinner.fail('Failed to stage changes');
       throw error;
+    }
+  }
+
+  /**
+   * Check syntax of staged .js files
+   */
+  async syntaxCheck() {
+    this.spinner.start('Checking syntax of staged .js files...');
+    try {
+      const { valid, errors } = await this.gitManager.syntaxCheck();
+      if (!valid) {
+        this.spinner.fail(`${errors.length} file(s) have syntax errors`);
+        console.log(chalk.red('\n❌ Syntax errors found in staged files:\n'));
+        for (const { file, error } of errors) {
+          console.log(chalk.yellow(`  ${file}:`));
+          console.log(`    ${error}\n`);
+        }
+        const { continueAnyway } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'continueAnyway',
+            message: 'Continue with commit despite syntax errors?',
+            default: false,
+          },
+        ]);
+        if (!continueAnyway) {
+          await this.activityLogger.info('auto_git_cancelled', { reason: 'syntax_errors' });
+          return false;
+        }
+        await this.activityLogger.warn('syntax_check_continued', { errors });
+      } else {
+        this.spinner.succeed('Syntax check passed');
+      }
+      return true;
+    } catch (error) {
+      console.log(chalk.gray('ℹ Syntax check skipped (node not available)'));
+      return true;
     }
   }
 

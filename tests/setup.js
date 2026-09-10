@@ -71,5 +71,5 @@ index 0000000..1234567
   }),
 
   // Helper to wait for async operations
-  wait: (ms = 100) => new Promise(resolve => setTimeout(resolve, ms)),
+  wait: (ms = 100) => new Promise(resolve => { setTimeout(resolve, ms); }),
 };

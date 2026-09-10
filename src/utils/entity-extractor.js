@@ -92,7 +92,7 @@ class EntityExtractor {
     for (const pattern of this.functionPatterns) {
       const regex = new RegExp(pattern.source, 'g');
       let match;
-      while ((match = regex.exec(diff)) !== null) {
+      while ((match = regex.exec(diff)) !== null) { // eslint-disable-line no-cond-assign
         const name = match[1];
         if (name && !FALSE_POSITIVES.has(name) && name.length > 1) {
           functions.add(name);
@@ -109,7 +109,7 @@ class EntityExtractor {
     for (const pattern of this.classPatterns) {
       const regex = new RegExp(pattern.source, 'g');
       let match;
-      while ((match = regex.exec(diff)) !== null) {
+      while ((match = regex.exec(diff)) !== null) { // eslint-disable-line no-cond-assign
         const name = match[1];
         if (name && !FALSE_POSITIVES.has(name) && name.length > 1) {
           classes.add(name);
@@ -126,7 +126,7 @@ class EntityExtractor {
     for (const pattern of this.variablePatterns) {
       const regex = new RegExp(pattern.source, 'g');
       let match;
-      while ((match = regex.exec(diff)) !== null) {
+      while ((match = regex.exec(diff)) !== null) { // eslint-disable-line no-cond-assign
         const name = match[1];
         if (name && !FALSE_POSITIVES.has(name) && name.length > 1) {
           variables.add(name);

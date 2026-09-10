@@ -113,6 +113,7 @@ program
   .option('-n, --no-push', "Don't push after commit")
   .option('--dry-run', 'Show what would be done without executing')
   .option('--enterprise-mode', 'Block commits with ANY sensitive data (strict security)')
+  .option('--skip-syntax-check', 'Skip syntax checking of staged .js files')
   .action(async (message, options) => {
     try {
       const { gitManager, analysisEngine, configManager, activityLogger, generationPipeline, conflictResolver } = buildGenerator();

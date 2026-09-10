@@ -112,7 +112,7 @@ class DiffSummarizer {
     return changes;
   }
 
-  combineSummaries(summaries, conventional = false) {
+  combineSummaries(summaries, _conventional = false) {
     if (!summaries || summaries.length === 0) {
       return {
         combined: '',

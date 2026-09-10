@@ -252,7 +252,7 @@ index acd6a14108..e1765113af 100644
 
       expect(prompt).toContain('Generate 3 precise commit messages for this git diff');
       expect(prompt).toContain('DIFFERENT emphasis');
-      expect(prompt).toContain('3 distinct commit messages, one per line:');
+      expect(prompt).toContain('3 distinct commit messages, each separated by one blank line:');
       expect(prompt).not.toContain('Single best commit message:');
     });
 

@@ -24,7 +24,8 @@ class MessageFormatter {
 
     const type = options.type || this.inferType(message);
     const scope = options.scope || this.inferScope(message, options.context);
-    const conventional = type + (scope ? `(${scope})` : '') + ': ';
+    const breaking = options.breaking ? '!' : '';
+    const conventional = type + (scope ? `(${scope})` : '') + breaking + ': ';
     return conventional + this.cleanDescription(message);
   }
 
@@ -32,7 +33,8 @@ class MessageFormatter {
    * Check if message is already in conventional format
    */
   isConventionalFormat(message) {
-    return /^(\w+)(\(.+\))?: .+/.test(message);
+    // Matches: type(scope): desc, type!: desc, type(scope)!: desc
+    return /^(\w+)(\(.+\))?!?: .+/.test(message);
   }
 
   /**
@@ -111,7 +113,7 @@ class MessageFormatter {
    */
   cleanupFormatting(message) {
     return message
-      .replace(/\s+/g, ' ')
+      .replace(/[^\S\n]+/g, ' ')
       .replace(/\n\s*\n\s*\n/g, '\n\n')
       .trim();
   }
@@ -128,12 +130,21 @@ class MessageFormatter {
     }
     const trimmed = message.trim();
     const title = trimmed.split('\n')[0];
+    const body = trimmed.split('\n').slice(1).join('\n');
     if (title.length === 0) errors.push('Title cannot be empty');
     else if (title.length > 72) warnings.push('Title should be 72 characters or less');
     if (options.conventional && !this.isConventionalFormat(title)) {
       errors.push('Conventional commit format required: type(scope): description');
     }
     if (title.endsWith('.')) warnings.push('Title should not end with a period');
+
+    // Breaking change detection
+    const hasBreakingFooter = /BREAKING[- ]CHANGE:/i.test(body);
+    const hasBreakingBang = /!\s*:\s*/.test(title);
+    if (hasBreakingFooter && !hasBreakingBang) {
+      warnings.push('Breaking change footer found but title missing ! marker');
+    }
+
     return { valid: errors.length === 0, errors, warnings };
   }
 
@@ -153,7 +164,7 @@ class MessageFormatter {
     ];
     for (const pattern of invalid) if (pattern.test(trimmed)) return false;
     const valid = [
-      /^(\w+)(\(.+\))?: .+/,
+      /^(\w+)(\(.+\))?!?: .+/,
       /^(add|fix|remove|update|create|delete|implement|refactor)/i,
     ];
     return valid.some(p => p.test(trimmed));
@@ -165,13 +176,24 @@ class MessageFormatter {
   calculateRelevanceScore(message) {
     let score = 50;
     const trimmed = message.toLowerCase().trim();
-    if (/^\w+\(\w+\):/.test(message)) score += 15;
+    if (/^\w+\(\w+\)!?:/.test(message)) score += 15;
     const actions = ['add', 'fix', 'remove', 'update', 'improve', 'optimize', 'refactor'];
     if (actions.some(w => trimmed.includes(w))) score += 10;
     if (/\((auth|api|ui|db|config|theme|plugin|utils|test)\)/.test(message)) score += 10;
+    if (/!/.test(message.split(':')[0])) score += 5; // breaking change bonus
     const vague = ['update', 'change', 'modify', 'improve'];
     score -= vague.filter(t => trimmed.includes(t)).length * 5;
     return Math.max(0, Math.min(100, score));
+  }
+
+  /**
+   * Detect if a diff indicates a breaking change.
+   * Returns true if the diff contains deprecation, removal, API change, or interface change signals.
+   */
+  detectBreaking(diff) {
+    if (!diff || typeof diff !== 'string') return false;
+    const lower = diff.toLowerCase();
+    return /breaking|deprecat|remove|delete.*function|throw.*error|interface.*change/i.test(lower);
   }
 }
 

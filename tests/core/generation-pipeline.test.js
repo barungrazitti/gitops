@@ -280,5 +280,29 @@ fix: unrelated message
       expect(pipeline.parseCommitMessages(undefined)).toEqual([]);
       expect(pipeline.parseCommitMessages(42)).toEqual([]);
     });
+
+    it('keeps title + bullet body + Refs as ONE multi-line message', () => {
+      const raw = `feat(theme): add Marketo modal enhancements
+
+- Add validation before submit
+- Load widget scripts eagerly
+
+Refs: #123`;
+      expect(pipeline.parseCommitMessages(raw)).toEqual([raw.trim()]);
+    });
+
+    it('separates two multi-line messages by their titles', () => {
+      const raw = `feat(theme): add modal
+
+- bullet one
+
+fix(core): load eagerly
+
+- bullet two`;
+      expect(pipeline.parseCommitMessages(raw)).toEqual([
+        'feat(theme): add modal\n\n- bullet one',
+        'fix(core): load eagerly\n\n- bullet two',
+      ]);
+    });
   });
 });

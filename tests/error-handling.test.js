@@ -80,7 +80,7 @@ describe('AICommitGenerator Error Handling', () => {
       // Mock a slow AI provider
       const mockProvider = {
         generateResponse: jest.fn().mockImplementation(
-          () => new Promise(resolve => setTimeout(() => resolve(''), 100)) // 100ms delay
+          () => new Promise(resolve => { setTimeout(() => resolve(''), 100); }) // 100ms delay
         ),
       };
 

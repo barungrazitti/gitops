@@ -431,6 +431,33 @@ class GitManager {
   }
 
   /**
+   * Check syntax of staged .js files using node --check.
+   * Returns { valid: boolean, errors: Array<{file: string, error: string}> }.
+   */
+  async syntaxCheck() {
+    const { execFile } = require('child_process');
+    const { promisify } = require('util');
+    const execFileAsync = promisify(execFile);
+
+    const files = await this.getStagedFiles();
+    const jsFiles = files.filter(f => f.endsWith('.js'));
+    const errors = [];
+
+    for (const file of jsFiles) {
+      try {
+        await execFileAsync('node', ['--check', file]);
+      } catch (err) {
+        errors.push({
+          file,
+          error: (err.stderr || err.message || '').trim(),
+        });
+      }
+    }
+
+    return { valid: errors.length === 0, errors };
+  }
+
+  /**
    * Get list of all changed files (staged and unstaged)
    */
   async getAllChangedFiles() {
