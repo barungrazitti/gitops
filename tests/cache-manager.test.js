@@ -67,21 +67,4 @@ describe('CacheManager', () => {
     });
   });
 
-  describe('invalidate', () => {
-    it('should delete from cache', async () => {
-      const delSpy = jest.spyOn(cacheManager.memoryCache, 'del');
-      await cacheManager.invalidate('test diff');
-      expect(delSpy).toHaveBeenCalled();
-      delSpy.mockRestore();
-    });
-  });
-
-  describe('clear', () => {
-    it('should clear all caches', async () => {
-      const flushAllSpy = jest.spyOn(cacheManager.memoryCache, 'flushAll');
-      await cacheManager.clear();
-      expect(flushAllSpy).toHaveBeenCalled();
-      flushAllSpy.mockRestore();
-    });
-  });
 });

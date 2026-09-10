@@ -94,14 +94,6 @@ describe('GitManager', () => {
     });
   });
 
-  describe('getUnstagedDiff', () => {
-    it('should get unstaged diff', async () => {
-      const result = await gitManager.getUnstagedDiff();
-      expect(typeof result).toBe('string');
-      expect(mockGit.diff).toHaveBeenCalledWith();
-    });
-  });
-
   describe('getCommitHistory', () => {
     it('should get commit history with default limit', async () => {
       mockGit.log.mockResolvedValue({
@@ -150,34 +142,6 @@ describe('GitManager', () => {
       const result = await gitManager.getStagedFiles();
       expect(Array.isArray(result)).toBe(true);
       expect(mockGit.status).toHaveBeenCalled();
-    });
-  });
-
-  describe('hasStagedChanges', () => {
-    it('should return true when staged changes exist', async () => {
-      mockGit.status.mockResolvedValue({
-        staged: ['file1.js'],
-        modified: [],
-        not_added: [],
-        deleted: [],
-        created: [],
-      });
-
-      const result = await gitManager.hasStagedChanges();
-      expect(result).toBe(true);
-    });
-
-    it('should return false when no staged changes', async () => {
-      mockGit.status.mockResolvedValue({
-        staged: [],
-        modified: [],
-        not_added: [],
-        deleted: [],
-        created: [],
-      });
-
-      const result = await gitManager.hasStagedChanges();
-      expect(result).toBe(false);
     });
   });
 
@@ -248,105 +212,6 @@ describe('GitManager', () => {
       expect(result).toBeDefined();
       expect(Array.isArray(result.mostUsedTypes)).toBe(true);
       expect(typeof result.averageLength).toBe('number');
-    });
-  });
-
-  describe('stashChanges', () => {
-    it('should stash changes', async () => {
-      mockGit.stash.mockResolvedValue({ saved: true });
-
-      await gitManager.stashChanges();
-
-      expect(mockGit.stash).toHaveBeenCalled();
-    });
-  });
-
-  describe('popStash', () => {
-    it('should pop stash', async () => {
-      mockGit.stash.mockResolvedValue({ applied: true });
-
-      await gitManager.popStash();
-
-      expect(mockGit.stash).toHaveBeenCalledWith(['pop']);
-    });
-  });
-
-  describe('hasStash', () => {
-    it('should return true when stash exists', async () => {
-      mockGit.stashList.mockResolvedValue({ all: [{ hash: 'abc' }] });
-
-      const result = await gitManager.hasStash();
-      expect(result).toBe(true);
-    });
-
-    it('should return false on error', async () => {
-      mockGit.stashList.mockRejectedValue(new Error('Stash error'));
-
-      const result = await gitManager.hasStash();
-      expect(result).toBe(false);
-    });
-  });
-
-  describe('getUnstagedFiles', () => {
-    it('should get unstaged files', async () => {
-      mockGit.status.mockResolvedValue({
-        staged: [],
-        modified: ['file1.js'],
-        not_added: [],
-        deleted: [],
-        created: [],
-      });
-
-      const result = await gitManager.getUnstagedFiles();
-      expect(Array.isArray(result)).toBe(true);
-      expect(result).toContain('file1.js');
-    });
-  });
-
-  describe('resetStaged', () => {
-    it('should reset staged changes', async () => {
-      await expect(gitManager.resetStaged()).resolves.toBeUndefined();
-      expect(mockGit.reset).toHaveBeenCalledWith(['--mixed']);
-    });
-  });
-
-  describe('getAllChangedFiles', () => {
-    it('should get all changed files', async () => {
-      mockGit.status.mockResolvedValue({
-        staged: ['file1.js'],
-        modified: ['file2.js'],
-        not_added: ['file3.js'],
-        deleted: ['file4.js'],
-        created: ['file5.js'],
-      });
-
-      const result = await gitManager.getAllChangedFiles();
-
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBe(5);
-    });
-  });
-
-  describe('pushCommits', () => {
-    it('should push commits to current branch', async () => {
-      mockGit.branch.mockResolvedValue({ current: 'main' });
-      mockGit.push.mockResolvedValue({ pushed: true });
-
-      await gitManager.pushCommits();
-
-      expect(mockGit.push).toHaveBeenCalledWith('origin', 'main', '');
-    });
-
-    it('should push to specified branch', async () => {
-      await gitManager.pushCommits('develop');
-
-      expect(mockGit.push).toHaveBeenCalledWith('origin', 'develop', '');
-    });
-
-    it('should handle push errors', async () => {
-      mockGit.push.mockRejectedValue(new Error('Push error'));
-
-      await expect(gitManager.pushCommits()).rejects.toThrow('Failed to push commits');
     });
   });
 

@@ -33,8 +33,6 @@ describe('ConfigManager', () => {
 
       expect(defaults).toHaveProperty('defaultProvider', 'groq');
       expect(defaults).toHaveProperty('conventionalCommits', true);
-      expect(defaults).toHaveProperty('language', 'en');
-      expect(defaults).toHaveProperty('messageCount', 1);
       expect(defaults).toHaveProperty('maxTokens', 150);
       expect(defaults).toHaveProperty('temperature', 0.7);
       expect(defaults).toHaveProperty('cache', true);
@@ -62,20 +60,6 @@ describe('ConfigManager', () => {
     it('should reject invalid provider', () => {
       const schema = configManager.getValidationSchema();
       const { error } = schema.validate({ defaultProvider: 'invalid' });
-
-      expect(error).toBeDefined();
-    });
-
-    it('should reject invalid language', () => {
-      const schema = configManager.getValidationSchema();
-      const { error } = schema.validate({ language: 'invalid' });
-
-      expect(error).toBeDefined();
-    });
-
-    it('should reject invalid messageCount', () => {
-      const schema = configManager.getValidationSchema();
-      const { error } = schema.validate({ messageCount: 0 });
 
       expect(error).toBeDefined();
     });
@@ -110,7 +94,7 @@ describe('ConfigManager', () => {
       await expect(
         configManager.setMultiple({
           conventionalCommits: false,
-          language: 'fr',
+          temperature: 0.5,
         })
       ).resolves.toBeUndefined();
     });

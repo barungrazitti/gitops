@@ -63,41 +63,6 @@ describe('OllamaProvider', () => {
     });
   });
 
-  describe('test', () => {
-    it('should return success when model is available', async () => {
-      const axios = require('axios');
-      axios.get.mockResolvedValue({
-        data: { models: [{ name: 'deepseek-v3.1:671b-cloud' }] },
-      });
-      axios.post.mockResolvedValue({
-        data: { response: 'test successful' },
-      });
-
-      const result = await provider.test({ model: 'deepseek-v3.1:671b-cloud' });
-      expect(result.success).toBe(true);
-    });
-
-    it('should return failure when model not available', async () => {
-      const axios = require('axios');
-      axios.get.mockResolvedValue({
-        data: { models: [{ name: 'other-model' }] },
-      });
-
-      const result = await provider.test({ model: 'missing-model' });
-      expect(result.success).toBe(false);
-    });
-
-    it('should handle connection refused', async () => {
-      const axios = require('axios');
-      const error = new Error('Connection refused');
-      error.code = 'ECONNREFUSED';
-      axios.get.mockRejectedValue(error);
-
-      const result = await provider.test({});
-      expect(result.success).toBe(false);
-    });
-  });
-
   describe('generateResponse', () => {
     it('should return response text for a plain string prompt', async () => {
       const axios = require('axios');

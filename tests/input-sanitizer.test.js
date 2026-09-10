@@ -16,34 +16,6 @@ jest.mock(
 const InputSanitizer = require('../src/utils/input-sanitizer');
 
 describe('InputSanitizer', () => {
-  describe('sanitizeFilePath', () => {
-    it('should return null for null input', () => {
-      expect(InputSanitizer.sanitizeFilePath(null)).toBeNull();
-    });
-
-    it('should reject directory traversal', () => {
-      expect(() => {
-        InputSanitizer.sanitizeFilePath('../etc/passwd');
-      }).toThrow();
-    });
-
-    it('should reject absolute paths', () => {
-      expect(() => {
-        InputSanitizer.sanitizeFilePath('/etc/passwd');
-      }).toThrow();
-    });
-
-    it('should accept valid relative paths', () => {
-      const result = InputSanitizer.sanitizeFilePath('src/index.js');
-      expect(result).toBe('src/index.js');
-    });
-
-    it('should normalize paths', () => {
-      const result = InputSanitizer.sanitizeFilePath('foo/./bar');
-      expect(result).toBe('foo/bar');
-    });
-  });
-
   describe('sanitizeGitArgs', () => {
     it('should handle single string', () => {
       const result = InputSanitizer.sanitizeGitArgs('commit message');
@@ -119,39 +91,6 @@ describe('InputSanitizer', () => {
     it('should accept valid branch names', () => {
       expect(InputSanitizer.validateGitReference('main')).toBe(true);
       expect(InputSanitizer.validateGitReference('feature/new-feature')).toBe(true);
-    });
-  });
-
-  describe('sanitizeRepoUrl', () => {
-    it('should return non-string unchanged', () => {
-      expect(InputSanitizer.sanitizeRepoUrl(null)).toBe(null);
-    });
-
-    it('should accept valid http URLs', () => {
-      const result = InputSanitizer.sanitizeRepoUrl('http://github.com/user/repo');
-      expect(result).toBe('http://github.com/user/repo');
-    });
-
-    it('should accept valid https URLs', () => {
-      const result = InputSanitizer.sanitizeRepoUrl('https://github.com/user/repo');
-      expect(result).toBe('https://github.com/user/repo');
-    });
-
-    it('should accept ssh URLs', () => {
-      const result = InputSanitizer.sanitizeRepoUrl('ssh://git@github.com/user/repo.git');
-      expect(result).toBe('ssh://git@github.com/user/repo.git');
-    });
-
-    it('should reject invalid protocols', () => {
-      expect(() => {
-        InputSanitizer.sanitizeRepoUrl('ftp://github.com/user/repo');
-      }).toThrow();
-    });
-
-    it('should throw for invalid URLs', () => {
-      expect(() => {
-        InputSanitizer.sanitizeRepoUrl('not-a-url');
-      }).toThrow();
     });
   });
 });

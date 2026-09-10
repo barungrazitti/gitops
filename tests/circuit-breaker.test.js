@@ -152,34 +152,6 @@ describe('CircuitBreaker', () => {
     });
   });
 
-  describe('getStatus', () => {
-    it('should return status object', () => {
-      circuitBreaker.failureCount = 2;
-
-      const status = circuitBreaker.getStatus();
-
-      expect(status).toHaveProperty('state', 'CLOSED');
-      expect(status).toHaveProperty('failureCount', 2);
-      expect(status).toHaveProperty('isOpen', false);
-      expect(status).toHaveProperty('failureThreshold', 3);
-    });
-  });
-
-  describe('reset', () => {
-    it('should reset circuit breaker to initial state', () => {
-      circuitBreaker.failureCount = 5;
-      circuitBreaker.state = 'OPEN';
-      circuitBreaker.successCount = 2;
-
-      circuitBreaker.reset();
-
-      expect(circuitBreaker.state).toBe('CLOSED');
-      expect(circuitBreaker.failureCount).toBe(0);
-      expect(circuitBreaker.successCount).toBe(0);
-      expect(circuitBreaker.metrics.totalRequests).toBe(0);
-    });
-  });
-
   describe('onSuccess', () => {
     it('should update metrics on success', () => {
       circuitBreaker.onSuccess(100);

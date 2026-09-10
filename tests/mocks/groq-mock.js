@@ -1,27 +1,16 @@
 /**
- * Mock for groq-sdk
+ * Mock for groq-sdk module
  */
 
-class Groq {
-  constructor(options) {
-    this.apiKey = options?.apiKey;
-  }
-
-  get chat() {
-    return {
+class MockGroq {
+  constructor() {
+    this.chat = {
       completions: {
-        create: async _options => ({
-          choices: [
-            {
-              message: {
-                content: 'Mock commit message from Groq',
-              },
-            },
-          ],
-        }),
+        create: jest.fn(),
       },
     };
   }
 }
 
-module.exports = Groq;
+module.exports = MockGroq;
+module.exports.default = MockGroq;
