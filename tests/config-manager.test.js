@@ -162,4 +162,68 @@ describe('ConfigManager', () => {
       expect(result.a).toBe(1);
     });
   });
+
+  describe('.env / environment overrides', () => {
+    const ENV_KEYS = ['GROQ_API_KEY', 'AIC_MODEL', 'AIC_PROVIDER'];
+    const savedEnv = {};
+
+    beforeEach(() => {
+      ENV_KEYS.forEach(key => {
+        savedEnv[key] = process.env[key];
+        delete process.env[key];
+      });
+      jest.clearAllMocks();
+      configManager = new ConfigManager();
+    });
+
+    afterEach(() => {
+      ENV_KEYS.forEach(key => {
+        if (savedEnv[key] === undefined) {
+          delete process.env[key];
+        } else {
+          process.env[key] = savedEnv[key];
+        }
+      });
+    });
+
+    it('applies GROQ_API_KEY from env without persisting it to the store', async () => {
+      process.env.GROQ_API_KEY = 'gsk_env_test';
+
+      const result = await configManager.load();
+
+      expect(result.apiKey).toBe('gsk_env_test');
+      // Env values are never written back to the conf store (AGENTS.md rule 6)
+      expect(configManager.config.set).not.toHaveBeenCalledWith(
+        'apiKey',
+        'gsk_env_test'
+      );
+    });
+
+    it('applies AIC_MODEL from env', async () => {
+      process.env.AIC_MODEL = 'llama-3.1-8b-instant';
+
+      const result = await configManager.load();
+
+      expect(result.model).toBe('llama-3.1-8b-instant');
+    });
+
+    it('applies AIC_PROVIDER from env', async () => {
+      process.env.AIC_PROVIDER = 'ollama';
+
+      const result = await configManager.load();
+
+      expect(result.defaultProvider).toBe('ollama');
+    });
+
+    it('flows store values through unchanged when no env vars are set', async () => {
+      configManager.config.store.apiKey = 'gsk_store_key';
+      configManager.config.store.model = 'store-model';
+
+      const result = await configManager.load();
+
+      expect(result.apiKey).toBe('gsk_store_key');
+      expect(result.model).toBe('store-model');
+      expect(result.defaultProvider).toBe('groq');
+    });
+  });
 });
