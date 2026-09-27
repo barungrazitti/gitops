@@ -303,6 +303,10 @@ class AutoGit {
             return messages[0];
           }
         }
+
+        throw new Error(
+          'Staged changes contain merge-conflict markers that could not be cleaned automatically. Resolve conflicts first (git status), then run again.'
+        );
       }
 
       // Use the main AI commit generator with sequential fallback
