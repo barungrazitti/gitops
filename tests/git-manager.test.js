@@ -409,4 +409,38 @@ describe('GitManager', () => {
       await expect(gitManager.getWorkingDiff()).rejects.toThrow('Failed to get working diff');
     });
   });
+
+  // Real-git integration: the module-level simple-git mock cannot verify
+  // stage syntax, so construct GitManager and swap in a REAL simple-git
+  // instance pointed at a scratch conflicted repo.
+  describe('showIndexSide (real git integration)', () => {
+    it('returns stage 2 (ours) and stage 3 (theirs) content', async () => {
+      const { execSync } = require('child_process');
+      const fs = require('fs-extra');
+      const os = require('os');
+      const path = require('path');
+      const GitManagerReal = require('../src/core/git-manager');
+
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'aic-conflict-'));
+      const git = (cmd) => execSync(`git ${cmd}`, { cwd: dir });
+      git('init -q');
+      git('config user.email t@t.test');
+      git('config user.name t');
+      fs.writeFileSync(path.join(dir, 'f.txt'), 'base\n');
+      git('add .'); git('commit -qm base');
+      git('checkout -qb side');
+      fs.writeFileSync(path.join(dir, 'f.txt'), 'theirs\n');
+      git('add .'); git('commit -qm theirs');
+      git('checkout -q main 2>/dev/null || git checkout -q master');
+      fs.writeFileSync(path.join(dir, 'f.txt'), 'ours\n');
+      git('add .'); git('commit -qm ours');
+      git('merge side || true'); // exits non-zero on conflict — expected
+
+      const gm = new GitManagerReal(dir);
+      gm.git = jest.requireActual('simple-git')(dir);
+      await expect(gm.showIndexSide('f.txt', 'ours')).resolves.toContain('ours');
+      await expect(gm.showIndexSide('f.txt', 'theirs')).resolves.toContain('theirs');
+      fs.removeSync(dir);
+    }, 30000);
+  });
 });

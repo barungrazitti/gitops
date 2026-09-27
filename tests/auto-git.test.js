@@ -391,6 +391,19 @@ describe('AutoGit', () => {
       expect(mockSpinner.fail).toHaveBeenCalledWith('Failed to generate commit message');
     });
 
+    it('should refuse marker-laden diffs when cleanup fails (no fall-through)', async () => {
+      mockGitManager.getStagedDiff.mockResolvedValue(
+        '+<<<<<<< HEAD\n+ours line\n+=======\n+theirs line\n+>>>>>>> side\n'
+      );
+      mockAiCommit.conflictResolver.detectAndCleanupConflictMarkers.mockResolvedValue({
+        cleaned: false,
+      });
+
+      await expect(autoGit.generateCommitMessage()).rejects.toThrow(/merge-conflict markers/);
+
+      expect(mockAiCommit.generateMessages).not.toHaveBeenCalled();
+    });
+
     it('should pass options to AI generator', async () => {
       const options = { provider: 'ollama' };
       mockAiCommit.generateMessages.mockResolvedValue(['test message']);
@@ -592,6 +605,81 @@ describe('AutoGit', () => {
       await expect(autoGit.pullAndMerge()).rejects.toThrow('Merge aborted');
 
       expect(mockGitManager.mergeAbort).toHaveBeenCalled();
+    });
+
+    it('should reach the strategy menu when the conflicting merge pull fails', async () => {
+      mockGitManager.pull.mockRejectedValue(
+        new Error('Automatic merge failed; fix conflicts and then commit the result.')
+      );
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['b.js'] });
+      mockGitManager.commit.mockResolvedValue();
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'keep-mine' });
+
+      // Simulate the real call path: rebase flow opted out into merge fallback.
+      autoGit.syncOperation = 'rebase';
+      await autoGit.pullAndMerge();
+
+      // Merge: keep-mine = ours. The failure must not strand the repo mid-merge.
+      expect(mockGitManager.mergeAbort).not.toHaveBeenCalled();
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('b.js', 'ours');
+      expect(mockGitManager.commit).toHaveBeenCalledWith(
+        'AI-resolved merge conflicts with intelligent merging'
+      );
+    });
+
+    it('should rethrow the pull error when the failed merge has no conflicts', async () => {
+      mockGitManager.pull.mockRejectedValue(new Error('Network error'));
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: [] });
+
+      autoGit.syncOperation = null;
+      await expect(autoGit.pullAndMerge()).rejects.toThrow('Network error');
+
+      expect(inquirer.prompt).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('handleRebaseConflicts (multi-round loop)', () => {
+    it('loops to the next round when rebaseContinue surfaces new conflicts', async () => {
+      autoGit.syncOperation = 'rebase';
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['a.js'] });
+      mockGitManager.rebaseContinue
+        .mockRejectedValueOnce(
+          new Error(
+            'Failed to continue rebase: could not apply abc123... Resolve all conflicts manually, mark them as resolved (git add), and run git rebase --continue.'
+          )
+        )
+        .mockResolvedValueOnce();
+      autoGit.resolveConflictsWithAI = jest.fn().mockResolvedValue();
+
+      inquirer.prompt
+        .mockResolvedValueOnce({ resolutionStrategy: 'ai' })
+        .mockResolvedValueOnce({ resolutionStrategy: 'keep-mine' });
+
+      await autoGit.handleRebaseConflicts(['a.js']);
+
+      // Round 1's failure quoted git's "resolve manually" hint — the loop
+      // must not treat that as a user abort; it continues to round 2.
+      expect(mockGitManager.rebaseContinue).toHaveBeenCalledTimes(2);
+      // Rebase swaps keep-mine → theirs.
+      expect(mockGitManager.checkoutSide).toHaveBeenCalledWith('a.js', 'theirs');
+      expect(mockSpinner.succeed).toHaveBeenCalledWith('Rebase completed with no conflicts');
+    });
+
+    it('rethrows immediately when the AI flow reports a user abort (no loop)', async () => {
+      autoGit.syncOperation = 'rebase';
+      mockGitManager.getStatus.mockResolvedValue({ conflicted: ['a.js'] });
+
+      const abortError = AutoGit.userAbort(
+        'AI resolution discarded. Your branch is unchanged.'
+      );
+      autoGit.resolveConflictsWithAI = jest.fn().mockRejectedValue(abortError);
+
+      inquirer.prompt.mockResolvedValueOnce({ resolutionStrategy: 'ai' });
+
+      await expect(autoGit.handleRebaseConflicts(['a.js'])).rejects.toBe(abortError);
+
+      expect(mockGitManager.rebaseContinue).not.toHaveBeenCalled();
     });
   });
 
