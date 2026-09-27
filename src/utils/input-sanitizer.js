@@ -66,14 +66,11 @@ class InputSanitizer {
       return message;
     }
 
-    // Remove control characters
-    let sanitized = message.replace(/[\x00-\x1f\x7f]/g, '');
+    // Remove control characters EXCEPT \n — multi-line commit bodies are
+    // legitimate (bullets, Refs trailers); simple-git passes argv, not a shell.
+    let sanitized = message.replace(/[\x00-\x09\x0b-\x1f\x7f]/g, '');
 
-    // Remove potential command injection characters
-    sanitized = sanitized.replace(/[;&|$`]/g, '');
-
-    // Preserve newlines – they are part of a proper multi‑line commit body.
-    // However, strip trailing whitespace on each line to keep the git command safe.
+    // Strip trailing whitespace per line to keep the git command safe.
     sanitized = sanitized
       .split(/\r?\n/)
       .map(l => l.trimEnd())

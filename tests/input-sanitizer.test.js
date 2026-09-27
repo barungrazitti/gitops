@@ -72,6 +72,25 @@ describe('InputSanitizer', () => {
       const result = InputSanitizer.sanitizeCommitMessage(long);
       expect(result.length).toBe(1000);
     });
+
+    it('should preserve multi-line bodies with bullets and Refs trailers', () => {
+      const message = 'feat: add modal\n\n- Add validation\n- Load scripts\n\nRefs: #123';
+      const result = InputSanitizer.sanitizeCommitMessage(message);
+      expect(result).toBe(message);
+      expect(result.includes('\n')).toBe(true);
+    });
+
+    it('should keep legitimate metacharacters in commit messages', () => {
+      const message = 'fix: handle $ref forwarding and a || b';
+      expect(InputSanitizer.sanitizeCommitMessage(message)).toBe(message);
+    });
+
+    it('should still remove control characters except newline', () => {
+      const result = InputSanitizer.sanitizeCommitMessage('feat:\x00\x07 ok');
+      expect(result).not.toContain('\x00');
+      expect(result).not.toContain('\x07');
+      expect(result).toBe('feat: ok');
+    });
   });
 
   describe('validateGitReference', () => {
