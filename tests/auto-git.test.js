@@ -143,6 +143,21 @@ describe('AutoGit', () => {
       stdoutSpy.mockRestore();
     });
 
+    it('scrubs control characters from the dry-run stdout seam', async () => {
+      autoGit.generateCommitMessage = jest
+        .fn()
+        .mockResolvedValue('feat: add \x1b[31mred\x1b[0m thing\n\nRefs: #1');
+      const stdoutSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      await autoGit.run({ dryRun: true });
+
+      const printed = stdoutSpy.mock.calls.flat().map(String).join('\n');
+      expect(printed).toContain('feat: add ');
+      expect(printed).toContain('Refs: #1');
+      expect(printed).not.toContain('\x1b');
+      stdoutSpy.mockRestore();
+    });
+
     it('should complete full workflow successfully', async () => {
       await autoGit.run();
 

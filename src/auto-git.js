@@ -62,7 +62,11 @@ class AutoGit {
         }
       }
       if (dryRunMessage) {
-        console.log(dryRunMessage);
+        // The git hook pipes this stdout verbatim into COMMIT_EDITMSG
+        // (`aic --dry-run | head -1 > "$1"`), so scrub control characters
+        // before printing — provider text must not inject stream controls.
+        const InputSanitizer = require('./utils/input-sanitizer');
+        console.log(InputSanitizer.sanitizeCommitMessage(dryRunMessage));
       }
 
       await this.activityLogger.info('auto_git_completed', {
