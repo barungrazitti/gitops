@@ -34,6 +34,8 @@ describe('GenerationPipeline', () => {
       },
       activityLogger: {
         info: jest.fn().mockResolvedValue(),
+        warn: jest.fn().mockResolvedValue(),
+        error: jest.fn().mockResolvedValue(),
         logAIInteraction: jest.fn().mockResolvedValue(),
       },
       statsManager: {
@@ -238,6 +240,73 @@ describe('GenerationPipeline', () => {
       expect(messages).toEqual(['style: apply whitespace formatting']);
       expect(deps.providerFactory.create).not.toHaveBeenCalled();
       expect(deps.promptBuilder.buildPrompt).not.toHaveBeenCalled();
+    });
+
+    describe('enterprise mode gate', () => {
+      const stubScanner = summary => ({
+        scanAndRedact: jest.fn().mockReturnValue('REDACTED DIFF'),
+        getRedactionSummary: jest.fn().mockReturnValue(summary),
+        clearRedactionLog: jest.fn(),
+      });
+
+      it('blocks generation when sensitive data is found', async () => {
+        pipeline = new GenerationPipeline({
+          ...deps,
+          secretScanner: stubScanner({ found: true, redacted: 2, byCategory: { secret: 2 } }),
+        });
+
+        await expect(
+          pipeline.generate(fakeDiff, {
+            context: { files: {} },
+            preferredProvider: 'groq',
+            enterpriseMode: true,
+          })
+        ).rejects.toThrow(/Enterprise mode/);
+
+        expect(deps.providerFactory.create).not.toHaveBeenCalled();
+        expect(deps.activityLogger.error).toHaveBeenCalledWith(
+          'enterprise_mode_blocked',
+          expect.objectContaining({ redacted: 2 })
+        );
+      });
+
+      it('proceeds to the provider normally when nothing is found', async () => {
+        pipeline = new GenerationPipeline({
+          ...deps,
+          secretScanner: stubScanner({ found: false, redacted: 0, byCategory: {} }),
+        });
+        deps.providerFactory.create.mockReturnValue({
+          generateResponse: jest.fn().mockResolvedValue('feat: safe change'),
+        });
+
+        const messages = await pipeline.generate(fakeDiff, {
+          context: { files: {} },
+          preferredProvider: 'groq',
+          enterpriseMode: true,
+        });
+
+        expect(messages).toEqual(['feat: safe change']);
+        expect(deps.activityLogger.error).not.toHaveBeenCalled();
+      });
+
+      it('still redacts and blocks when sanitize is explicitly false', async () => {
+        pipeline = new GenerationPipeline({
+          ...deps,
+          secretScanner: stubScanner({ found: true, redacted: 1, byCategory: { secret: 1 } }),
+        });
+
+        await expect(
+          pipeline.generate(fakeDiff, {
+            context: { files: {} },
+            preferredProvider: 'groq',
+            sanitize: false,
+            enterpriseMode: true,
+          })
+        ).rejects.toThrow(/Enterprise mode/);
+
+        expect(pipeline.secretScanner.scanAndRedact).toHaveBeenCalled();
+        expect(deps.providerFactory.create).not.toHaveBeenCalled();
+      });
     });
   });
 

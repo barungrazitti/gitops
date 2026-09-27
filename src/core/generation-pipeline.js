@@ -80,11 +80,13 @@ class GenerationPipeline {
     // SECURITY: redact secrets/PII at the pipeline boundary so EVERY caller is
     // covered (interactive generate AND auto mode), not just the CLI path.
     // Idempotent: diffs already redacted upstream pass through unchanged.
+    // Enterprise mode forces sanitization ON and blocks on any find.
     let safeDiff = diff;
-    if (options.sanitize !== false) {
+    let redactionSummary = { found: false, redacted: 0 };
+    if (options.sanitize !== false || options.enterpriseMode) {
       const originalLength = diff.length;
       safeDiff = this.secretScanner.scanAndRedact(diff, true);
-      const redactionSummary = this.secretScanner.getRedactionSummary();
+      redactionSummary = this.secretScanner.getRedactionSummary();
       if (redactionSummary.found) {
         await this.activityLogger.warn('sensitive_data_redacted', {
           source: 'generation_pipeline',
@@ -95,6 +97,17 @@ class GenerationPipeline {
         });
       }
       this.secretScanner.clearRedactionLog();
+    }
+
+    if (options.enterpriseMode && redactionSummary.found) {
+      await this.activityLogger.error('enterprise_mode_blocked', {
+        redacted: redactionSummary.redacted,
+        byCategory: redactionSummary.byCategory,
+      });
+      throw new Error(
+        `Enterprise mode: ${redactionSummary.redacted} sensitive item(s) detected in staged changes — commit blocked. ` +
+          'Remove the secrets, or re-run without --enterprise-mode.'
+      );
     }
 
     // Step 1: Intelligent diff management with semantic context

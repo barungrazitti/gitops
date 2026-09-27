@@ -261,7 +261,7 @@ class AutoGit {
   /**
    * Generate AI commit message
    */
-  async generateCommitMessage(_options) {
+  async generateCommitMessage(options = {}) {
     this.spinner.start('Generating AI commit message...');
     try {
       // Get repository context for better AI generation
@@ -298,6 +298,7 @@ class AutoGit {
               conventional: config.conventionalCommits !== false,
               language: config.language || 'en',
               preferredProvider: config.defaultProvider || 'groq',
+              enterpriseMode: options.enterpriseMode === true,
             });
             this.spinner.succeed('AI commit message generated from cleaned diff');
             return messages[0];
@@ -317,6 +318,7 @@ class AutoGit {
         conventional: config.conventionalCommits !== false,
         language: config.language || 'en',
         preferredProvider: config.defaultProvider || 'groq',
+        enterpriseMode: options.enterpriseMode === true,
       });
 
       this.spinner.succeed('AI commit message generated');
