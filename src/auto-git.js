@@ -566,7 +566,14 @@ class AutoGit {
   async pullAndMerge() {
     this.syncOperation = 'merge';
     this.spinner.start('Pulling latest changes (merge)...');
-    await this.gitManager.pull();
+    try {
+      await this.gitManager.pull();
+    } catch (error) {
+      const conflictedOnFailure = await this.conflictedFiles();
+      if (conflictedOnFailure.length === 0) {
+        throw error;
+      }
+    }
     const conflicted = await this.conflictedFiles();
     if (conflicted.length === 0) {
       this.spinner.succeed('Pulled with merge, no conflicts');
