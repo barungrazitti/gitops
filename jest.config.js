@@ -10,7 +10,7 @@ module.exports = {
   ],
   
   // Coverage configuration
-  collectCoverage: true,
+  collectCoverage: false,
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
   collectCoverageFrom: [
@@ -31,23 +31,19 @@ module.exports = {
   
   // Transform ignore patterns - allow ES modules in node_modules
   transformIgnorePatterns: [
-    'node_modules/(?!(@mistralai|@anthropic-ai|@google|groq-sdk|cohere-ai)/)'
+    'node_modules/(?!groq-sdk/)'
   ],
   
   // Module name mapping for ES modules
   moduleNameMapper: {
-    '^@mistralai/mistralai$': '<rootDir>/tests/mocks/mistral-mock.js',
-    '^@anthropic-ai/sdk$': '<rootDir>/tests/mocks/anthropic-mock.js',
-    '^@google/generative-ai$': '<rootDir>/tests/mocks/gemini-mock.js',
-    '^groq-sdk$': '<rootDir>/tests/mocks/groq-mock.js',
-    '^cohere-ai$': '<rootDir>/tests/mocks/cohere-mock.js'
+    '^groq-sdk$': '<rootDir>/tests/mocks/groq-mock.js'
   },
   
   // Test timeout
   testTimeout: 30000,
   
   // Verbose output
-  verbose: true,
+  verbose: false,
   
   // Clear mocks between tests
   clearMocks: true,
