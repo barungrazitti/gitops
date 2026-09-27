@@ -92,15 +92,16 @@ node_modules/
 tests/
 *.test.js
 jest.config.js
-.eslintrc.js
+.eslintrc.json
 .prettierrc
+scripts/
+.github/
+plans/
+install.sh
+build-info.json
 
 # Documentation
-TODO.md
-TESTING.md
-FORMATTING_GUIDE.md
 AGENTS.md
-EXAMPLES.md
 
 # Logs
 *.log
@@ -166,6 +167,15 @@ print_status "The application is ready for production deployment."
 # Optional: Publish to npm if this is a release
 if [ "$1" = "--publish" ]; then
     print_status "Publishing to npm..."
+
+    # Guard: the published version must have a matching git tag
+    VERSION=$(node -p "require('./package.json').version")
+    if ! git tag --list | grep -qx "v${VERSION}"; then
+        print_error "git tag v${VERSION} does not exist. Create and push it first:"
+        print_error "  git tag v${VERSION} && git push origin v${VERSION}"
+        exit 1
+    fi
+
     if npm publish; then
         print_status "✅ Published to npm successfully"
     else
