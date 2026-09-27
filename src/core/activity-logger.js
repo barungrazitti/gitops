@@ -5,6 +5,7 @@
 const fs = require('fs-extra');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const Conf = require('conf');
 
 class ActivityLogger {
@@ -22,6 +23,8 @@ class ActivityLogger {
     this.logDir = path.join(os.homedir(), '.ai-commit-generator', 'logs');
     this.sessionId = this.generateSessionId();
     this.currentLogFile = null;
+    // Re-chmod the log file after rotation/reinit (a new file is created).
+    this._logFileSecured = false;
 
     // Console mirroring is quiet by default: file logging always runs, but
     // info/debug only reach the console with --verbose (warn/error always do).
@@ -43,9 +46,13 @@ class ActivityLogger {
    */
   async initializeLogDirectory() {
     try {
-      await fs.ensureDir(this.logDir);
+      // Owner-only: logs contain prompt/response metadata — never world-readable.
+      // ensureDir does not chmod an existing dir, so chmod explicitly too.
+      await fs.ensureDir(this.logDir, { mode: 0o700 });
+      await fs.chmod(this.logDir, 0o700).catch(() => {});
       await this.cleanOldLogs();
       this.currentLogFile = path.join(this.logDir, `activity-${this.getDateString()}.log`);
+      this._logFileSecured = false;
     } catch (error) {
       console.warn('Failed to initialize log directory:', error.message);
     }
@@ -143,6 +150,12 @@ class ActivityLogger {
       if (this.currentLogFile) {
         await fs.appendFile(this.currentLogFile, logLine);
 
+        // Owner-only file mode, applied once per file (new file → re-applied).
+        if (!this._logFileSecured) {
+          await fs.chmod(this.currentLogFile, 0o600).catch(() => {});
+          this._logFileSecured = true;
+        }
+
         // Check file size and rotate if needed
         const stats = await fs.stat(this.currentLogFile);
         const maxSize = this.config.get('maxLogSize');
@@ -204,6 +217,8 @@ class ActivityLogger {
       const baseName = path.basename(this.currentLogFile, '.log');
       const rotatedFile = path.join(this.logDir, `${baseName}-${Date.now()}.log`);
       await fs.move(this.currentLogFile, rotatedFile);
+      // Next append recreates currentLogFile from scratch — re-secure it.
+      this._logFileSecured = false;
       console.log(`Rotated log file: ${path.basename(rotatedFile)}`);
     } catch (error) {
       console.warn('Failed to rotate log file:', error.message);
@@ -233,17 +248,25 @@ class ActivityLogger {
    * Log AI provider interaction
    */
   async logAIInteraction(provider, type, prompt, response, responseTime, success) {
+    // SECURITY: prompts embed full diffs — log only length + hash by default.
+    // AIC_LOG_PROMPTS=1 is the explicit opt-in for full prompt content.
+    const includeContent = process.env.AIC_LOG_PROMPTS === '1';
     await this.info('ai_interaction', {
       provider,
       type, // 'commit_generation' or 'conflict_resolution'
       promptLength: prompt?.length || 0,
+      promptHash: prompt
+        ? crypto.createHash('sha256').update(prompt).digest('hex').substring(0, 12)
+        : null,
       responseLength: response?.length || 0,
       responseTime,
       success,
       timestamp: Date.now(),
-      // Log the actual prompt for analysis (truncated if too large)
-      prompt:
-        prompt && prompt.length > 10000 ? `${prompt.substring(0, 10000)}...[TRUNCATED]` : prompt,
+      prompt: includeContent
+        ? prompt && prompt.length > 10000
+          ? `${prompt.substring(0, 10000)}...[TRUNCATED]`
+          : prompt
+        : undefined,
       // Log the actual response for quality analysis (truncated if too large)
       response:
         response && response.length > 2000

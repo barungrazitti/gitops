@@ -27,6 +27,8 @@ describe('ActivityLogger', () => {
       stat: jest.fn().mockResolvedValue({ size: 1000 }),
       appendFile: jest.fn().mockResolvedValue(),
       remove: jest.fn().mockResolvedValue(),
+      chmod: jest.fn().mockResolvedValue(),
+      move: jest.fn().mockResolvedValue(),
     }));
 
     // Mock os
@@ -69,6 +71,50 @@ describe('ActivityLogger', () => {
   describe('logActivity', () => {
     it('should log activity', async () => {
       await logger.logActivity('info', 'test_action', { key: 'value' });
+    });
+
+    it('secures the log file with 0o600 on first write', async () => {
+      const fsExtra = require('fs-extra');
+      await logger.logActivity('info', 'test_action', { key: 'value' });
+
+      expect(fsExtra.chmod).toHaveBeenCalledWith(logger.currentLogFile, 0o600);
+    });
+  });
+
+  describe('logAIInteraction', () => {
+    const rawPrompt = 'diff --git a/f.js b/f.js\n+const superSecretPromptPayload = 1;';
+
+    afterEach(() => {
+      delete process.env.AIC_LOG_PROMPTS;
+    });
+
+    it('logs prompt length and hash, never the raw prompt, by default', async () => {
+      const fsExtra = require('fs-extra');
+      delete process.env.AIC_LOG_PROMPTS;
+
+      await logger.logAIInteraction('groq', 'commit_generation', rawPrompt, 'feat: x', 100, true);
+
+      expect(fsExtra.appendFile).toHaveBeenCalled();
+      const logLine = fsExtra.appendFile.mock.calls.pop()[1];
+      const entry = JSON.parse(logLine.trim());
+
+      expect(entry.data.promptLength).toBe(rawPrompt.length);
+      expect(entry.data.promptHash).toMatch(/^[a-f0-9]{12}$/);
+      expect(logLine).not.toContain('superSecretPromptPayload');
+      expect(entry.data.prompt).toBeUndefined();
+    });
+
+    it('includes the raw prompt only when AIC_LOG_PROMPTS=1', async () => {
+      const fsExtra = require('fs-extra');
+      process.env.AIC_LOG_PROMPTS = '1';
+
+      await logger.logAIInteraction('groq', 'commit_generation', rawPrompt, 'feat: x', 100, true);
+
+      const logLine = fsExtra.appendFile.mock.calls.pop()[1];
+      const entry = JSON.parse(logLine.trim());
+
+      expect(entry.data.prompt).toContain('superSecretPromptPayload');
+      expect(entry.data.promptHash).toMatch(/^[a-f0-9]{12}$/);
     });
   });
 
