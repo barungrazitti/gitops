@@ -325,7 +325,10 @@ RESOLVED CODE (output only):
           if (fileAiUsed) aiUsed = true;
         }
       } catch (e) {
-        // File might not exist (deleted), skip
+        await this.activityLogger.warn('conflict_cleanup_file_skipped', {
+          file: file.fileB,
+          error: e.message,
+        });
       }
     }
 
