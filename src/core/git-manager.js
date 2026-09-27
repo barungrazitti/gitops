@@ -6,8 +6,8 @@ const simpleGit = require('simple-git');
 const InputSanitizer = require('../utils/input-sanitizer');
 
 class GitManager {
-  constructor() {
-    this.git = simpleGit();
+  constructor(baseDir) {
+    this.git = simpleGit(baseDir);
     this._statusCache = null;
     this._statusCacheTime = 0;
   }
@@ -195,7 +195,8 @@ class GitManager {
       throw new Error('Show requires a file path');
     }
     try {
-      return await this.git.show([`--${side}`, `:${filePath}`]);
+      const stage = side === 'ours' ? 2 : 3;
+      return await this.git.show([`:${stage}:${filePath}`]);
     } catch (error) {
       throw new Error(`Failed to show ${side} version of ${filePath}: ${error.message}`);
     }

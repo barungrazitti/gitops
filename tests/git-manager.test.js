@@ -326,14 +326,14 @@ describe('GitManager', () => {
 
       const result = await gitManager.showIndexSide('test.js', 'ours');
 
-      expect(mockGit.show).toHaveBeenCalledWith(['--ours', ':test.js']);
+      expect(mockGit.show).toHaveBeenCalledWith([':2:test.js']);
       expect(result).toBe('incoming content');
     });
 
     it('should show the theirs side of a conflicted file', async () => {
       await gitManager.showIndexSide('test.js', 'theirs');
 
-      expect(mockGit.show).toHaveBeenCalledWith(['--theirs', ':test.js']);
+      expect(mockGit.show).toHaveBeenCalledWith([':3:test.js']);
     });
 
     it('should reject invalid sides', async () => {
