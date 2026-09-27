@@ -102,3 +102,53 @@ describe('CLIPresenter.selectMessage', () => {
     expect(rl.close).toHaveBeenCalled();
   });
 });
+
+describe('CLIPresenter.config', () => {
+  const RAW_KEY = 'gsk_test_raw_secret_key';
+  let presenter;
+  let configManager;
+
+  beforeEach(() => {
+    configManager = {
+      get: jest.fn().mockResolvedValue(RAW_KEY),
+      set: jest.fn().mockResolvedValue(undefined),
+      load: jest.fn().mockResolvedValue({ defaultProvider: 'groq', apiKey: RAW_KEY }),
+      reset: jest.fn().mockResolvedValue(undefined),
+    };
+    presenter = new CLIPresenter({ configManager });
+  });
+
+  const loggedOutput = () =>
+    console.log.mock.calls.flat().map(String).join('\n');
+
+  it('masks apiKey on --get', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await presenter.config({ get: 'apiKey' });
+
+    const out = logSpy.mock.calls.flat().map(String).join('\n');
+    expect(out).toContain('***configured***');
+    expect(out).not.toContain(RAW_KEY);
+  });
+
+  it('masks apiKey on --set and never echoes the raw value', async () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await presenter.config({ set: `apiKey=${RAW_KEY}` });
+
+    expect(configManager.set).toHaveBeenCalledWith('apiKey', RAW_KEY);
+    const out = logSpy.mock.calls.flat().map(String).join('\n');
+    expect(out).toContain('***masked***');
+    expect(out).not.toContain(RAW_KEY);
+  });
+
+  it('still prints non-secret values plainly on --get', async () => {
+    configManager.get.mockResolvedValue('groq');
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await presenter.config({ get: 'defaultProvider' });
+
+    const out = logSpy.mock.calls.flat().map(String).join('\n');
+    expect(out).toContain('defaultProvider: groq');
+  });
+});

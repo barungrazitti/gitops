@@ -114,10 +114,14 @@ class CLIPresenter {
     if (options.set) {
       const [key, value] = options.set.split('=');
       await this.configManager.set(key, value);
-      console.log(chalk.green(`✅ Configuration updated: ${key} = ${value}`));
+      // Never echo secrets back to the terminal.
+      const shown = key === 'apiKey' ? '***masked***' : value;
+      console.log(chalk.green(`✅ Configuration updated: ${key} = ${shown}`));
     } else if (options.get) {
       const value = await this.configManager.get(options.get);
-      console.log(`${options.get}: ${value || 'not set'}`);
+      // Same masking as --list: the raw key must never hit stdout.
+      const display = options.get === 'apiKey' && value ? '***configured***' : value;
+      console.log(`${options.get}: ${display || 'not set'}`);
     } else if (options.list || (!options.set && !options.get && !options.reset)) {
       const config = await this.configManager.load();
       console.log(chalk.cyan('Current configuration:'));
