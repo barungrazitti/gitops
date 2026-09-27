@@ -145,6 +145,41 @@ describe('GitManager', () => {
     });
   });
 
+  describe('syntaxCheck', () => {
+    it('should check the STAGED index blob and report broken JS', async () => {
+      mockGit.status.mockResolvedValue({ staged: ['bad.js'], modified: [], not_added: [] });
+      mockGit.show.mockResolvedValue('const = ;');
+
+      const result = await gitManager.syntaxCheck();
+
+      expect(mockGit.show).toHaveBeenCalledWith([':bad.js']);
+      expect(result.valid).toBe(false);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors[0].file).toBe('bad.js');
+      expect(result.errors[0].error.length).toBeGreaterThan(0);
+    });
+
+    it('should pass valid staged content', async () => {
+      mockGit.status.mockResolvedValue({ staged: ['good.js'], modified: [], not_added: [] });
+      mockGit.show.mockResolvedValue('const x = 1;\n');
+
+      const result = await gitManager.syntaxCheck();
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+
+    it('should skip staged paths that cannot be shown (deleted/renamed)', async () => {
+      mockGit.status.mockResolvedValue({ staged: ['gone.js'], modified: [], not_added: [] });
+      mockGit.show.mockRejectedValue(new Error('path does not exist'));
+
+      const result = await gitManager.syntaxCheck();
+
+      expect(result.valid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
+  });
+
   describe('commit', () => {
     it('should commit with message', async () => {
       const message = 'Test commit message';

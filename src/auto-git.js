@@ -253,7 +253,7 @@ class AutoGit {
       }
       return true;
     } catch (error) {
-      console.log(chalk.gray('ℹ Syntax check skipped (node not available)'));
+      console.log(chalk.gray(`ℹ Syntax check could not run: ${error.message}`));
       return true;
     }
   }

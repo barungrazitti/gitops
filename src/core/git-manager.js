@@ -349,12 +349,16 @@ class GitManager {
   }
 
   /**
-   * Check syntax of staged .js files using node --check.
+   * Check syntax of staged .js files using node --check on the INDEX blob.
    * Returns { valid: boolean, errors: Array<{file: string, error: string}> }.
    */
   async syntaxCheck() {
     const { execFile } = require('child_process');
     const { promisify } = require('util');
+    const fs = require('fs');
+    const os = require('os');
+    const path = require('path');
+    const crypto = require('crypto');
     const execFileAsync = promisify(execFile);
 
     const files = await this.getStagedFiles();
@@ -362,13 +366,28 @@ class GitManager {
     const errors = [];
 
     for (const file of jsFiles) {
+      let content;
       try {
-        await execFileAsync('node', ['--check', file]);
+        content = await this.git.show([`:${file}`]);
+      } catch (_) {
+        continue; // deleted/renamed staged path — nothing to check
+      }
+
+      const tmp = path.join(
+        os.tmpdir(),
+        `aic-synchk-${crypto.randomBytes(6).toString('hex')}.js`
+      );
+      try {
+        fs.writeFileSync(tmp, content);
+        await execFileAsync('node', ['--check', tmp]);
       } catch (err) {
-        errors.push({
-          file,
-          error: (err.stderr || err.message || '').trim(),
-        });
+        if (err.code === 'ENOENT' && !err.stderr) {
+          // node binary unavailable — skip the gate entirely
+          return { valid: true, errors: [], skipped: true };
+        }
+        errors.push({ file, error: (err.stderr || err.message || '').trim() });
+      } finally {
+        try { fs.unlinkSync(tmp); } catch (_) {} // eslint-disable-line no-empty
       }
     }
 
