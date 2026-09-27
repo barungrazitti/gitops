@@ -60,8 +60,8 @@ index 0000000..1234567
 
   // Helper to create mock config
   createMockConfig: (overrides = {}) => ({
-    provider: 'openai',
-    model: 'gpt-3.5-turbo',
+    provider: 'groq',
+    model: 'openai/gpt-oss-20b',
     language: 'en',
     conventional: true,
     cache: true,

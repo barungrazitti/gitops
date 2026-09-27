@@ -365,7 +365,7 @@ diff --git a/old-file.js b/old-file.js
       expect(result.info.preservedFiles).toContain('new-feature/new-file.js');
     });
 
-    it('should filter out node_modules files', () => {
+    it('should filter out node_modules files during smart truncation', () => {
       const diffWithNodeModules = `diff --git a/src/main.js b/src/main.js
 --- a/src/main.js
 +++ b/src/main.js
@@ -488,7 +488,7 @@ diff --git a/src/utils.js b/src/utils.js
       expect(result.data).toContain('src/main.js');
     });
 
-    it('should filter out node_modules files', () => {
+    it('should filter out node_modules files without semantic context', () => {
       const diffWithNodeModules = `diff --git a/src/main.js b/src/main.js
 --- a/src/main.js
 +++ b/src/main.js
