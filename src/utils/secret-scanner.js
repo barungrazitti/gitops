@@ -20,11 +20,51 @@ class SecretScanner {
         category: 'secret',
       },
 
-      // GitHub personal access tokens (flexible length)
+      // GitHub personal access tokens (classic + fine-grained + app tokens)
       {
         name: 'github_token',
-        pattern: /ghp_[A-Za-z0-9_]{20,40}/g,
+        pattern: /(?:ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9_]{20,40}|github_pat_[A-Za-z0-9_]{40,90}/g,
         replacement: '[REDACTED_GITHUB_TOKEN]',
+        category: 'secret',
+      },
+
+      // GitLab personal access tokens
+      {
+        name: 'gitlab_token',
+        pattern: /glpat-[A-Za-z0-9_\-]{20,}/g,
+        replacement: '[REDACTED_GITLAB_TOKEN]',
+        category: 'secret',
+      },
+
+      // SendGrid API keys
+      {
+        name: 'sendgrid_token',
+        pattern: /SG\.[A-Za-z0-9_\-]{16,}\.[A-Za-z0-9_\-]{16,}/g,
+        replacement: '[REDACTED_SENDGRID_TOKEN]',
+        category: 'secret',
+      },
+
+      // npm access tokens
+      {
+        name: 'npm_token',
+        pattern: /npm_[A-Za-z0-9]{30,}/g,
+        replacement: '[REDACTED_NPM_TOKEN]',
+        category: 'secret',
+      },
+
+      // Stripe live secret/restricted keys
+      {
+        name: 'stripe_token',
+        pattern: /(?:rk|sk)_live_[A-Za-z0-9]{20,}/g,
+        replacement: '[REDACTED_STRIPE_TOKEN]',
+        category: 'secret',
+      },
+
+      // Twilio API key SIDs (SK + 32 hex)
+      {
+        name: 'twilio_token',
+        pattern: /SK[0-9a-fA-F]{32}/g,
+        replacement: '[REDACTED_TWILIO_TOKEN]',
         category: 'secret',
       },
 
@@ -45,7 +85,7 @@ class SecretScanner {
       },
       {
         name: 'aws_secret_key',
-        pattern: /\b(?:aws_)?secret[_-]?key[\s:=]+['"]?([A-Za-z0-9\/+]{40})['"]?/gi,
+        pattern: /\b(?:aws_)?secret[_-]?(?:access[_-]?)?key[\s:=]+['"]?([A-Za-z0-9\/+]{40})['"]?/gi,
         replacement: '[REDACTED_AWS_SECRET_KEY]',
         category: 'secret',
       },
@@ -54,7 +94,7 @@ class SecretScanner {
       {
         name: 'ssh_private_key',
         pattern:
-          /-----BEGIN (?:RSA |EC |DSA |SSH2 )?PRIVATE KEY-----(?:\n|\r\n)[\s\S]*?(?:\n|\r\n)-----END (?:RSA |EC |DSA |SSH2 )?PRIVATE KEY-----/g,
+          /-----BEGIN (?:RSA |EC |DSA |SSH2 |OPENSSH )?PRIVATE KEY-----(?:\n|\r\n)[\s\S]*?(?:\n|\r\n)[+\- ]?-----END (?:RSA |EC |DSA |SSH2 |OPENSSH )?PRIVATE KEY-----/g,
         replacement: '[REDACTED_SSH_PRIVATE_KEY]',
         category: 'secret',
       },
