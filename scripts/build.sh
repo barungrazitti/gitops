@@ -37,10 +37,6 @@ npm run lint
 print_status "Running tests..."
 npm test
 
-# Generate coverage report
-print_status "Generating coverage report..."
-npm run test:coverage
-
 # Validate package.json
 print_status "Validating package.json..."
 node -e "

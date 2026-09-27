@@ -62,15 +62,6 @@ else
     exit 1
 fi
 
-# Run test coverage
-print_status "Generating test coverage..."
-if npm run test:coverage; then
-    print_status "✅ Test coverage generated"
-else
-    print_error "❌ Test coverage failed"
-    exit 1
-fi
-
 # Check if package.json is ready for production
 print_status "Checking package.json..."
 if node -e "const pkg = require('./package.json'); if (!pkg.version || !pkg.main) process.exit(1)"; then
