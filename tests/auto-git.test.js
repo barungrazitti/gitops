@@ -416,6 +416,7 @@ describe('AutoGit', () => {
         conventional: true,
         language: 'en',
         preferredProvider: 'groq',
+        enterpriseMode: false,
       });
     });
   });
