@@ -65,8 +65,7 @@
     "node-cache": "^5.1.2",
     "ora": "^5.4.1",
     "parse-diff": "^0.11.1",
-    "simple-git": "^3.20.0",
-    "tiktoken": "^1.0.22"
+    "simple-git": "^3.20.0"
   },
   "devDependencies": {
     "eslint": "^8.57.1",
