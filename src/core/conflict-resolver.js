@@ -341,3 +341,4 @@ RESOLVED CODE (output only):
 
 module.exports = ConflictResolver;
 module.exports.DIFF_MARKER_REGEX = DIFF_MARKER_REGEX;
+module.exports.languageForFile = languageForFile;

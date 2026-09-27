@@ -6,7 +6,7 @@
 const chalk = require('chalk');
 const inquirer = require('inquirer');
 const ora = require('ora');
-const { DIFF_MARKER_REGEX } = require('./core/conflict-resolver');
+const { DIFF_MARKER_REGEX, languageForFile } = require('./core/conflict-resolver');
 
 class AutoGit {
   // Cap on rebase --continue rounds: each round replays remaining commits and
@@ -721,7 +721,7 @@ class AutoGit {
         filePath,
         currentVersion: isRebase ? stage3 : stage2,
         incomingVersion: isRebase ? stage2 : stage3,
-        language: filePath.split('.').pop() === 'php' ? 'php' : 'javascript',
+        language: languageForFile(filePath),
       });
 
       const repoRoot = await this.gitManager.getRepositoryRoot();
