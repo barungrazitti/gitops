@@ -2,12 +2,12 @@
  * Tests for ConfigManager
  */
 
-const ConfigManager = require('../src/core/config-manager');
-
+// jest.mock is NOT hoisted (transform: {} — no babel), so register the mocks
+// BEFORE requiring the module under test or they never apply.
 jest.mock('fs-extra');
 jest.mock('conf', () =>
   jest.fn().mockImplementation(() => ({
-    store: {},
+    store: { defaultProvider: 'groq', conventionalCommits: true },
     path: '/test/config.json',
     get: jest.fn(key => {
       const store = { defaultProvider: 'groq', conventionalCommits: true };
@@ -17,6 +17,8 @@ jest.mock('conf', () =>
     clear: jest.fn(),
   }))
 );
+
+const ConfigManager = require('../src/core/config-manager');
 
 describe('ConfigManager', () => {
   let configManager;
@@ -97,6 +99,19 @@ describe('ConfigManager', () => {
           temperature: 0.5,
         })
       ).resolves.toBeUndefined();
+    });
+
+    it('chmods the conf store to 0600 after writing', async () => {
+      const fs = require('fs');
+      const chmodSpy = jest.spyOn(fs, 'chmodSync').mockImplementation(() => {});
+
+      try {
+        await configManager.setMultiple({ conventionalCommits: false });
+
+        expect(chmodSpy).toHaveBeenCalledWith('/test/config.json', 0o600);
+      } finally {
+        chmodSpy.mockRestore();
+      }
     });
   });
 

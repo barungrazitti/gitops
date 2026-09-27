@@ -3,6 +3,7 @@
  */
 
 const Conf = require('conf');
+const fs = require('fs');
 const path = require('path');
 
 // quiet: true suppresses dotenv's per-run "injected env" banner (dotenv 17+).
@@ -23,6 +24,18 @@ class ConfigManager {
     });
 
     this.schema = this.getValidationSchema();
+  }
+
+  /**
+   * Restrict the conf store file to the owner (it holds the API key).
+   * Non-fatal: the store may not exist yet or the fs may not support modes.
+   */
+  _secureStoreFile() {
+    try {
+      fs.chmodSync(this.config.path, 0o600);
+    } catch (_) {
+      // Ignore — permissions hardening must never break a config write.
+    }
   }
 
   /**
@@ -155,6 +168,8 @@ class ConfigManager {
       } else {
         this.config.set(key, value);
       }
+
+      this._secureStoreFile();
     } catch (error) {
       throw new Error(`Failed to set configuration value: ${error.message}`);
     }
@@ -179,6 +194,8 @@ class ConfigManager {
       Object.entries(cleanValues).forEach(([key, value]) => {
         this.config.set(key, value);
       });
+
+      this._secureStoreFile();
     } catch (error) {
       throw new Error(`Failed to set configuration values: ${error.message}`);
     }
@@ -194,6 +211,8 @@ class ConfigManager {
       Object.entries(defaults).forEach(([key, value]) => {
         this.config.set(key, value);
       });
+
+      this._secureStoreFile();
     } catch (error) {
       throw new Error(`Failed to reset configuration: ${error.message}`);
     }
