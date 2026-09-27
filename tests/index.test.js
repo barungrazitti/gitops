@@ -94,6 +94,9 @@ describe('AICommitGenerator', () => {
         .fn()
         .mockResolvedValue({ action: 'commit', message: mockMessages[0] });
       generator.gitManager.commit = jest.fn().mockResolvedValue({});
+      generator.generationPipeline.generate = jest
+        .fn()
+        .mockResolvedValue(mockMessages);
     });
 
     it('should handle no staged changes', async () => {
