@@ -118,9 +118,6 @@ describe('CLIPresenter.config', () => {
     presenter = new CLIPresenter({ configManager });
   });
 
-  const loggedOutput = () =>
-    console.log.mock.calls.flat().map(String).join('\n');
-
   it('masks apiKey on --get', async () => {
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
