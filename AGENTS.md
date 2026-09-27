@@ -4,7 +4,7 @@
 
 ### Testing
 
-- `npm test` - Run full Jest test suite (472 tests, 26 suites)
+- `npm test` - Run full Jest test suite (519 tests, 29 suites)
 - `npx jest tests/auto-git.test.js` - Run single test file
 - `npm run test:coverage` - Jest with coverage report
 - `npm run test:watch` - Jest in watch mode
@@ -69,14 +69,14 @@
 5. **Reasoning models (gpt-oss) need higher max_tokens** — groq-provider enforces a 2000-token floor for them; a low budget yields empty `message.content`.
 6. **`.env` overrides config** via `ConfigManager._applyEnvOverrides()` (`GROQ_API_KEY`, `AIC_MODEL`, `AIC_PROVIDER`). Env values are never persisted to the conf store.
 7. **Secrets are masked in output** — never print `config.apiKey` raw.
-8. **`bin/aic.js` is the single composition root.** `buildGenerator()` builds every collaborator once and injects them into `AICommitGenerator` + `AutoGit`. Providers receive shared `configManager`/`activityLogger` via `AIProviderFactory.create(name, deps)` — never fabricated per call. `AICommitGenerator` accepts `deps` with fresh-instance defaults.
+8. **`bin/aic.js` is the single composition root.** `buildFullGenerator()` builds every collaborator once for auto/generate; `buildLightGenerator()` wires the lightweight path for config/setup/stats/hook. Providers receive shared `configManager`/`activityLogger` via `AIProviderFactory.create(name, deps)` — never fabricated per call. `AICommitGenerator` accepts `deps` with fresh-instance defaults.
 9. **The dry-run stdout seam**: `auto-git` dry-run prints the candidate commit message to stdout (`aic --dry-run | head -1` for hooks), silently when none can be generated.
 
 ### Core Modules
 
 | Module | Responsibility |
 |--------|---------------|
-| `src/index.js` | `AICommitGenerator` — generation pipeline orchestrator (~850 lines) |
+| `src/index.js` | `AICommitGenerator` — generation pipeline orchestrator (~450 lines) |
 | `src/auto-git.js` | `AutoGit` — stage/commit/pull/AI-resolve/push workflow |
 | `src/cli-presenter.js` | Console UI (menus, config/setup/stats display) |
 | `src/core/diff-shaper.js` | Diff budget owner: filtering, truncation, chunking |
@@ -92,6 +92,7 @@
 | `src/core/circuit-breaker.js` | Provider failure protection |
 | `src/core/hook-manager.js` | Git hook management |
 | `src/core/message-formatter.js` | Conventional commit formatting |
+| `src/core/generation-pipeline.js` | Provider sequencing, redaction, parsing, local synthesis |
 | `src/providers/*` | Groq + Ollama adapters on `base-provider.js` |
 | `src/utils/efficient-prompt-builder.js` | Prompt assembly (NO size management) |
 
@@ -113,7 +114,7 @@
 
 | Metric | Status |
 |--------|--------|
-| Tests | 472 tests, 26 suites ✅ |
+| Tests | 519 tests, 29 suites ✅ |
 | Lint | 0 errors, 0 warnings ✅ |
 | Default model | `openai/gpt-oss-20b` (Groq) |
 | Entry point | `bin/aic` (single command) |

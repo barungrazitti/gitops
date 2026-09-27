@@ -3,7 +3,7 @@
 ![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Tests](https://img.shields.io/badge/tests-480%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-jest-brightgreen)
 
 **Automate your git workflow with AI-powered commit messages**
 
@@ -21,7 +21,10 @@ git clone https://github.com/barungrazitti/gitops.git
 cd gitops
 npm install
 
-# 2. Configure — either create a .env file:
+# 2. Put aic on your PATH (or run ./install.sh for the guided version)
+ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
+
+# 3. Configure — either create a .env file:
 cat > .env << 'EOF'
 GROQ_API_KEY=your_key_from_console.groq.com
 AIC_MODEL=openai/gpt-oss-20b
@@ -31,7 +34,7 @@ EOF
 #    ...or run the interactive wizard:
 aic setup
 
-# 3. Use it!
+# 4. Use it!
 aic
 ```
 
@@ -158,7 +161,7 @@ staged diff ──▶ SecretScanner (redact) ──▶ DiffShaper (18KB budget, 
 
 ```bash
 npm install         # Install dependencies
-npm test            # Run test suite (480 tests, 25 suites)
+npm test            # Run test suite
 npm run lint        # ESLint
 npm run test:coverage
 ```
@@ -183,14 +186,14 @@ src/
 │   ├── activity-logger.js   # Structured activity logs (.aic-logs/)
 │   ├── hook-manager.js      # Git hook management
 │   ├── circuit-breaker.js   # Provider failure protection
+│   ├── generation-pipeline.js # Provider sequencing, redaction, parsing, local synthesis
 │   └── message-formatter.js # Conventional commit formatting
 ├── providers/
 │   ├── base-provider.js     # Abstract provider (retry, parse, errors)
 │   ├── groq-provider.js     # Groq adapter
 │   ├── ollama-provider.js   # Ollama adapter
 │   └── ai-provider-factory.js
-├── utils/             # Secret scanner, prompt builder, sanitizers, etc.
-└── formatters/        # Message section formatters
+└── utils/             # Secret scanner, prompt builder, sanitizers, etc.
 bin/
 ├── aic                # Shell shim
 └── aic.js             # CLI entry point (all commands)
@@ -203,11 +206,7 @@ tests/                 # Jest suites (mirrors src/ layout)
 
 ### Command Not Found
 
-```bash
-mkdir -p ~/.local/bin
-ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
-export PATH="$HOME/.local/bin:$PATH"
-```
+Put `aic` on your PATH — see step 2 of [Quick Start](#-quick-start), or run `./install.sh` for the guided setup.
 
 ### Groq returns empty responses
 
