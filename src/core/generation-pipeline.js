@@ -129,6 +129,19 @@ class GenerationPipeline {
       return messages;
     }
 
+    // Whitespace-only change: nothing semantic for the AI to analyze;
+    // synthesize locally like the binary-only branch.
+    if (diffManagement.strategy === 'whitespace-only') {
+      const messages = ['style: apply whitespace formatting'];
+      await this.activityLogger.info('diff_management', {
+        ...diffManagement.info,
+        provider: 'local',
+        responseTime: 0,
+        success: true,
+      });
+      return messages;
+    }
+
     // Compute diff analysis once (DiffShaper owns classification); prompt builders reuse it
     enrichedOptions.diffAnalysis = this.diffShaper.analyzeDiffType(
       diffManagement.data,

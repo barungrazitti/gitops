@@ -221,6 +221,24 @@ describe('GenerationPipeline', () => {
       expect(deps.providerFactory.create).not.toHaveBeenCalled();
       expect(deps.promptBuilder.buildPrompt).not.toHaveBeenCalled();
     });
+    it('synthesizes messages locally for whitespace-only diffs without calling providers', async () => {
+      deps.diffShaper.manageDiffForAI.mockReturnValue({
+        strategy: 'whitespace-only',
+        data: '',
+        chunks: null,
+        info: { strategy: 'whitespace-only', size: 0, chunks: 1, reasoning: 'Whitespace-only change' },
+      });
+
+      const messages = await pipeline.generate(fakeDiff, {
+        context: { files: {} },
+        preferredProvider: 'groq',
+        count: 3,
+      });
+
+      expect(messages).toEqual(['style: apply whitespace formatting']);
+      expect(deps.providerFactory.create).not.toHaveBeenCalled();
+      expect(deps.promptBuilder.buildPrompt).not.toHaveBeenCalled();
+    });
   });
 
   describe('synthesizeBinaryOnlyMessages()', () => {
