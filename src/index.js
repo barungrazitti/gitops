@@ -200,7 +200,7 @@ Do not explain the error, just provide the solution.`;
 
       // Get staged changes
       spinner.text = chalk.blue('📋 Analyzing staged changes...');
-      let diff = await this.gitManager.getStagedDiff();
+      diff = await this.gitManager.getStagedDiff();
 
       if (!diff || diff.trim().length === 0) {
         spinner.fail(
@@ -416,7 +416,7 @@ Do not explain the error, just provide the solution.`;
       });
 
       // Provide helpful suggestions based on error type
-      this.provideErrorSuggestions(error, mergedOptions);
+      await this.provideErrorSuggestions(error, mergedOptions);
 
       throw error;
     }
