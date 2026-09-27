@@ -401,6 +401,7 @@ describe('AutoGit', () => {
         context: {},
         count: 1,
         conventional: true,
+        language: 'en',
         preferredProvider: 'groq',
       });
     });

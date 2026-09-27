@@ -150,26 +150,28 @@ class CLIPresenter {
       console.log('1. Groq (Fast Cloud)');
       console.log('2. Ollama (Local)');
 
-      const providerChoice = await question('Enter choice (1-2, default: 1): ');
+      const providerChoice = String(await question('Enter choice (1-2, default: 1): ') || '').trim();
       const provider = providerChoice === '2' ? 'ollama' : 'groq';
 
       let apiKey = '';
       if (provider !== 'ollama') {
-        apiKey = await question('Enter your Groq API key: ');
-        if (!apiKey.trim()) {
+        apiKey = String(await question('Enter your Groq API key: ') || '').trim();
+        if (!apiKey) {
           console.log(chalk.red('❌ API key is required for Groq'));
           rl.close();
           return;
         }
-        if (!apiKey.trim().startsWith('gsk_')) {
+        if (!apiKey.startsWith('gsk_')) {
           console.log(chalk.yellow('⚠️  Groq keys typically start with "gsk_" — double-check your key.'));
         }
       }
 
-      const conventionalChoice = await question(
-        'Use conventional commit format? (Y/n, default: Y): '
-      );
-      const conventionalCommits = conventionalChoice.toLowerCase() !== 'n';
+      const conventionalChoice = String(
+        await question('Use conventional commit format? (Y/n, default: Y): ') || ''
+      )
+        .trim()
+        .toLowerCase();
+      const conventionalCommits = conventionalChoice !== 'n' && conventionalChoice !== 'no';
 
       console.log('Select commit message language:');
       console.log('1. English');
@@ -179,24 +181,29 @@ class CLIPresenter {
       console.log('5. Chinese');
       console.log('6. Japanese');
 
-      const langChoice = await question('Enter choice (1-6, default: 1): ');
+      const langChoice = String(await question('Enter choice (1-6, default: 1): ') || '').trim();
       const languages = {
-        1: 'en',
-        2: 'es',
-        3: 'fr',
-        4: 'de',
-        5: 'zh',
-        6: 'ja',
+        '1': 'en',
+        '2': 'es',
+        '3': 'fr',
+        '4': 'de',
+        '5': 'zh',
+        '6': 'ja',
+        '': 'en',
       };
       const language = languages[langChoice] || 'en';
 
-      // Save configuration
-      await this.configManager.setMultiple({
+      // Save configuration (omit apiKey for Ollama so we don't clobber an
+      // existing Groq key with an empty string).
+      const values = {
         defaultProvider: provider,
-        apiKey,
         conventionalCommits,
         language,
-      });
+      };
+      if (apiKey) {
+        values.apiKey = apiKey;
+      }
+      await this.configManager.setMultiple(values);
 
       console.log(chalk.green('\n✅ Setup completed successfully!'));
       console.log(chalk.cyan('You can now use "aic" to generate commit messages.'));

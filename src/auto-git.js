@@ -285,7 +285,8 @@ class AutoGit {
             const messages = await this.generateMessages(newDiff, {
               context,
               count: 1,
-              conventional: true,
+              conventional: config.conventionalCommits !== false,
+              language: config.language || 'en',
               preferredProvider: config.defaultProvider || 'groq',
             });
             this.spinner.succeed('AI commit message generated from cleaned diff');
@@ -299,7 +300,8 @@ class AutoGit {
       const messages = await this.generateMessages(diff, {
         context,
         count: 1, // Only need one message for auto-commit
-        conventional: true,
+        conventional: config.conventionalCommits !== false,
+        language: config.language || 'en',
         preferredProvider: config.defaultProvider || 'groq',
       });
 

@@ -11,6 +11,15 @@ const PromptTemplates = require('./prompt-templates');
 const DiffSummarizer = require('./diff-summarizer');
 const DiffShaper = require('../core/diff-shaper');
 
+const COMMIT_LANGUAGES = {
+  en: 'English',
+  es: 'Spanish',
+  fr: 'French',
+  de: 'German',
+  zh: 'Chinese',
+  ja: 'Japanese',
+};
+
 class EfficientPromptBuilder {
   constructor(options = {}) {
     this.diffCategorizer = new DiffCategorizer();
@@ -32,6 +41,7 @@ class EfficientPromptBuilder {
       enhancedPrompt,
       promptInstructions,
       strictValidation,
+      language = 'en',
     } = options;
 
     // Handle null/undefined diff
@@ -213,6 +223,13 @@ After the title line, add a blank line then bullet points starting with "- " sum
       if (typeHint) {
         prompt += `\n\nDetected type hint: ${typeHint} (confirmed by changed lines)`;
       }
+    }
+
+    // Commit message language (from `aic setup`; defaults to English).
+    // Keep conventional type/scope in English; only the description is translated.
+    const languageName = COMMIT_LANGUAGES[language] || COMMIT_LANGUAGES.en;
+    if (language && language !== 'en') {
+      prompt += `\n\nWrite the commit message description in ${languageName}. Keep the conventional type and scope in English (e.g. "fix(auth): ...") and translate only the description text.`;
     }
 
     // Check for asset summary in diff
@@ -666,5 +683,7 @@ REMEMBER: OUTPUT ONLY THE COMMIT MESSAGE${count > 1 ? 'S' : ''}. NO WARNINGS. NO
     return examples.slice(0, 2).join(', ');
   }
 }
+
+EfficientPromptBuilder.LANGUAGES = COMMIT_LANGUAGES;
 
 module.exports = EfficientPromptBuilder;
