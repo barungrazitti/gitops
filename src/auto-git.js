@@ -16,6 +16,16 @@ class AutoGit {
   // Preview length for the AI-resolution review gate.
   static REVIEW_PREVIEW_LINES = 100;
 
+  /**
+   * Mark and detect user-chosen aborts. git stderr (e.g. "resolve all
+   * conflicts manually") must never be classified as a user abort.
+   */
+  static userAbort(message) {
+    const error = new Error(message);
+    error.aicUserAbort = true;
+    return error;
+  }
+
   constructor({ gitManager, analysisEngine, configManager, generateMessages, conflictResolver, activityLogger } = {}) {
     this.gitManager = gitManager;
     this.analysisEngine = analysisEngine;
@@ -529,7 +539,7 @@ class AutoGit {
       await this.gitManager.stageAll();
       await this.gitManager.rebaseContinue();
     } catch (error) {
-      if (/cancelled|Manual|discarded/i.test(error.message)) {
+      if (error.aicUserAbort === true) {
         throw error;
       }
       // --continue can surface the NEXT commit's conflicts; loop with a cap.
@@ -638,7 +648,7 @@ class AutoGit {
             fallbackUsed: fallback,
             resolutionTime: Date.now() - resolutionStartTime,
           });
-          throw new Error('Operation cancelled due to resolution failure');
+          throw AutoGit.userAbort('Operation cancelled due to resolution failure');
         }
 
         await this.gitManager.checkoutSide(file, this.sideForIntent(fallback));
@@ -691,12 +701,12 @@ class AutoGit {
 
     if (decision === 'abort') {
       await this.abortSync();
-      throw new Error('AI resolution discarded. Your branch is unchanged.');
+      throw AutoGit.userAbort('AI resolution discarded. Your branch is unchanged.');
     }
 
     if (decision === 'manual') {
       this.manualInstructions();
-      throw new Error(
+      throw AutoGit.userAbort(
         'AI resolution set aside. Resolve manually and run again.'
       );
     }
