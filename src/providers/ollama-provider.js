@@ -2,7 +2,6 @@
  * Ollama Provider - Local AI models integration
  */
 
-const axios = require('axios');
 const BaseProvider = require('./base-provider');
 const CircuitBreaker = require('../core/circuit-breaker');
 
@@ -38,9 +37,10 @@ class OllamaProvider extends BaseProvider {
       async () =>
         await this.circuitBreaker.execute(
           async () => {
-            const response = await axios.post(
-              `${this.baseURL}/api/generate`,
-              {
+            const response = await fetch(`${this.baseURL}/api/generate`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
                 model,
                 prompt: fullPrompt,
                 stream: false,
@@ -48,13 +48,16 @@ class OllamaProvider extends BaseProvider {
                   temperature: options.temperature || config.temperature || 0.3,
                   num_predict: options.maxTokens || 2000,
                 },
-              },
-              {
-                timeout: config.timeout || 60000, // Longer timeout for code fixing
-              }
-            );
+              }),
+              signal: AbortSignal.timeout(config.timeout || 60000),
+            });
 
-            const content = response.data.response;
+            if (!response.ok) {
+              throw new Error(`Ollama API error (${response.status}): ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            const content = data.response;
             if (!content) {
               throw new Error('No response content from Ollama');
             }
@@ -72,7 +75,7 @@ class OllamaProvider extends BaseProvider {
   async validate(_config) {
     // Check if Ollama is running
     try {
-      await axios.get(`${this.baseURL}/api/tags`, { timeout: 5000 });
+      await fetch(`${this.baseURL}/api/tags`, { signal: AbortSignal.timeout(5000) });
       return true;
     } catch (error) {
       throw new Error('Ollama is not running. Please start Ollama service.');

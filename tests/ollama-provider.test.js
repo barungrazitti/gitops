@@ -5,12 +5,22 @@
 describe('OllamaProvider', () => {
   let OllamaProvider;
   let provider;
+  let fetchSpy;
 
-  beforeEach(() => {
+  const jsonResponse = (payload, { ok = true, status = 200, statusText = 'OK' } = {}) => ({
+    ok,
+    status,
+    statusText,
+    json: async () => payload,
+  });
+
+  // Module graph is built once per file: conf -> atomically registers a
+  // process exit listener on every fresh require, and re-requiring it in
+  // beforeEach (the old setup) tripped MaxListenersExceededWarning at the
+  // 11th test. Each test still gets a brand-new provider + mock instances.
+  beforeAll(() => {
     jest.resetModules();
-    jest.clearAllMocks();
 
-    jest.mock('axios');
     jest.mock('../src/core/config-manager', () =>
       jest.fn().mockImplementation(() => ({
         get: jest.fn().mockReturnValue('test-host'),
@@ -29,7 +39,18 @@ describe('OllamaProvider', () => {
     );
 
     OllamaProvider = require('../src/providers/ollama-provider');
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+
+    fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(jsonResponse({}));
+
     provider = new OllamaProvider();
+  });
+
+  afterEach(() => {
+    fetchSpy.mockRestore();
   });
 
   describe('constructor', () => {
@@ -48,16 +69,18 @@ describe('OllamaProvider', () => {
 
   describe('validate', () => {
     it('should return true when Ollama is running', async () => {
-      const axios = require('axios');
-      axios.get.mockResolvedValue({ data: {} });
+      fetchSpy.mockResolvedValue(jsonResponse({}));
 
       const result = await provider.validate({});
       expect(result).toBe(true);
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/tags'),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      );
     });
 
     it('should throw error when not running', async () => {
-      const axios = require('axios');
-      axios.get.mockRejectedValue(new Error('Connection refused'));
+      fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
 
       await expect(provider.validate({})).rejects.toThrow('Ollama is not running');
     });
@@ -65,10 +88,7 @@ describe('OllamaProvider', () => {
 
   describe('generateResponse', () => {
     it('should return response text for a plain string prompt', async () => {
-      const axios = require('axios');
-      axios.post.mockResolvedValue({
-        data: { response: 'feat: add new feature' },
-      });
+      fetchSpy.mockResolvedValue(jsonResponse({ response: 'feat: add new feature' }));
       provider.circuitBreaker.execute.mockImplementation(cb => cb());
 
       const result = await provider.generateResponse('Generate a commit message for this diff');
@@ -76,33 +96,64 @@ describe('OllamaProvider', () => {
     });
 
     it('should pass systemPrompt through to the prompt body', async () => {
-      const axios = require('axios');
-      axios.post.mockResolvedValue({
-        data: { response: 'ok' },
-      });
+      fetchSpy.mockResolvedValue(jsonResponse({ response: 'ok' }));
       provider.circuitBreaker.execute.mockImplementation(cb => cb());
 
       await provider.generateResponse('prompt body', { systemPrompt: 'CUSTOM SYSTEM' });
 
-      expect(axios.post).toHaveBeenCalledWith(
+      expect(fetchSpy).toHaveBeenCalledWith(
         expect.stringContaining('/api/generate'),
         expect.objectContaining({
-          prompt: expect.stringContaining('CUSTOM SYSTEM'),
-        }),
-        expect.anything()
+          method: 'POST',
+          body: expect.stringContaining('CUSTOM SYSTEM'),
+        })
       );
     });
 
     it('should throw when response has no content', async () => {
-      const axios = require('axios');
-      axios.post.mockResolvedValue({
-        data: { response: '' },
-      });
+      fetchSpy.mockResolvedValue(jsonResponse({ response: '' }));
       provider.circuitBreaker.execute.mockImplementation(cb => cb());
 
       await expect(provider.generateResponse('Fix this')).rejects.toThrow(
         'No response content from Ollama'
       );
+    });
+
+    it('should throw when the API responds with an error status', async () => {
+      fetchSpy.mockResolvedValue(
+        jsonResponse({}, { ok: false, status: 500, statusText: 'Internal Server Error' })
+      );
+      provider.circuitBreaker.execute.mockImplementation(cb => cb());
+
+      jest.useFakeTimers();
+      try {
+        const pending = provider.generateResponse('Fix this');
+        const assertion = expect(pending).rejects.toThrow(
+          'Ollama API error (500): Internal Server Error'
+        );
+        await jest.runAllTimersAsync();
+        await assertion;
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('should retry and then propagate a network refusal', async () => {
+      jest.useFakeTimers();
+      try {
+        fetchSpy.mockRejectedValue(new TypeError('fetch failed'));
+        provider.circuitBreaker.execute.mockImplementation(cb => cb());
+        provider.activityLogger = { debug: jest.fn() };
+
+        const pending = provider.generateResponse('Fix this');
+        const assertion = expect(pending).rejects.toThrow('fetch failed');
+        await jest.runAllTimersAsync();
+        await assertion;
+
+        expect(fetchSpy).toHaveBeenCalledTimes(3);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
