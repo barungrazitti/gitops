@@ -15,6 +15,7 @@ your row when done.
 | 003  | Six correctness defects (sanitizer, whitespace-only, syntax check, breaker, error path, cache key) | P2 | M | 001 | DONE (branch `advisor/003-correctness-remainder`, 6 commits, reviewed+approved 2026-09-27) |
 | 004  | Security hardening (enterprise mode, scanner gaps, log perms, key masking, hook seam) | P1 | M | 001, 003 | DONE (branch `advisor/004-security-hardening`, 8 commits, reviewed+approved 2026-09-27) |
 | 005  | Test gaps + release hygiene + docs accuracy + idle deps | P2 | M | 001 (run last) | DONE (branch `advisor/005-tests-release-hygiene`, 10 commits, reviewed+approved 2026-09-27; final: 523 tests, 30 suites) |
+| 006  | Characterize + split god files (diff-shaper, analysis-engine, activity-logger — DEBT-02/03) | P3 | L | 001, 005 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -54,16 +55,23 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - **groq-sdk 0.33 → 1.6 upgrade**: valid direction finding (DEPS-02);
   intentionally NOT planned here. Do it after 001 lands so the green suite
   can catch regressions, as its own change with the groq-provider suite as
-  the gate.
+  the gate. — **DONE 2026-09-28** (`aec450d`, suite gate + live dry-run).
 
 ## Findings not covered by any plan (deferred)
 
 - DEBT-01 (utils↔core layering cycle via
   `efficient-prompt-builder.js:12`): needs a design decision about where
   DiffShaper consumption lives; candidate for the next advisor pass.
+  — **DONE 2026-09-28** (`32d9bed`, DiffShaper now injection-only with a
+  fail-fast constructor; zero utils→core edges verified by grep).
 - DEBT-02/03 (god files `diff-shaper.js` 1074 lines, `analysis-engine.js`
   690 @ 54% coverage, `activity-logger.js` 47%): characterization tests
   first (005 partially covers logger/cache), then split — next pass.
+  — **NOW PLAN 006** (characterization-first, facade-preserving split;
+  fresh baseline 2026-09-28: diff-shaper 89%, analysis-engine 50%,
+  activity-logger 50%).
 - TEST-04's full breadth (auto-git review-gate UX tests) — 002 covers the
   recovery paths; the remaining review-gate discard/manual prompts are
-  lower-value UI tests.
+  lower-value UI tests. — **CLOSED 2026-09-28** (`fe498f1`: code review
+  showed abort was already covered; the `manual` branch was the only real
+  gap and now has a test).

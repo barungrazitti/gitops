@@ -3,7 +3,7 @@
 ![Version](https://img.shields.io/badge/version-1.5.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Tests](https://img.shields.io/badge/tests-jest-brightgreen)
+![Tests](https://img.shields.io/badge/tests-527-jest-brightgreen)
 
 **Automate your git workflow with AI-powered commit messages**
 
@@ -47,7 +47,7 @@ aic
 | **🚀 Fast**       | Groq-first with Ollama fallback                    |
 | **🧠 Smart**      | Semantic analysis of your diff and repo context    |
 | **🔒 Secure**     | Auto-redacts 20+ secret/PII patterns before AI     |
-| **🤖 Auto Git**   | Stage, commit, pull, AI-resolve conflicts, push    |
+| **🤖 Auto Git**   | Stage, commit, pull, AI-resolve conflicts (review-gated), push |
 | **🏢 Enterprise** | Strict mode blocks commits with ANY sensitive data |
 
 ---
@@ -152,8 +152,9 @@ staged diff ──▶ SecretScanner (redact) ──▶ DiffShaper (18KB budget, 
 ```
 
 - **DiffShaper** owns the token budget: one module decides what the AI sees (file headers preserved, high-significance chunks prioritized)
-- **Merge conflicts** are resolved block-by-block by AI (`generateResponse` path), with a keep-HEAD fallback if AI fails
-- **QUAL-01/QUAL-02** quality gates log message quality on every generation
+- **Merge conflicts** are resolved block-by-block by AI (`generateResponse` path), previewed at a **human review gate** — accept, set aside for manual resolution, or discard — before anything is staged
+- **Message quality** — scopes are grounded in the changed code (never guessed), empty `Refs:` trailers are stripped, and multi-line bodies survive sanitization
+- **QUAL-01/QUAL-02** quality gates log message quality on every generation; binary-only diffs are described locally without calling a model
 
 ---
 
@@ -193,11 +194,11 @@ src/
 │   ├── groq-provider.js     # Groq adapter
 │   ├── ollama-provider.js   # Ollama adapter
 │   └── ai-provider-factory.js
-└── utils/             # Secret scanner, prompt builder, sanitizers, etc.
+└── utils/             # Secret scanner, prompt builder (DiffShaper injected), sanitizers, etc.
 bin/
 ├── aic                # Shell shim
 └── aic.js             # CLI entry point (all commands)
-tests/                 # Jest suites (mirrors src/ layout)
+tests/                 # Jest suites (527 tests; core/ mirrors src/core/)
 ```
 
 ---
