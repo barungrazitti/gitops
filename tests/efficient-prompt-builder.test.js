@@ -1,10 +1,17 @@
 const EfficientPromptBuilder = require('../src/utils/efficient-prompt-builder');
+const DiffShaper = require('../src/core/diff-shaper');
 
 describe('EfficientPromptBuilder relevance hints', () => {
   let builder;
 
   beforeEach(() => {
-    builder = new EfficientPromptBuilder();
+    builder = new EfficientPromptBuilder({ diffShaper: new DiffShaper() });
+  });
+
+  it('fails fast when constructed without an injected DiffShaper', () => {
+    expect(() => new EfficientPromptBuilder()).toThrow(
+      'EfficientPromptBuilder requires options.diffShaper'
+    );
   });
 
   const wordpressCacheDiff = `diff --git a/wp-content/themes/seoinux-child/inc/su-rest-functions.php b/wp-content/themes/seoinux-child/inc/su-rest-functions.php

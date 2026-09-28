@@ -9,7 +9,6 @@ const DiffCategorizer = require('./diff-categorizer');
 const EntityExtractor = require('./entity-extractor');
 const PromptTemplates = require('./prompt-templates');
 const DiffSummarizer = require('./diff-summarizer');
-const DiffShaper = require('../core/diff-shaper');
 
 const COMMIT_LANGUAGES = {
   en: 'English',
@@ -25,7 +24,11 @@ class EfficientPromptBuilder {
     this.diffCategorizer = new DiffCategorizer();
     this.entityExtractor = new EntityExtractor();
     this.diffSummarizer = new DiffSummarizer();
-    this.diffShaper = options.diffShaper || new DiffShaper();
+    // DiffShaper is injected (layering: utils must not depend on core).
+    this.diffShaper = options.diffShaper;
+    if (!this.diffShaper) {
+      throw new Error('EfficientPromptBuilder requires options.diffShaper');
+    }
   }
 
   /**
