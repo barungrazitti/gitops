@@ -15,7 +15,7 @@ your row when done.
 | 003  | Six correctness defects (sanitizer, whitespace-only, syntax check, breaker, error path, cache key) | P2 | M | 001 | DONE (branch `advisor/003-correctness-remainder`, 6 commits, reviewed+approved 2026-09-27) |
 | 004  | Security hardening (enterprise mode, scanner gaps, log perms, key masking, hook seam) | P1 | M | 001, 003 | DONE (branch `advisor/004-security-hardening`, 8 commits, reviewed+approved 2026-09-27) |
 | 005  | Test gaps + release hygiene + docs accuracy + idle deps | P2 | M | 001 (run last) | DONE (branch `advisor/005-tests-release-hygiene`, 10 commits, reviewed+approved 2026-09-27; final: 523 tests, 30 suites) |
-| 006  | Characterize + split god files (diff-shaper, analysis-engine, activity-logger — DEBT-02/03) | P3 | L | 001, 005 | TODO |
+| 006  | Characterize + split god files (diff-shaper, analysis-engine, activity-logger — DEBT-02/03) | P3 | L | 001, 005 | REJECTED (no correctness impact, no feature blocked; diff-shaper already 89% covered — revisit only if a concrete change makes these files painful) |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale — finding fixed independently or approach abandoned)
 
@@ -67,9 +67,11 @@ Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJE
 - DEBT-02/03 (god files `diff-shaper.js` 1074 lines, `analysis-engine.js`
   690 @ 54% coverage, `activity-logger.js` 47%): characterization tests
   first (005 partially covers logger/cache), then split — next pass.
-  — **NOW PLAN 006** (characterization-first, facade-preserving split;
-  fresh baseline 2026-09-28: diff-shaper 89%, analysis-engine 50%,
-  activity-logger 50%).
+  — **REJECTED 2026-09-28** (plan 006 drafted then withdrawn: no
+  correctness impact and no feature blocked; fresh baseline has
+  diff-shaper at 89% coverage. The two coverage gaps — analysis-engine
+  language analyzers, activity-logger export half — are worth
+  characterization tests only if a future change touches those files.)
 - TEST-04's full breadth (auto-git review-gate UX tests) — 002 covers the
   recovery paths; the remaining review-gate discard/manual prompts are
   lower-value UI tests. — **CLOSED 2026-09-28** (`fe498f1`: code review
