@@ -762,6 +762,19 @@ describe('AutoGit', () => {
       expect(mockGitManager.stageAll).not.toHaveBeenCalled();
     });
 
+    it('should set aside the AI resolution when the review is rejected with manual', async () => {
+      inquirer.prompt.mockResolvedValue({ decision: 'manual' });
+
+      await expect(autoGit.resolveConflictsWithAI(['file1.js'])).rejects.toThrow(
+        'AI resolution set aside'
+      );
+
+      // Manual keeps the branch untouched: no staging, no abort either.
+      expect(mockGitManager.stageAll).not.toHaveBeenCalled();
+      expect(mockGitManager.mergeAbort).not.toHaveBeenCalled();
+      expect(mockGitManager.commit).not.toHaveBeenCalled();
+    });
+
     it('should handle AI resolution failures with intent-based fallback', async () => {
       const conflictedFiles = ['file1.js'];
       const error = new Error('AI resolution failed');
