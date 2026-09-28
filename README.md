@@ -1,231 +1,261 @@
-# 🤖 AI Commit Generator
+# AI Commit Generator (`aic`)
 
-![Version](https://img.shields.io/badge/version-1.5.0-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
-![Node](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)
-![Tests](https://img.shields.io/badge/tests-527-jest-brightgreen)
+<p align="center">
+  <strong>One command for your whole git workflow — stage, write the message, pull, resolve conflicts, push.</strong>
+</p>
 
-**Automate your git workflow with AI-powered commit messages**
+<p align="center">
+  <a href="https://github.com/barungrazitti/gitops"><img src="https://img.shields.io/badge/version-1.5.0-blue?style=flat-square" alt="version" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square" alt="node" />
+  <img src="https://img.shields.io/badge/tests-523%20passing-brightgreen?style=flat-square" alt="tests" />
+  <img src="https://img.shields.io/badge/conventional%20commits-1.0.0-yellow?style=flat-square" alt="conventional commits" />
+</p>
 
-A Node.js CLI tool that generates intelligent commit messages using Groq (cloud) or Ollama (local). One command stages, commits, pulls, resolves merge conflicts with AI, and pushes.
+`aic` generates intelligent [Conventional Commit](https://www.conventionalcommits.org/) messages from your diff using **Groq (cloud, default)** or **Ollama (local, private)** — then finishes the boring parts for you.
 
-> **One command to rule them all:** `aic` 🚀
+```bash
+$ aic
+✔ Staged 4 files
+✔ Generated: feat(auth): add PKCE flow to OAuth callback
+✔ Pulled origin/main — clean
+✔ Pushed in 6.2s
+```
 
 ---
 
-## ⚡ Quick Start
+## Table of contents
+
+- [Why aic?](#why-aic)
+- [Quick start](#quick-start)
+- [Usage](#usage)
+- [Configuration](#configuration)
+- [Providers](#providers)
+- [How it works](#how-it-works)
+- [Security](#security)
+- [Development](#development)
+- [Troubleshooting](#troubleshooting)
+- [License](#license)
+
+---
+
+## Why aic?
+
+| Without `aic` | With `aic` |
+|---|---|
+| `git add -p`, stare at diff, write `fix stuff` | `aic` stages, analyses the diff + repo context, proposes 3 ranked messages |
+| `git pull`, hit a merge conflict, lose 20 min | AI resolves conflict blocks, **you review each one** before anything is staged |
+| Secrets accidentally pushed to the remote | 20+ secret/PII patterns redacted **before** anything leaves your machine |
+| Inconsistent message styles across the team | Conventional-commit output, validated by quality gates on every run |
+
+---
+
+## Quick start
+
+**Prerequisites:** Node.js ≥ 18, Git, and (for the default provider) a free [Groq API key](https://console.groq.com/keys).
 
 ```bash
 # 1. Install
 git clone https://github.com/barungrazitti/gitops.git
 cd gitops
 npm install
+./install.sh          # guided: symlink, global, or npx — pick one
 
-# 2. Put aic on your PATH (or run ./install.sh for the guided version)
-ln -sf "$(pwd)/bin/aic.js" ~/.local/bin/aic
-
-# 3. Configure — either create a .env file:
-cat > .env << 'EOF'
-GROQ_API_KEY=your_key_from_console.groq.com
-AIC_MODEL=openai/gpt-oss-20b
-AIC_PROVIDER=groq
-EOF
-
-#    ...or run the interactive wizard:
+# 2. Configure (pick one)
+cp .env.example .env  # then set GROQ_API_KEY=...
+# ...or run the wizard:
 aic setup
 
-# 4. Use it!
-aic
+# 3. Use it
+cd your-repo
+aic                   # stage → message → pull → resolve → push
 ```
+
+> No `.env`? No problem — `aic setup` stores config in your OS keychain-backed store. `.env` values always win when both exist.
 
 ---
 
-## ✨ Features
+## Usage
 
-| Feature           | Description                                        |
-| ----------------- | -------------------------------------------------- |
-| **🚀 Fast**       | Groq-first with Ollama fallback                    |
-| **🧠 Smart**      | Semantic analysis of your diff and repo context    |
-| **🔒 Secure**     | Auto-redacts 20+ secret/PII patterns before AI     |
-| **🤖 Auto Git**   | Stage, commit, pull, AI-resolve conflicts (review-gated), push |
-| **🏢 Enterprise** | Strict mode blocks commits with ANY sensitive data |
+`aic` with no subcommand runs the full `auto` workflow.
+
+### Full automation
+
+```bash
+aic                        # stage → AI message → pull → AI-resolve → push
+aic "fix the login bug"    # skip AI generation, use your message
+aic --dry-run              # preview: prints the candidate message to stdout
+aic --skip-pull            # don't pull before push
+aic --no-push              # commit locally only
+aic --enterprise-mode      # block the commit if ANY sensitive data is found
+aic -f                     # force run even with no detected changes
+aic -p ollama              # one-off provider override
+```
+
+Pipe-friendly: `aic --dry-run | head -1` gives you the message for hooks and scripts.
+
+### Generate only (interactive pick)
+
+```bash
+aic generate                  # propose 3 messages for staged changes, pick one
+aic generate -c 5             # propose 5
+aic generate --conventional   # force conventional-commit format
+aic generate --dry-run        # print without committing
+```
+
+### Everyday commands
+
+| Command | What it does |
+|---|---|
+| `aic setup` | Interactive provider + model wizard |
+| `aic config --list` | Show config (API key masked) |
+| `aic config --set defaultProvider=ollama` | Change one value |
+| `aic config --get <key>` | Read one value (dot notation supported) |
+| `aic config --reset` | Back to defaults |
+| `aic stats` | Usage statistics |
+| `aic stats --analyze` | Recent activity analysis |
+| `aic hook --install` / `--uninstall` | Manage the `prepare-commit-msg` hook |
+| `aic --verbose` | Detailed logs on console (default: log file only, in `.aic-logs/`) |
+
+Run `aic <command> --help` for the full flag list.
 
 ---
 
-## 🚀 Usage
+## Configuration
 
-### Full Automation (default command)
+Precedence (highest first): **CLI flags → `.env` → stored config → defaults**.
 
-```bash
-aic                        # Stage → AI commit message → pull → resolve → push
-aic "fix the login bug"    # Use provided message, skip AI generation
-aic --dry-run              # Preview what would happen
-aic --skip-pull            # Skip pulling before push
-aic --no-push              # Don't push after commit
-aic --enterprise-mode      # Block commits with ANY sensitive data
-aic -f                     # Force run even if no changes detected
-```
-
-### Configuration
+| Variable | Default | Description |
+|---|---|---|
+| `GROQ_API_KEY` | — | Groq API key (required for `groq` provider) |
+| `AIC_PROVIDER` | `groq` | `groq` or `ollama` |
+| `AIC_MODEL` | `openai/gpt-oss-20b` | Any Groq model id, or Ollama model name |
 
 ```bash
-aic config --list                    # View config (API key masked)
-aic config --set defaultProvider=ollama
-aic config --reset
-aic setup                            # Interactive wizard
+# .env
+GROQ_API_KEY=gsk_...
+AIC_MODEL=openai/gpt-oss-20b
+AIC_PROVIDER=groq
 ```
 
-### .env Support
-
-Settings in `.env` override the stored config — no setup prompts needed:
-
-```bash
-GROQ_API_KEY=gsk_...         # Groq API key
-AIC_MODEL=openai/gpt-oss-20b # Any Groq model id
-AIC_PROVIDER=groq            # groq | ollama
-```
-
-### Statistics
-
-```bash
-aic stats            # Usage statistics
-aic stats --analyze  # Recent activity analysis
-aic stats --reset    # Reset stats
-```
-
-### Git Hooks
-
-```bash
-aic hook --install     # Install prepare-commit-msg hook
-aic hook --uninstall
-```
+See [`.env.example`](.env.example) for the template.
 
 ---
 
-## 🤖 AI Providers
+## Providers
 
-### Groq (Cloud) — Default
+| | **Groq** (default) | **Ollama** |
+|---|---|---|
+| Setup | API key from [console.groq.com/keys](https://console.groq.com/keys) | Install from [ollama.ai](https://ollama.ai/), `ollama serve` |
+| Best for | Speed + quality | Privacy, offline, no API key |
+| Default model | `openai/gpt-oss-20b` (reasoning model — token budget auto-raised) | whatever you have pulled |
+| Other models | `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`, `qwen/qwen3-32b` | any local model |
+| Switch | `AIC_PROVIDER=groq` or `aic setup` | `aic config --set defaultProvider=ollama` |
 
-Fast, good quality. Default model: **`openai/gpt-oss-20b`** (reasoning model; the tool automatically raises the token budget for it).
+If Groq fails, `aic` automatically falls back to Ollama when available.
 
-- Get an API key at [console.groq.com/keys](https://console.groq.com/keys)
-- Configure via `.env` (`GROQ_API_KEY`) or `aic setup`
+---
 
-Other Groq models available: `llama-3.1-8b-instant`, `llama-3.3-70b-versatile`, `qwen/qwen3-32b`.
+## How it works
 
-### Ollama (Local)
+```
+staged diff ──▶ redact secrets ──▶ DiffShaper (18 KB budget, keeps file
+                                       headers, prioritises key chunks)
+                       │                        │
+                 diff cache                  Groq ──fail──▶ Ollama
+                                                  │
+                                     rank candidates by quality
+                                                  │
+                                     validate (QUAL-01/02 gates)
+                                                  │
+                                     commit → pull → AI-resolve* → push
+```
 
-Private, no API key. Install from [ollama.ai](https://ollama.ai/), then:
+Three design decisions worth knowing:
+
+1. **One module owns the diff budget.** `src/core/diff-shaper.js` is the only place that truncates or chunks diffs — prompts and providers never re-truncate.
+2. **Conflicts are review-gated.** AI resolves merge conflicts block-by-block, then shows you each one: accept, set aside for manual resolution, or discard. Nothing is staged silently.
+3. **Messages are grounded.** Scopes come from the changed code (never guessed), empty trailers are stripped, binary-only diffs are described locally without a model call.
+
+---
+
+## Security
+
+All diffs are scanned and redacted **locally, before** any network call:
+
+| Category | Coverage |
+|---|---|
+| Secrets (15+ patterns) | API keys, tokens, passwords, SSH keys |
+| PII (8 patterns) | Emails, phones, SSNs, addresses, credit cards |
+
+- `--enterprise-mode` aborts the commit if **any** sensitive data is detected (instead of redacting and continuing).
+- API keys are masked in all console output and logs.
+
+---
+
+## Development
 
 ```bash
-aic config --set defaultProvider=ollama
+npm install            # install dependencies
+npm test               # full Jest suite (523 tests, 30 suites)
+npx jest tests/auto-git.test.js   # single file
+npm run test:coverage  # with coverage
+npm run lint           # ESLint — must be 0 errors, 0 warnings
+npm run lint:fix       # auto-fix
 ```
 
----
-
-## 🔒 Security
-
-All diffs are scanned and redacted **before** being sent to any AI provider:
-
-| Category       | Patterns | Examples                                     |
-| -------------- | -------- | -------------------------------------------- |
-| **🔑 Secrets** | 15+      | API keys, tokens, passwords, SSH keys        |
-| **👤 PII**     | 8        | Emails, phones, SSN, addresses, credit cards |
-
-Enterprise mode (`--enterprise-mode`) blocks commits containing ANY sensitive data.
-
----
-
-## 🧭 How It Works
-
-```
-staged diff ──▶ SecretScanner (redact) ──▶ DiffShaper (18KB budget, smart truncation)
-                  │                              │
-                  ▼                              ▼
-             CacheManager ──── miss ───▶ Groq ──fail──▶ Ollama
-                                                 │
-                                                 ▼
-                                  MessageRanker (score & rank)
-                                                 │
-                                                 ▼
-                                  MessageValidator (QUAL-01/02 gates)
-```
-
-- **DiffShaper** owns the token budget: one module decides what the AI sees (file headers preserved, high-significance chunks prioritized)
-- **Merge conflicts** are resolved block-by-block by AI (`generateResponse` path), previewed at a **human review gate** — accept, set aside for manual resolution, or discard — before anything is staged
-- **Message quality** — scopes are grounded in the changed code (never guessed), empty `Refs:` trailers are stripped, and multi-line bodies survive sanitization
-- **QUAL-01/QUAL-02** quality gates log message quality on every generation; binary-only diffs are described locally without calling a model
-
----
-
-## 🛠️ Development
-
-```bash
-npm install         # Install dependencies
-npm test            # Run test suite
-npm run lint        # ESLint
-npm run test:coverage
-```
-
-### Code Structure
+Entry point is `bin/aic` → `bin/aic.js` (the composition root). Conventions: CommonJS `require()`, `PascalCase` classes, `camelCase` methods, `kebab-case` files, JSDoc on public methods, `async/await` throughout. See [AGENTS.md](AGENTS.md) for architecture rules (e.g. DiffShaper budget ownership, dependency-injected `AutoGit`).
 
 ```
 src/
-├── index.js           # AICommitGenerator — generation pipeline orchestrator
-├── auto-git.js        # AutoGit — full workflow (stage/commit/pull/resolve/push)
-├── cli-presenter.js   # Console UI (selection menus, config/setup/stats display)
-├── core/
-│   ├── diff-shaper.js       # THE diff budget owner (truncation, chunking)
-│   ├── message-ranker.js    # Commit message scoring & ranking
-│   ├── conflict-resolver.js # AI merge-conflict resolution
-│   ├── message-validator.js # QUAL-01/02 quality gates
-│   ├── git-manager.js       # Git operations
-│   ├── config-manager.js    # Config + .env overrides
-│   ├── cache-manager.js     # Diff-keyed message cache
-│   ├── analysis-engine.js   # Repository context analysis
-│   ├── stats-manager.js     # Usage statistics
-│   ├── activity-logger.js   # Structured activity logs (.aic-logs/)
-│   ├── hook-manager.js      # Git hook management
-│   ├── circuit-breaker.js   # Provider failure protection
-│   ├── generation-pipeline.js # Provider sequencing, redaction, parsing, local synthesis
-│   └── message-formatter.js # Conventional commit formatting
-├── providers/
-│   ├── base-provider.js     # Abstract provider (retry, parse, errors)
-│   ├── groq-provider.js     # Groq adapter
-│   ├── ollama-provider.js   # Ollama adapter
-│   └── ai-provider-factory.js
-└── utils/             # Secret scanner, prompt builder (DiffShaper injected), sanitizers, etc.
+├── index.js            # AICommitGenerator — pipeline orchestrator
+├── auto-git.js         # stage / commit / pull / resolve / push workflow
+├── cli-presenter.js    # console UI
+├── core/               # diff-shaper, generation-pipeline, conflict-resolver,
+│                       # message-{ranker,validator,formatter}, git/config/cache/
+│                       # analysis/stats/activity-log/hook/circuit-breaker
+├── providers/          # base + groq + ollama + factory
+└── utils/              # secret-scanner, prompt-builder, sanitizers, scorers
 bin/
-├── aic                # Shell shim
-└── aic.js             # CLI entry point (all commands)
-tests/                 # Jest suites (527 tests; core/ mirrors src/core/)
+├── aic                 # shell shim
+└── aic.js              # CLI entry point (all commands)
+tests/                  # Jest suites (mirrors src/)
 ```
+
+Contributions welcome — open an issue or PR. Please run `npm test` and `npm run lint` before submitting.
 
 ---
 
-## 🆘 Troubleshooting
+## Troubleshooting
 
-### Command Not Found
+<details>
+<summary><strong><code>aic: command not found</code></strong></summary>
 
-Put `aic` on your PATH — see step 2 of [Quick Start](#-quick-start), or run `./install.sh` for the guided setup.
+Re-run `./install.sh` (option 1 creates `~/.local/bin/aic`), ensure `~/.local/bin` is on your `PATH`, or just use `node bin/aic.js …` / `npx aic …` directly.
 
-### Groq returns empty responses
+</details>
 
-Reasoning models (`gpt-oss`) need a larger token budget — the tool handles this automatically. If problems persist, verify your API key (`aic config --list`) or switch models via `.env` (`AIC_MODEL=llama-3.1-8b-instant`).
+<details>
+<summary><strong>Groq returns empty responses</strong></summary>
 
-### Ollama issues
+Reasoning models (`gpt-oss-*`) need a larger token budget — handled automatically. If it persists, check `aic config --list` for your key, or try a non-reasoning model: `AIC_MODEL=llama-3.1-8b-instant` in `.env`.
+
+</details>
+
+<details>
+<summary><strong>Ollama connection errors</strong></summary>
 
 ```bash
-ollama serve                          # Ensure Ollama is running
-curl http://localhost:11434/api/tags  # Test connection
+ollama serve                          # must be running
+curl http://localhost:11434/api/tags  # should list models
 ```
 
----
-
-## 📄 License
-
-MIT License - see [LICENSE](LICENSE) file
+</details>
 
 ---
 
-_Made with ❤️ by [Barun Tayenjam](https://github.com/barungrazitti)_
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+_Made by [Barun Tayenjam](https://github.com/barungrazitti)_
