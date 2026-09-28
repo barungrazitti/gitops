@@ -4,7 +4,7 @@
 
 ### Testing
 
-- `npm test` - Run full Jest test suite (523 tests, 30 suites)
+- `npm test` - Run full Jest test suite (527 tests, 30 suites)
 - `npx jest tests/auto-git.test.js` - Run single test file
 - `npm run test:coverage` - Jest with coverage report
 - `npm run test:watch` - Jest in watch mode
@@ -114,7 +114,7 @@
 
 | Metric | Status |
 |--------|--------|
-| Tests | 523 tests, 30 suites ✅ |
+| Tests | 527 tests, 30 suites ✅ |
 | Lint | 0 errors, 0 warnings ✅ |
 | Default model | `openai/gpt-oss-20b` (Groq) |
 | Entry point | `bin/aic` (single command) |
