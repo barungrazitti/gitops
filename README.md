@@ -3,7 +3,6 @@
 <p align="center"><strong>Stop writing <code>fix stuff</code>. One command stages your changes, writes the commit message, pulls, resolves conflicts, and pushes.</strong></p>
 
 <p align="center">
-  <a href="https://github.com/barungrazitti/gitops/actions/workflows/ci.yml"><img src="https://github.com/barungrazitti/gitops/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/badge/version-1.5.0-blue?style=flat-square" alt="version" />
   <img src="https://img.shields.io/badge/tests-527%20passing-brightgreen?style=flat-square" alt="tests" />
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square" alt="node" />
