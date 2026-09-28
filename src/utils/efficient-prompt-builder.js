@@ -213,9 +213,9 @@ For a FILE MODE change with no content changes:
     if (conventional) {
       prompt += `\n\nFormat: type(scope): description
 Types: feat, fix, docs, style, refactor, perf, test, chore, ci, build
-Scope: be specific (api, ui, auth, db, config, utils, test, theme, plugin)
+Scope: derive it from the changed code — a module or directory name, or a scope already used in the recent commits above when it fits. Omit the scope rather than guess; never use a generic scope (utils, code, misc) that does not match the changed files.
 
-After the title line, add a blank line then bullet points starting with "- " summarizing each distinct change. End with a blank line followed by "Refs: <issue-refs>" listing related issue references.`;
+After the title line, add a blank line then bullet points starting with "- " summarizing each distinct change. Add a "Refs: <id>" trailer on its own line ONLY when the diff or context names a real issue/PR to reference — never output an empty "Refs:" line.`;
 
       // Add file-pattern hints only when they agree with the actual changed lines.
       // Pre-computed by the pipeline; falls back for direct construction.

@@ -219,6 +219,21 @@ index acd6a14108..e1765113af 100644
     expect(prompt).not.toContain('chore(config): update environment variables');
   });
 
+  it('grounds scope guidance and makes the Refs trailer conditional', () => {
+    const prompt = builder.buildPrompt(
+      'diff --git a/src/math.js b/src/math.js\n+function divide(a, b) { return a / b; }',
+      {
+        conventional: true,
+        count: 1,
+        context: { files: {} },
+      }
+    );
+
+    expect(prompt).toContain('Omit the scope rather than guess');
+    expect(prompt).not.toContain('Scope: be specific (api, ui');
+    expect(prompt).toContain('never output an empty "Refs:" line');
+  });
+
   describe('count handling (matches buildPrompt count branch)', () => {
     const simpleDiff = `diff --git a/src/util.js b/src/util.js
 --- a/src/util.js

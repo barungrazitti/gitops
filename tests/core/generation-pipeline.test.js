@@ -378,6 +378,21 @@ Refs: #123`;
       expect(pipeline.parseCommitMessages(raw)).toEqual([raw.trim()]);
     });
 
+    it('drops empty or placeholder Refs trailers but keeps real references', () => {
+      expect(
+        pipeline.parseCommitMessages('feat: add thing\n\n- bullet\n\nRefs:')
+      ).toEqual(['feat: add thing\n\n- bullet']);
+      expect(
+        pipeline.parseCommitMessages('fix: resolve crash\n\nRefs: <issue-refs>')
+      ).toEqual(['fix: resolve crash']);
+      expect(
+        pipeline.parseCommitMessages('fix: resolve crash\n\nRef: <id>')
+      ).toEqual(['fix: resolve crash']);
+      expect(
+        pipeline.parseCommitMessages('fix: resolve crash\n\nRefs: #123')
+      ).toEqual(['fix: resolve crash\n\nRefs: #123']);
+    });
+
     it('separates two multi-line messages by their titles', () => {
       const raw = `feat(theme): add modal
 

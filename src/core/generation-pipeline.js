@@ -335,7 +335,16 @@ class GenerationPipeline {
       }
     }
 
-    return messages.filter(message => {
+    // Drop empty "Refs:" trailers (models comply with trailer instructions
+    // even when there is no issue to reference); real references survive.
+    const cleaned = messages.map(message =>
+      message
+        .replace(/^[ \t]*Refs?:[ \t]*(?:<[^>]+>)?[ \t]*$/gim, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trimEnd()
+    );
+
+    return cleaned.filter(message => {
       const firstLine = message.split('\n')[0];
       return firstLine.length >= 10 && firstLine.length <= 200;
     });
